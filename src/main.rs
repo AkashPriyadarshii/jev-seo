@@ -4,9 +4,12 @@ use colored::*;
 use serde_json::json;
 
 mod audit;
+mod brief;
 mod engine;
 mod mcp;
 mod rank;
+mod robots;
+mod schema;
 mod serp;
 
 #[cfg(test)]
@@ -40,9 +43,9 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Audit local markdown (.md/.mdx) or HTML file for on-page SEO issues
+    /// Audit a local file or directory for on-page SEO issues, duplicate titles, and thin pages
     Audit {
-        /// File path to inspect
+        /// File path or directory path to inspect
         path: String,
         #[arg(long)]
         target_query: Option<String>,
@@ -55,6 +58,31 @@ enum Commands {
         target: String,
         #[arg(long)]
         query: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Validate Schema.org JSON-LD markup against active 2026 search specifications
+    Schema {
+        /// File path, HTML, or raw JSON string
+        target: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Inspect robots.txt on a live domain for AI crawler permissions and sitemaps
+    Robots {
+        /// Domain or URL to inspect
+        domain: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Synthesize live SERP competitor results into a ready-to-write content brief
+    Brief {
+        /// Topic or search query
+        topic: String,
+        #[arg(short, long, default_value_t = 5)]
+        limit: usize,
+        #[arg(long)]
+        markdown: bool,
         #[arg(long)]
         json: bool,
     },
@@ -128,39 +156,74 @@ fn main() -> Result<()> {
             }
         }
         Commands::Audit { path, target_query, json } => {
-            let report = audit::audit_file(&path)?;
+            let dir_report = audit::audit_path(&path)?;
 
             if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
+                println!("{}", serde_json::to_string_pretty(&dir_report)?);
                 return Ok(());
             }
 
-            println!("\n{} {}", "On-Page SEO Audit:".cyan().bold(), report.file_path);
-            println!("  Title:       {}", report.title.as_deref().unwrap_or("N/A"));
-            println!("  Description: {}", report.description.as_deref().unwrap_or("N/A"));
-            println!("  Headings:    H1: {}, H2: {}, H3: {}", report.h1_count, report.h2_count, report.h3_count);
-            println!("  Word Count:  {}", report.word_count);
-            println!("  Links:       Internal: {}, External: {}", report.internal_links, report.external_links);
+            if dir_report.total_files > 1 {
+                println!("\n{} {}", "Batch Directory SEO Audit:".cyan().bold(), dir_report.dir_path);
+                println!("  Total Files Audited: {}", dir_report.total_files);
+                println!("  Total Word Count:    {}", dir_report.total_words);
+                println!("  Avg Words per File:  {}", dir_report.avg_words_per_file);
+                println!("  Overall Check Pass:  {:.1}%", dir_report.pass_rate);
 
-            println!("\n{}", "Check Results:".bold());
-            for check in &report.checks {
-                let badge = if check.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
-                println!("  [{}] {:<20} - {}", badge, check.name, check.message);
-            }
+                if !dir_report.duplicate_titles.is_empty() {
+                    println!("\n{}", "Duplicate Titles Detected:".red().bold());
+                    for (title, files) in &dir_report.duplicate_titles {
+                        println!("  - \"{}\" in {} files:", title, files.len());
+                        for f in files {
+                            println!("      {}", f.dimmed());
+                        }
+                    }
+                } else {
+                    println!("  Title Collisions:    {}", "0 (Clean)".green());
+                }
 
-            if let Some(query) = target_query {
-                if let Some(client) = engine::JevClient::new() {
-                    let state = json!({
-                        "target_query": query,
-                        "page_title": report.title,
-                        "description": report.description,
-                        "checks": report.checks
-                    });
-                    if let Ok(eval) = client.fanout_eval(state) {
-                        println!("\n{}", "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold());
-                        println!("  GEO Score:       {}/10", eval.geo_score);
-                        println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
-                        println!("  Content Gap:     {}", eval.content_gap.yellow());
+                if !dir_report.thin_pages.is_empty() {
+                    println!("\n{}", format!("Thin Pages (<300 words, {} files):", dir_report.thin_pages.len()).yellow().bold());
+                    for (f, wc) in dir_report.thin_pages.iter().take(5) {
+                        println!("  - {} ({} words)", f, wc);
+                    }
+                    if dir_report.thin_pages.len() > 5 {
+                        println!("    ... and {} more", dir_report.thin_pages.len() - 5);
+                    }
+                }
+
+                if !dir_report.missing_canonicals.is_empty() {
+                    println!("  Missing Canonicals:  {} files", dir_report.missing_canonicals.len().to_string().yellow());
+                }
+                println!("\n{}", "Summary Status: Audit complete across directory.".green());
+            } else if let Some(report) = dir_report.reports.first() {
+                println!("\n{} {}", "On-Page SEO Audit:".cyan().bold(), report.file_path);
+                println!("  Title:       {}", report.title.as_deref().unwrap_or("N/A"));
+                println!("  Description: {}", report.description.as_deref().unwrap_or("N/A"));
+                println!("  Headings:    H1: {}, H2: {}, H3: {}", report.h1_count, report.h2_count, report.h3_count);
+                println!("  Word Count:  {}", report.word_count);
+                println!("  Links:       Internal: {}, External: {}", report.internal_links, report.external_links);
+
+                println!("\n{}", "Check Results:".bold());
+                for check in &report.checks {
+                    let badge = if check.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
+                    println!("  [{}] {:<20} - {}", badge, check.name, check.message);
+                }
+
+                if let Some(query) = target_query {
+                    if let Some(client) = engine::JevClient::new() {
+                        let state = json!({
+                            "target_query": query,
+                            "page_title": report.title,
+                            "description": report.description,
+                            "checks": report.checks
+                        });
+                        if let Ok(eval) = client.fanout_eval(state) {
+                            println!("\n{}", "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold());
+                            println!("  GEO Score:       {}/10", eval.geo_score);
+                            println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
+                            println!("  Content Gap:     {}", eval.content_gap.yellow());
+                        }
                     }
                 }
             }
@@ -184,6 +247,111 @@ fn main() -> Result<()> {
                 }
             } else {
                 eprintln!("{}", "Error: TYPESAFE_API_KEY environment variable not set.".red());
+            }
+        }
+        Commands::Schema { target, json } => {
+            let report = schema::validate_target(&target)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                return Ok(());
+            }
+
+            println!("\n{} {}", "Schema.org Structured Data Audit:".cyan().bold(), report.target);
+            println!("  Schemas Found:       {}", report.schemas_found);
+            println!("  Detected Types:      {}", if report.types.is_empty() { "None".to_string() } else { report.types.join(", ") });
+            println!("  Completeness Score:  {}/100", report.completeness_score);
+            println!("  Validation Status:   {}", if report.is_valid { "VALID".green().bold() } else { "INVALID".red().bold() });
+
+            if !report.details.is_empty() {
+                println!("\n{}", "Schema Details:".bold());
+                for d in &report.details {
+                    let status = if d.is_valid { "PASS".green() } else { "FAIL".red() };
+                    println!("  [{}] @type: {}", status, d.schema_type.bold());
+                    if !d.missing_required.is_empty() {
+                        println!("      Missing required: {}", d.missing_required.join(", ").red());
+                    }
+                    if !d.missing_recommended.is_empty() {
+                        println!("      Missing recommended: {}", d.missing_recommended.join(", ").yellow());
+                    }
+                    if let Some(dep) = &d.deprecation_notice {
+                        println!("      DEPRECATION: {}", dep.yellow());
+                    }
+                }
+            }
+
+            if !report.errors.is_empty() {
+                println!("\n{}", "Errors:".red().bold());
+                for e in &report.errors {
+                    println!("  ✖ {}", e);
+                }
+            }
+            if !report.warnings.is_empty() {
+                println!("\n{}", "Warnings:".yellow().bold());
+                for w in &report.warnings {
+                    println!("  ⚠ {}", w);
+                }
+            }
+        }
+        Commands::Robots { domain, json } => {
+            let report = robots::inspect_robots(&domain)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                return Ok(());
+            }
+
+            println!("\n{} {}", "robots.txt & AI Crawler Audit:".cyan().bold(), report.domain);
+            println!("  Robots URL:     {}", report.robots_url.dimmed());
+            println!("  HTTP Status:    {}", report.status_code);
+            println!("  Has robots.txt: {}", if report.has_robots { "YES".green() } else { "NO".red() });
+
+            if !report.sitemaps.is_empty() {
+                println!("\n{}", "Sitemaps Discovered:".cyan().bold());
+                for s in &report.sitemaps {
+                    println!("  - {}", s);
+                }
+            }
+
+            println!("\n{}", "AI Crawler Permissions:".bold());
+            for rule in &report.ai_bot_rules {
+                let badge = match rule.status {
+                    robots::BotStatus::Allowed => "ALLOW".green().bold(),
+                    robots::BotStatus::Disallowed => "BLOCK".red().bold(),
+                    robots::BotStatus::DefaultStar => "DEFAULT(*)".yellow(),
+                };
+                println!("  [{:<10}] {:<16} ({})", badge, rule.bot_name.bold(), rule.purpose.dimmed());
+                println!("               {}", rule.rule_snippet.dimmed());
+            }
+        }
+        Commands::Brief { topic, limit, markdown, json } => {
+            let brief = brief::generate_brief(&topic, limit)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&brief)?);
+                return Ok(());
+            }
+
+            if markdown {
+                println!("{}", brief.to_markdown());
+                return Ok(());
+            }
+
+            println!("\n{} \"{}\"", "Content Brief Blueprint:".cyan().bold(), brief.topic);
+            println!("  Suggested Title: {}", brief.suggested_title.green().bold());
+            println!("  Target Length:   {}", brief.target_word_count);
+            println!("  Search Intent:   {}", brief.search_intent);
+            println!("  Audience:        {}", brief.target_audience);
+            println!("  Differentiator:  {}", brief.winning_angle.yellow());
+
+            println!("\n{}", "GEO 150-Word Opening Prescription:".cyan().bold());
+            println!("  {}", brief.geo_opening_prescription);
+
+            println!("\n{}", "Recommended Heading Outline (H2):".bold());
+            for h2 in &brief.recommended_h2_outline {
+                println!("  {}", h2);
+            }
+
+            println!("\n{}", "Top Competitors Analyzed:".bold());
+            for comp in &brief.competitor_benchmarks {
+                println!("  #{} {} ({})", comp.rank, comp.title, comp.url.dimmed());
             }
         }
         Commands::Rank { domain, query } => {
