@@ -1,0 +1,25 @@
+[package]
+name = "jev-seo"
+version = "0.1.0"
+edition = "2021"
+authors = ["Akash Priyadarshi <272530059+AkashPriyadarshii@users.noreply.github.com>"]
+license = "MIT"
+description = "FOSS zero-cost, agent-first SEO & GEO search radar CLI powered by TypeSafe Jev"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+ureq = { version = "2.10", features = ["json"] }
+url = "2.5"
+gray_matter = "0.2"
+fast-html-parser = "0.1"
+regex = "1.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.32", features = ["bundled"] }
+colored = "2.1"
+tabled = { version = "0.16", features = ["ansi"] }
+thiserror = "2.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+tempfile = "3.10"
