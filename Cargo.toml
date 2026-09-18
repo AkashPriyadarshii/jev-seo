@@ -5,6 +5,11 @@ edition = "2021"
 authors = ["Akash Priyadarshi <272530059+AkashPriyadarshii@users.noreply.github.com>"]
 license = "MIT"
 description = "FOSS zero-cost, agent-first SEO & GEO search radar CLI powered by TypeSafe Jev"
+repository = "https://github.com/AkashPriyadarshii/jev-seo"
+homepage = "https://github.com/AkashPriyadarshii/jev-seo"
+readme = "README.md"
+keywords = ["seo", "geo", "typesafe-ai", "mcp", "serp"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
