@@ -321,3 +321,156 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
         checks,
     })
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectoryAuditReport {
+    pub dir_path: String,
+    pub total_files: usize,
+    pub total_words: usize,
+    pub avg_words_per_file: usize,
+    pub pass_rate: f64,
+    pub reports: Vec<AuditReport>,
+    pub duplicate_titles: std::collections::HashMap<String, Vec<String>>,
+    pub thin_pages: Vec<(String, usize)>,
+    pub missing_canonicals: Vec<String>,
+    pub missing_descriptions: Vec<String>,
+}
+
+pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
+    let path = Path::new(path_str);
+    if !path.exists() {
+        anyhow::bail!("Path does not exist: {}", path_str);
+    }
+
+    if path.is_file() {
+        let single = audit_file(path_str)?;
+        let total_words = single.word_count;
+        let mut missing_canonicals = Vec::new();
+        if !single.canonical_found {
+            missing_canonicals.push(path_str.to_string());
+        }
+        let mut missing_descriptions = Vec::new();
+        if single.description.is_none() {
+            missing_descriptions.push(path_str.to_string());
+        }
+        let mut thin_pages = Vec::new();
+        if single.word_count < 300 {
+            thin_pages.push((path_str.to_string(), single.word_count));
+        }
+        let passed = single.checks.iter().filter(|c| c.passed).count();
+        let pass_rate = if !single.checks.is_empty() {
+            (passed as f64 / single.checks.len() as f64) * 100.0
+        } else {
+            100.0
+        };
+
+        return Ok(DirectoryAuditReport {
+            dir_path: path_str.to_string(),
+            total_files: 1,
+            total_words,
+            avg_words_per_file: total_words,
+            pass_rate,
+            reports: vec![single],
+            duplicate_titles: std::collections::HashMap::new(),
+            thin_pages,
+            missing_canonicals,
+            missing_descriptions,
+        });
+    }
+
+    let mut files = Vec::new();
+    collect_audit_files(path, &mut files)?;
+    files.sort();
+
+    if files.is_empty() {
+        anyhow::bail!("No markdown (.md/.mdx) or HTML files found in directory: {}", path_str);
+    }
+
+    let mut reports = Vec::new();
+    let mut total_words = 0;
+    let mut total_checks = 0;
+    let mut total_passed = 0;
+    let mut title_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut thin_pages = Vec::new();
+    let mut missing_canonicals = Vec::new();
+    let mut missing_descriptions = Vec::new();
+
+    for f in &files {
+        let p_str = f.to_string_lossy().to_string();
+        if let Ok(rep) = audit_file(&p_str) {
+            total_words += rep.word_count;
+            for c in &rep.checks {
+                total_checks += 1;
+                if c.passed {
+                    total_passed += 1;
+                }
+            }
+
+            if let Some(t) = &rep.title {
+                let clean_t = t.trim().to_string();
+                if !clean_t.is_empty() {
+                    title_map.entry(clean_t).or_default().push(p_str.clone());
+                }
+            }
+
+            if rep.word_count < 300 {
+                thin_pages.push((p_str.clone(), rep.word_count));
+            }
+            if !rep.canonical_found {
+                missing_canonicals.push(p_str.clone());
+            }
+            if rep.description.is_none() {
+                missing_descriptions.push(p_str.clone());
+            }
+
+            reports.push(rep);
+        }
+    }
+
+    let duplicate_titles: std::collections::HashMap<String, Vec<String>> = title_map
+        .into_iter()
+        .filter(|(_, paths)| paths.len() > 1)
+        .collect();
+
+    let total_files = reports.len();
+    let avg_words_per_file = if total_files > 0 { total_words / total_files } else { 0 };
+    let pass_rate = if total_checks > 0 {
+        (total_passed as f64 / total_checks as f64) * 100.0
+    } else {
+        100.0
+    };
+
+    Ok(DirectoryAuditReport {
+        dir_path: path_str.to_string(),
+        total_files,
+        total_words,
+        avg_words_per_file,
+        pass_rate,
+        reports,
+        duplicate_titles,
+        thin_pages,
+        missing_canonicals,
+        missing_descriptions,
+    })
+}
+
+fn collect_audit_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> {
+    if dir.is_dir() {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if file_name.starts_with('.') || file_name == "node_modules" || file_name == "target" || file_name == "dist" || file_name == "build" {
+                continue;
+            }
+            if path.is_dir() {
+                collect_audit_files(&path, files)?;
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if ext == "md" || ext == "mdx" || ext == "markdown" || ext == "html" || ext == "htm" {
+                    files.push(path);
+                }
+            }
+        }
+    }
+    Ok(())
+}

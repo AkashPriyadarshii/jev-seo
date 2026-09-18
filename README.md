@@ -1,6 +1,16 @@
 ---
 title: "jev-seo: FOSS Zero-Cost SEO & GEO Search Radar"
 description: "Open-source, subscription-free alternative to Semrush and OpenSEO. Powered by TypeSafe AI Jev and local DuckDuckGo scraping."
+canonical: "https://github.com/AkashPriyadarshii/jev-seo"
+keywords:
+  - seo
+  - geo
+  - generative-engine-optimization
+  - typesafe-ai
+  - jev
+  - rust
+  - mcp
+  - search-radar
 ---
 
 <!--
@@ -23,7 +33,8 @@ Keywords: seo, geo, generative engine optimization, typesafe ai, jev, foss, rust
     <a href="#quickstart">Quickstart</a> •
     <a href="#workflows">Workflows</a> •
     <a href="#architecture">Architecture</a> •
-    <a href="#non-goals">Non-Goals</a>
+    <a href="#non-goals">Non-Goals</a> •
+    <a href="#ecosystem">Ecosystem</a>
   </p>
 </div>
 
@@ -35,9 +46,15 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 
 - **Zero subscriptions (₹0)**: Scrapes DuckDuckGo HTML and suggest endpoints directly. No credit cards, no paid API keys.
 - **TypeSafe Jev System One**: Semantic intent classification, competitive gap detection, and AI visibility (GEO) scored deterministically without conversational LLM hallucinations.
-- **Agent native (MCP)**: Native stdio MCP server directly feeds keyword gaps and page audit scores into Claude Code, Gemini CLI, and Antigravity.
+- **Batch Directory Auditing**: Audits hundreds of markdown/HTML files in <1 second, detecting title collisions, canonical mismatches, and thin pages.
+- **2026 Schema.org Validator**: Deeply inspects JSON-LD schemas (`SoftwareApplication`, `Article`, `Organization`, `Product`) and flags deprecated schemas.
+- **Robots.txt & AI Crawler Radar**: Evaluates permissions for AI bots (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, `Bytespider`).
+- **SERP Content Briefs**: Synthesizes competitor SERP snippets into an actionable content blueprint with H2 outlines and optimal 134-167 word GEO blocks.
+- **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 7 SEO tools into Claude Code, Gemini CLI, and Antigravity.
 - **Local & private**: All rank tracking and audit histories persist in a single local SQLite database (`.jev-seo.db`).
 - **Low RAM footprint**: Fast native Rust binary that runs in under 30MB RAM on resource-constrained machines.
+
+---
 
 ## Quickstart
 
@@ -45,47 +62,71 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 # Install via Cargo (crates.io)
 cargo install jev-seo
 
-# Set your TypeSafe key for semantic oracle scoring
+# Set your free TypeSafe key for semantic oracle scoring
 export TYPESAFE_API_KEY=your_key_here
 
 # Run a live SERP competitive radar check
 jev-seo query "offline expense tracker android"
 
-# Audit a markdown blog post or local HTML file
-jev-seo audit content/posts/my-post.md --keyword "offline expense tracker"
+# Audit a single file or an entire documentation directory
+jev-seo audit docs/
+
+# Validate JSON-LD Schema.org markup
+jev-seo schema index.html
+
+# Check AI crawler permissions on a live domain
+jev-seo robots github.com
+
+# Generate a SERP-driven content brief
+jev-seo brief "agentic skills" --limit 5
 
 # Track domain rankings over time (saved to local SQLite)
-jev-seo rank track --domain mysite.com --keywords "rust cli, seo tools"
+jev-seo rank --domain "crates.io" --query "rust grep"
 
-# Start the Agent MCP Server
+# Start the Native Agent MCP Server
 jev-seo mcp
 ```
 
+---
+
 ## Workflows
 
-### 1. Keyword Research & Search Intent
+### 1. Batch Directory & File On-Page Audit
 ```bash
-jev-seo keywords "rust tui"
+jev-seo audit content/posts/
 ```
-Fetches autocomplete branches and uses Jev `Choice` to categorize intent into Informational, Commercial, Navigational, or Transactional.
+Recursively scans all markdown and HTML files, identifies title collisions, detects thin content (<300 words), verifies canonical links, and flags image alt deficiencies.
 
-### 2. Live SERP Radar & Content Gaps
+### 2. JSON-LD Schema.org Validation
 ```bash
-jev-seo query "best local markdown editor"
+jev-seo schema content/guide.md
 ```
-Pulls top 10 live SERP results, analyzes winning patterns, and highlights structural content gaps.
+Validates required properties across `SoftwareApplication`, `Article`, `Organization`, and `Product`. Flags deprecated schema types (e.g. `HowTo` rich results).
 
-### 3. Generative Engine Optimization (GEO)
+### 3. Robots.txt & AI Crawler Inspection
 ```bash
-jev-seo geo https://mysite.com/features
+jev-seo robots example.com
+```
+Audits `robots.txt` directives specifically for modern generative AI indexers:
+* `GPTBot` (OpenAI model training)
+* `ClaudeBot` & `anthropic-ai` (Anthropic)
+* `PerplexityBot` (Perplexity citation engine)
+* `Google-Extended` (Gemini training)
+* `Bytespider` (ByteDance)
+
+### 4. SERP-Driven Content Brief Generator
+```bash
+jev-seo brief "fast local sqlite tui" --markdown
+```
+Pulls live DuckDuckGo competitors, calculates optimal word count, and uses Jev System One fan-out to generate an actionable heading outline with a 150-word GEO direct-answer prescription.
+
+### 5. Generative Engine Optimization (GEO)
+```bash
+jev-seo geo README.md --query "agentic skills framework for coding agents"
 ```
 Calculates citation probability for Perplexity, SearchGPT, and Gemini Overviews using Jev `Score` (1-10) and `Noul`.
 
-### 4. Git Pre-Commit SEO Screener
-```bash
-git diff HEAD~1 | jev-seo diff
-```
-Screens changed markdown and HTML files for missing meta tags, broken link references, and AI-slop vocabulary.
+---
 
 ## Architecture
 
@@ -93,14 +134,20 @@ Screens changed markdown and HTML files for missing meta tags, broken link refer
 jev-seo
 ├── src
 │   ├── main.rs         CLI entrypoint & command dispatch
-│   ├── cli.rs          Clap command definitions
 │   ├── engine.rs       TypeSafe Jev client & speculative fan-out
 │   ├── serp.rs         DuckDuckGo HTML & suggest scraper
-│   ├── audit.rs        Markdown & HTML parser and meta verifier
-│   ├── rank.rs         Local SQLite rank drift tracker
-│   └── mcp.rs          Stdio JSON-RPC 2.0 MCP server
-└── Cargo.toml
+│   ├── audit.rs        Batch directory & file on-page meta auditor
+│   ├── schema.rs       JSON-LD Schema.org structural & semantic validator
+│   ├── robots.rs       Robots.txt & AI crawler permission analyzer
+│   ├── brief.rs        SERP-driven content brief generator
+│   ├── rank.rs         Local SQLite rank drift tracker (.jev-seo.db)
+│   ├── mcp.rs          Native stdio JSON-RPC 2.0 MCP server (7 tools)
+│   └── tests.rs        Unit & integration test harness (8 tests passing)
+├── Cargo.toml
+└── README.md
 ```
+
+---
 
 ## Non-Goals
 
@@ -112,11 +159,24 @@ jev-seo
 
 ## Ecosystem
 
-Built alongside:
-- [design-genius](https://github.com/AkashPriyadarshii/design-genius)
-- [akash-design-engineering](https://github.com/AkashPriyadarshii/akash-design-engineering)
-- [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android)
-- [kharcha](https://github.com/AkashPriyadarshii/kharcha)
+* [design-genius](https://github.com/AkashPriyadarshii/design-genius) — Autonomous design system intelligence for web applications
+* [akash-design-engineering](https://github.com/AkashPriyadarshii/akash-design-engineering) — High-performance editorial brutalist design tokens and cookbook
+* [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android) — Precompiled TDLib native binaries for all 4 Android ABIs
+* [kharcha](https://github.com/AkashPriyadarshii/kharcha) — India-first offline-first UPI expense tracker for Android
 
-**Author:** Akash Priyadarshi (Patna, Bihar, India)  
-GitHub: [@AkashPriyadarshii](https://github.com/AkashPriyadarshii) • Portfolio: [akashpriyadarshi.vercel.app](https://akashpriyadarshi.vercel.app) • LinkedIn: [in/akash-priyadarshi-1aa51b37a](https://linkedin.com/in/akash-priyadarshi-1aa51b37a)
+---
+
+## Author
+
+**Akash Priyadarshi**  
+Patna, Bihar, India  
+* GitHub: [@AkashPriyadarshii](https://github.com/AkashPriyadarshii)  
+* Portfolio: [akashpriyadarshi.vercel.app](https://akashpriyadarshi.vercel.app)  
+* LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akash-priyadarshi-1aa51b37a)  
+* Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)  
+
+**Social:** [X / Twitter](https://x.com/Akash__ydv001) • [Threads](https://www.threads.net/@akash.priyadarshii) • [Instagram](https://www.instagram.com/akash.priyadarshii/) • [Reddit](https://reddit.com/user/DragonfruitWeak2801)
+
+---
+
+*Zero-cost, agent-first SEO radar built with TypeSafe AI System One.*

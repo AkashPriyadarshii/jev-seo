@@ -82,13 +82,59 @@ fn handle_request(req: &RpcRequest) -> RpcResponse {
                     },
                     {
                         "name": "seo_audit",
-                        "description": "Audit local markdown or HTML file for on-page SEO issues",
+                        "description": "Audit a local file or an entire directory for on-page SEO issues, duplicate titles, and thin pages",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "path": { "type": "string" }
                             },
                             "required": ["path"]
+                        }
+                    },
+                    {
+                        "name": "seo_geo",
+                        "description": "Evaluate Generative Engine Optimization (GEO) citation likelihood (1-10) and direct answer presence using TypeSafe Jev",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "target": { "type": "string", "description": "File path or content snippet to score" },
+                                "query": { "type": "string", "description": "Target search query" }
+                            },
+                            "required": ["target", "query"]
+                        }
+                    },
+                    {
+                        "name": "seo_schema",
+                        "description": "Validate Schema.org JSON-LD markup against active 2026 search specifications",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "target": { "type": "string", "description": "File path, HTML snippet, or JSON string" }
+                            },
+                            "required": ["target"]
+                        }
+                    },
+                    {
+                        "name": "seo_robots",
+                        "description": "Inspect robots.txt on a live domain for AI crawler permissions (GPTBot, ClaudeBot, PerplexityBot, Google-Extended) and sitemaps",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "domain": { "type": "string", "description": "Domain or URL to inspect" }
+                            },
+                            "required": ["domain"]
+                        }
+                    },
+                    {
+                        "name": "seo_brief",
+                        "description": "Synthesize live SERP competitor results into a ready-to-write content brief with H2 outlines and 150-word direct answer guidance",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "topic": { "type": "string" },
+                                "limit": { "type": "integer", "description": "Number of SERP competitors to scrape (default: 5)" }
+                            },
+                            "required": ["topic"]
                         }
                     }
                 ]
@@ -143,8 +189,44 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         }
         "seo_audit" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-            match crate::audit::audit_file(path) {
+            match crate::audit::audit_path(path) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_geo" => {
+            let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
+            let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
+            let content = std::fs::read_to_string(target).unwrap_or_else(|_| target.to_string());
+            if let Some(client) = crate::engine::JevClient::new() {
+                let state = json!({ "query": query, "content": content });
+                match client.fanout_eval(state) {
+                    Ok(eval) => serde_json::to_string_pretty(&eval).unwrap_or_default(),
+                    Err(e) => format!("Error evaluating GEO via Jev: {}", e),
+                }
+            } else {
+                "Error: TYPESAFE_API_KEY environment variable not configured.".into()
+            }
+        }
+        "seo_schema" => {
+            let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::schema::validate_target(target) {
+                Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_robots" => {
+            let domain = args.get("domain").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::robots::inspect_robots(domain) {
+                Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_brief" => {
+            let topic = args.get("topic").and_then(|v| v.as_str()).unwrap_or("");
+            let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
+            match crate::brief::generate_brief(topic, limit) {
+                Ok(brief) => serde_json::to_string_pretty(&brief).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }
         }
