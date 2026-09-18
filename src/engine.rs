@@ -31,7 +31,7 @@ impl JevClient {
 
     pub fn fanout_eval(&self, state: serde_json::Value) -> Result<AnalysisResult> {
         let payload = json!({
-            "model": "jev-latest",
+            "model": "jev-1.13.0",
             "state": state,
             "questions": {
                 "intent": {
@@ -46,13 +46,22 @@ impl JevClient {
                 },
                 "geo_score": {
                     "type": "score",
-                    "instructions": "Rate citation likelihood (1-10) for AI engines (Perplexity, SearchGPT, Gemini).",
-                    "min": 1,
-                    "max": 10
+                    "instructions": "Rate citation likelihood for generative search engines (Perplexity, SearchGPT, Gemini).",
+                    "criteria": [
+                        "Very low: promotional fluff, lacks concrete documentation or technical specifics",
+                        "Low: shallow overview, missing practical code examples or proof",
+                        "Moderate: helpful technical details but lacks authoritative benchmark or structured layout",
+                        "High: clear, structured, copy-pasteable commands and direct factual definitions",
+                        "Exceptional: comprehensive authoritative reference, zero fluff, perfect citation density"
+                    ]
                 },
                 "direct_answer": {
                     "type": "noul",
-                    "instructions": "Does the content provide a direct, concise factual answer or code example in the opening section?"
+                    "instructions": "Does the content provide a direct, concise factual answer or code example in the opening section?",
+                    "criteria": {
+                        "true": "Content begins with a direct definition, quickstart command, or concise answer",
+                        "false": "Content rambles, buries the solution, or lacks concrete code"
+                    }
                 },
                 "content_gap": {
                     "type": "choice",
@@ -69,7 +78,7 @@ impl JevClient {
         });
 
         let resp = ureq::post(&self.endpoint)
-            .set("x-api-key", &self.api_key)
+            .set("Authorization", &format!("Bearer {}", self.api_key))
             .set("Content-Type", "application/json")
             .timeout(std::time::Duration::from_secs(12))
             .send_json(payload)
@@ -83,10 +92,11 @@ impl JevClient {
         let intent_confidence = intent_obj["confidence"].as_f64().unwrap_or(0.5);
 
         let geo_obj = &answers["geo_score"];
-        let geo_score = geo_obj["score"].as_u64().unwrap_or(5) as u32;
+        let geo_val = geo_obj["score"].as_f64().unwrap_or(2.0);
+        let geo_score = ((geo_val + 1.0) * 2.0).round().clamp(1.0, 10.0) as u32;
 
         let direct_obj = &answers["direct_answer"];
-        let direct_answer_p = direct_obj["probability"].as_f64().unwrap_or(0.5);
+        let direct_answer_p = direct_obj["noul"].as_f64().unwrap_or(direct_obj["probability"].as_f64().unwrap_or(0.5));
         let direct_answer = direct_answer_p >= 0.5;
 
         let gap_obj = &answers["content_gap"];
