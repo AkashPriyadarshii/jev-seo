@@ -46,7 +46,18 @@
 - Walks directories or targets single `.md`, `.mdx`, and `.html` files.
 - Uses `gray-matter-rs` for frontmatter extraction (YAML/TOML title, description, canonical).
 - Uses `fast-html-parser` for DOM inspection.
-- Executes 12 deterministic checks: title length (40-60 chars), meta description length (120-160 chars), H1 presence/uniqueness, heading hierarchy order, image alt tag completeness, and broken local anchors.
+- Executes deterministic SEO checks: title length (30-65 chars), meta description length (80-165 chars), H1 presence/uniqueness, heading hierarchy progression without skip-levels, image alt tag completeness, canonical presence, and OpenGraph tags.
+- Google Helpful Content and AI Slop Detector: Scans em-dash density per 500 words and 17 synthetic writing crutch terms.
+- Internal Link Graph: Extracts link targets across the directory to identify orphan pages with zero inbound links.
+- Keyword Cannibalization Radar: Normalizes titles and groups colliding pages targeting identical multi-word keyword stems.
+
+### `sitemap.rs` (XML Sitemap & Hreflang Auditor)
+- Fetches remote sitemaps via `ureq` or reads local XML files.
+- Parses `<loc>`, `<lastmod>`, and `<xhtml:link>` elements using streaming regex matching.
+- Enforces Google webmaster limits: flags files exceeding 50,000 URLs.
+- Protocol Security: Flags insecure `http://` entries and enforces canonical `https://`.
+- Parameter Pollution: Detects query strings (`?`) in sitemap paths.
+- International Hreflang: Validates two-letter ISO 639-1 language codes and optional ISO 3166-1 alpha-2 region codes. Flags legacy errors (e.g. `en-UK` instead of `en-GB`) and enforces the `x-default` fallback tag.
 
 ### `geo.rs` (Generative Engine Optimization)
 - Implements AI discovery heuristics (YellowFrogio AI-Discovery framework).
@@ -66,8 +77,11 @@
 ### `mcp.rs` (Stdio Model Context Protocol)
 - JSON-RPC 2.0 loop over stdin/stdout.
 - Tools:
-  - `seo_keywords`: Autocomplete + search intent classification.
+  - `seo_keywords`: Autocomplete variants and search intent classification.
   - `seo_serp_inspect`: Live SERP competitors and winning angles.
-  - `seo_audit`: Local file or directory on-page SEO scan.
+  - `seo_audit`: Local file or directory on-page SEO scan with orphan detection.
   - `seo_geo`: Generative Engine Optimization citation evaluation.
-  - `seo_rank_track`: Domain ranking verification and historical logging.
+  - `seo_schema`: Schema.org JSON-LD structural and deprecation validator.
+  - `seo_robots`: Live robots.txt and AI crawler permission checker.
+  - `seo_brief`: SERP-driven heading outline and content brief generator.
+  - `seo_sitemap`: XML sitemap, URL limits, HTTPS, and hreflang validator.
