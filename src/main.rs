@@ -134,7 +134,7 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{}", format!("Top Competitors on DuckDuckGo:").cyan().bold());
+            println!("\n{}", "Top Competitors on DuckDuckGo:".cyan().bold());
             for item in &items {
                 println!("  #{:<2} {} - {}", item.position.to_string().green().bold(), item.title, item.url.dimmed());
                 if !item.snippet.is_empty() {

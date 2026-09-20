@@ -48,11 +48,11 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
         Ok(response) => {
             let status_code = response.status();
             let body = response.into_string().unwrap_or_default();
-            parse_robots_body(&domain, &robots_url, status_code, &body)
+            parse_robots_txt(&domain, &robots_url, status_code, &body)
         }
         Err(ureq::Error::Status(code, response)) => {
             let body = response.into_string().unwrap_or_default();
-            parse_robots_body(&domain, &robots_url, code, &body)
+            parse_robots_txt(&domain, &robots_url, code, &body)
         }
         Err(_) => {
             Ok(RobotsReport {
@@ -68,7 +68,25 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
     }
 }
 
-fn parse_robots_body(domain: &str, robots_url: &str, status_code: u16, body: &str) -> Result<RobotsReport> {
+pub const TRACKED_AI_BOTS: &[(&str, &str)] = &[
+    ("GPTBot", "OpenAI model training foundation data"),
+    ("ChatGPT-User", "ChatGPT real-time browsing"),
+    ("ClaudeBot", "Anthropic Claude model training"),
+    ("anthropic-ai", "Anthropic search & web indexing"),
+    ("PerplexityBot", "Perplexity generative search citation indexer"),
+    ("Google-Extended", "Google Gemini & Vertex AI training data"),
+    ("Bytespider", "ByteDance AI & TikTok search crawler"),
+    ("CCBot", "Common Crawl open foundation training set"),
+];
+
+#[derive(Debug, Clone, Default)]
+struct AgentSection {
+    agents: Vec<String>,
+    disallows: Vec<String>,
+    allows: Vec<String>,
+}
+
+pub fn parse_robots_txt(domain: &str, robots_url: &str, status_code: u16, body: &str) -> Result<RobotsReport> {
     if status_code != 200 || body.trim().is_empty() {
         return Ok(RobotsReport {
             domain: domain.to_string(),
@@ -82,9 +100,8 @@ fn parse_robots_body(domain: &str, robots_url: &str, status_code: u16, body: &st
     }
 
     let mut sitemaps = Vec::new();
-    let mut sections: Vec<(Vec<String>, Vec<String>)> = Vec::new();
-    let mut current_agents: Vec<String> = Vec::new();
-    let mut current_disallows: Vec<String> = Vec::new();
+    let mut sections: Vec<AgentSection> = Vec::new();
+    let mut current_section = AgentSection::default();
 
     for line in body.lines() {
         let clean = line.split('#').next().unwrap_or("").trim();
@@ -97,92 +114,37 @@ fn parse_robots_body(domain: &str, robots_url: &str, status_code: u16, body: &st
             let val = clean[pos + 1..].trim();
 
             if key == "user-agent" {
-                if !current_disallows.is_empty() {
-                    sections.push((current_agents.clone(), current_disallows.clone()));
-                    current_agents.clear();
-                    current_disallows.clear();
+                if !current_section.disallows.is_empty() || !current_section.allows.is_empty() {
+                    sections.push(current_section);
+                    current_section = AgentSection::default();
                 }
-                current_agents.push(val.to_lowercase());
+                current_section.agents.push(val.to_lowercase());
             } else if key == "disallow" {
-                current_disallows.push(val.to_string());
+                current_section.disallows.push(val.to_string());
+            } else if key == "allow" {
+                current_section.allows.push(val.to_string());
             } else if key == "sitemap" {
                 sitemaps.push(val.to_string());
             }
         }
     }
 
-    if !current_agents.is_empty() {
-        sections.push((current_agents, current_disallows));
+    if !current_section.agents.is_empty() {
+        sections.push(current_section);
     }
 
-    // Known AI bots to check
-    let tracked_bots = vec![
-        ("GPTBot", "OpenAI model training foundation data"),
-        ("ChatGPT-User", "ChatGPT real-time browsing"),
-        ("ClaudeBot", "Anthropic Claude model training"),
-        ("anthropic-ai", "Anthropic search & web indexing"),
-        ("PerplexityBot", "Perplexity generative search citation indexer"),
-        ("Google-Extended", "Google Gemini & Vertex AI training data"),
-        ("Bytespider", "ByteDance AI & TikTok search crawler"),
-        ("CCBot", "Common Crawl open foundation training set"),
-    ];
-
-    // Find default '*' disallow rules
     let star_disallows: Vec<String> = sections
         .iter()
-        .filter(|(agents, _)| agents.iter().any(|a| a == "*"))
-        .flat_map(|(_, dis)| dis.clone())
+        .filter(|sec| sec.agents.iter().any(|a| a == "*"))
+        .flat_map(|sec| sec.disallows.clone())
         .collect();
 
     let disallow_all = star_disallows.iter().any(|d| d == "/");
 
-    let mut ai_bot_rules = Vec::new();
-
-    for (bot, purpose) in tracked_bots {
-        let bot_lower = bot.to_lowercase();
-        let explicit_rule = sections
-            .iter()
-            .find(|(agents, _)| agents.iter().any(|a| a == &bot_lower));
-
-        if let Some((_, disallows)) = explicit_rule {
-            if disallows.iter().any(|d| d == "/") {
-                ai_bot_rules.push(AiBotRule {
-                    bot_name: bot.to_string(),
-                    purpose: purpose.to_string(),
-                    status: BotStatus::Disallowed,
-                    rule_snippet: format!("User-agent: {} -> Disallow: /", bot),
-                });
-            } else if disallows.is_empty() || (disallows.len() == 1 && disallows[0].is_empty()) {
-                ai_bot_rules.push(AiBotRule {
-                    bot_name: bot.to_string(),
-                    purpose: purpose.to_string(),
-                    status: BotStatus::Allowed,
-                    rule_snippet: format!("User-agent: {} -> Disallow: (none)", bot),
-                });
-            } else {
-                ai_bot_rules.push(AiBotRule {
-                    bot_name: bot.to_string(),
-                    purpose: purpose.to_string(),
-                    status: BotStatus::Allowed,
-                    rule_snippet: format!("User-agent: {} -> Selective: [{}]", bot, disallows.join(", ")),
-                });
-            }
-        } else if disallow_all {
-            ai_bot_rules.push(AiBotRule {
-                bot_name: bot.to_string(),
-                purpose: purpose.to_string(),
-                status: BotStatus::Disallowed,
-                rule_snippet: "Inherited from: User-agent: * -> Disallow: /".to_string(),
-            });
-        } else {
-            ai_bot_rules.push(AiBotRule {
-                bot_name: bot.to_string(),
-                purpose: purpose.to_string(),
-                status: BotStatus::DefaultStar,
-                rule_snippet: "Inherits default allow (*) policy".to_string(),
-            });
-        }
-    }
+    let ai_bot_rules = TRACKED_AI_BOTS
+        .iter()
+        .map(|(bot, purpose)| evaluate_bot_rule(bot, purpose, &sections, disallow_all))
+        .collect();
 
     Ok(RobotsReport {
         domain: domain.to_string(),
@@ -193,4 +155,62 @@ fn parse_robots_body(domain: &str, robots_url: &str, status_code: u16, body: &st
         sitemaps,
         disallow_all,
     })
+}
+
+fn evaluate_bot_rule(
+    bot: &str,
+    purpose: &str,
+    sections: &[AgentSection],
+    disallow_all: bool,
+) -> AiBotRule {
+    let bot_lower = bot.to_lowercase();
+    let explicit_rule = sections
+        .iter()
+        .find(|sec| sec.agents.iter().any(|a| a == &bot_lower));
+
+    if let Some(sec) = explicit_rule {
+        if sec.disallows.iter().any(|d| d == "/") {
+            AiBotRule {
+                bot_name: bot.to_string(),
+                purpose: purpose.to_string(),
+                status: BotStatus::Disallowed,
+                rule_snippet: format!("User-agent: {} -> Disallow: /", bot),
+            }
+        } else if sec.disallows.is_empty() || (sec.disallows.len() == 1 && sec.disallows[0].is_empty()) {
+            AiBotRule {
+                bot_name: bot.to_string(),
+                purpose: purpose.to_string(),
+                status: BotStatus::Allowed,
+                rule_snippet: format!("User-agent: {} -> Disallow: (none)", bot),
+            }
+        } else {
+            let mut parts = Vec::new();
+            if !sec.disallows.is_empty() {
+                parts.push(format!("Disallow: [{}]", sec.disallows.join(", ")));
+            }
+            if !sec.allows.is_empty() {
+                parts.push(format!("Allow: [{}]", sec.allows.join(", ")));
+            }
+            AiBotRule {
+                bot_name: bot.to_string(),
+                purpose: purpose.to_string(),
+                status: BotStatus::Allowed,
+                rule_snippet: format!("User-agent: {} -> Selective: {}", bot, parts.join(", ")),
+            }
+        }
+    } else if disallow_all {
+        AiBotRule {
+            bot_name: bot.to_string(),
+            purpose: purpose.to_string(),
+            status: BotStatus::Disallowed,
+            rule_snippet: "Inherited from: User-agent: * -> Disallow: /".to_string(),
+        }
+    } else {
+        AiBotRule {
+            bot_name: bot.to_string(),
+            purpose: purpose.to_string(),
+            status: BotStatus::DefaultStar,
+            rule_snippet: "Inherits default allow (*) policy".to_string(),
+        }
+    }
 }
