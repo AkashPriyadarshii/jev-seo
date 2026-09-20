@@ -3,23 +3,22 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::{BufRead, Write};
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct RpcRequest {
-    jsonrpc: String,
-    id: Option<serde_json::Value>,
-    method: String,
-    params: Option<serde_json::Value>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct RpcRequest {
+    pub(crate) jsonrpc: String,
+    pub(crate) id: Option<serde_json::Value>,
+    pub(crate) method: String,
+    pub(crate) params: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize)]
-struct RpcResponse {
-    jsonrpc: String,
-    id: Option<serde_json::Value>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct RpcResponse {
+    pub(crate) jsonrpc: String,
+    pub(crate) id: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    result: Option<serde_json::Value>,
+    pub(crate) result: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<serde_json::Value>,
+    pub(crate) error: Option<serde_json::Value>,
 }
 
 pub fn run_stdio_server() -> Result<()> {
@@ -50,7 +49,7 @@ pub fn run_stdio_server() -> Result<()> {
     Ok(())
 }
 
-fn handle_request(req: &RpcRequest) -> RpcResponse {
+pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
     match req.method.as_str() {
         "tools/list" => RpcResponse {
             jsonrpc: "2.0".into(),

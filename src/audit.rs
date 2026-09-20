@@ -34,12 +34,99 @@ pub struct CheckItem {
     pub message: String,
 }
 
+pub const MIN_TITLE_CHARS: usize = 30;
+pub const MAX_TITLE_CHARS: usize = 65;
+pub const MIN_DESC_CHARS: usize = 80;
+pub const MAX_DESC_CHARS: usize = 165;
+pub const MIN_CONTENT_WORDS: usize = 300;
+pub const GEO_MIN_WORDS: usize = 100;
+pub const GEO_MAX_WORDS: usize = 200;
+
+pub fn check_title_length(title_len: usize) -> CheckItem {
+    let passed = (MIN_TITLE_CHARS..=MAX_TITLE_CHARS).contains(&title_len);
+    CheckItem {
+        name: "Title Tag Length".into(),
+        passed,
+        message: format!("Length: {} chars (Optimal: {}-{} chars)", title_len, MIN_TITLE_CHARS, MAX_TITLE_CHARS),
+    }
+}
+
+pub fn check_meta_description(description_len: usize) -> CheckItem {
+    let passed = (MIN_DESC_CHARS..=MAX_DESC_CHARS).contains(&description_len);
+    CheckItem {
+        name: "Meta Description".into(),
+        passed,
+        message: if description_len == 0 {
+            "Missing description metadata".into()
+        } else {
+            format!("Length: {} chars (Optimal: {}-{} chars)", description_len, MIN_DESC_CHARS, MAX_DESC_CHARS)
+        },
+    }
+}
+
+pub fn check_h1_uniqueness(h1_count: usize) -> CheckItem {
+    CheckItem {
+        name: "H1 Uniqueness".into(),
+        passed: h1_count == 1,
+        message: format!("Found {} H1 headings (Expected: exactly 1)", h1_count),
+    }
+}
+
+pub fn check_content_depth(word_count: usize) -> CheckItem {
+    CheckItem {
+        name: "Content Depth".into(),
+        passed: word_count >= MIN_CONTENT_WORDS,
+        message: format!("Word count: {} (Recommended min: {} words)", word_count, MIN_CONTENT_WORDS),
+    }
+}
+
+pub fn check_image_alt_tags(image_count: usize, images_missing_alt: usize) -> CheckItem {
+    CheckItem {
+        name: "Image Alt Tags".into(),
+        passed: images_missing_alt == 0,
+        message: format!("Images: {}, Missing Alt: {}", image_count, images_missing_alt),
+    }
+}
+
+pub fn check_geo_citation_density(words: usize) -> CheckItem {
+    let passed = (GEO_MIN_WORDS..=GEO_MAX_WORDS).contains(&words);
+    CheckItem {
+        name: "GEO Citation Density".into(),
+        passed,
+        message: format!("Opening passage: {} words (Optimal AI citation block: 134-167 words)", words),
+    }
+}
+
+pub fn check_schema_markup(schema_found: bool) -> CheckItem {
+    CheckItem {
+        name: "Schema Markup".into(),
+        passed: schema_found,
+        message: if schema_found { "Structured data present".into() } else { "No JSON-LD/schema markup defined".into() },
+    }
+}
+
+pub fn check_canonical_reference(canonical_found: bool) -> CheckItem {
+    CheckItem {
+        name: "Canonical Reference".into(),
+        passed: canonical_found,
+        message: if canonical_found { "Canonical tag configured".into() } else { "Missing canonical URL definition".into() },
+    }
+}
+
+pub fn check_opengraph_metadata(og_found: bool) -> CheckItem {
+    CheckItem {
+        name: "OpenGraph Metadata".into(),
+        passed: og_found,
+        message: if og_found { "OpenGraph meta tags found".into() } else { "Missing og:title, og:description, or og:image tags".into() },
+    }
+}
+
 pub fn audit_file(path_str: &str) -> Result<AuditReport> {
     let path = Path::new(path_str);
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read file: {}", path_str))?;
 
-    let is_markdown = path.extension().map_or(false, |ext| {
+    let is_markdown = path.extension().is_some_and(|ext| {
         ext == "md" || ext == "mdx" || ext == "markdown"
     });
 
@@ -94,11 +181,11 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
 
     for line in body.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("# ") {
+        if let Some(stripped) = trimmed.strip_prefix("# ") {
             h1_count += 1;
             past_first_heading = true;
             if title.is_none() {
-                title = Some(trimmed[2..].trim().to_string());
+                title = Some(stripped.trim().to_string());
             }
         } else if trimmed.starts_with("## ") {
             h2_count += 1;
@@ -129,62 +216,16 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
     let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
     let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
 
-    let mut checks = Vec::new();
-    checks.push(CheckItem {
-        name: "Title Tag Length".into(),
-        passed: title_len >= 30 && title_len <= 65,
-        message: format!("Length: {} chars (Optimal: 40-60 chars)", title_len),
-    });
-
-    checks.push(CheckItem {
-        name: "Meta Description".into(),
-        passed: description_len >= 80 && description_len <= 165,
-        message: if description_len == 0 {
-            "Missing description frontmatter".into()
-        } else {
-            format!("Length: {} chars (Optimal: 120-160 chars)", description_len)
-        },
-    });
-
-    checks.push(CheckItem {
-        name: "H1 Uniqueness".into(),
-        passed: h1_count == 1,
-        message: format!("Found {} H1 headings (Expected: exactly 1)", h1_count),
-    });
-
-    checks.push(CheckItem {
-        name: "Content Depth".into(),
-        passed: word_count >= 300,
-        message: format!("Word count: {} (Recommended min: 300 words)", word_count),
-    });
-
-    checks.push(CheckItem {
-        name: "Image Alt Tags".into(),
-        passed: images_missing_alt == 0,
-        message: format!("Images: {}, Missing Alt: {}", image_count, images_missing_alt),
-    });
-
-    // 2026 GEO Passage Length Check (134-167 words in opening 30%)
-    let geo_passed = first_section_words >= 100 && first_section_words <= 200;
-    checks.push(CheckItem {
-        name: "GEO Citation Density".into(),
-        passed: geo_passed,
-        message: format!("Opening passage: {} words (Optimal AI citation block: 134-167 words)", first_section_words),
-    });
-
-    // Structured Data Check
-    checks.push(CheckItem {
-        name: "Schema Markup".into(),
-        passed: schema_found,
-        message: if schema_found { "Structured data present".into() } else { "No JSON-LD/schema frontmatter defined".into() },
-    });
-
-    // Canonical Tag Check
-    checks.push(CheckItem {
-        name: "Canonical Reference".into(),
-        passed: canonical_found,
-        message: if canonical_found { "Canonical tag configured".into() } else { "Missing canonical URL frontmatter".into() },
-    });
+    let checks = vec![
+        check_title_length(title_len),
+        check_meta_description(description_len),
+        check_h1_uniqueness(h1_count),
+        check_content_depth(word_count),
+        check_image_alt_tags(image_count, images_missing_alt),
+        check_geo_citation_density(first_section_words),
+        check_schema_markup(schema_found),
+        check_canonical_reference(canonical_found),
+    ];
 
     Ok(AuditReport {
         file_path: path_str.to_string(),
@@ -263,42 +304,17 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
     let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
     let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
 
-    let mut checks = Vec::new();
-    checks.push(CheckItem {
-        name: "Title Tag Length".into(),
-        passed: title_len >= 30 && title_len <= 65,
-        message: format!("Length: {} chars", title_len),
-    });
-
-    checks.push(CheckItem {
-        name: "Meta Description".into(),
-        passed: description_len >= 80 && description_len <= 165,
-        message: format!("Length: {} chars", description_len),
-    });
-
-    checks.push(CheckItem {
-        name: "H1 Presence".into(),
-        passed: h1_count == 1,
-        message: format!("Found {} H1 headings", h1_count),
-    });
-
-    checks.push(CheckItem {
-        name: "Schema (JSON-LD)".into(),
-        passed: schema_found,
-        message: if schema_found { "JSON-LD schema markup present".into() } else { "Missing <script type=\"application/ld+json\">".into() },
-    });
-
-    checks.push(CheckItem {
-        name: "Canonical URL".into(),
-        passed: canonical_found,
-        message: if canonical_found { "Canonical tag found".into() } else { "Missing <link rel=\"canonical\"> tag".into() },
-    });
-
-    checks.push(CheckItem {
-        name: "OpenGraph Metadata".into(),
-        passed: og_tags_found,
-        message: if og_tags_found { "OpenGraph meta tags found".into() } else { "Missing og:title or og:image tags".into() },
-    });
+    let checks = vec![
+        check_title_length(title_len),
+        check_meta_description(description_len),
+        check_h1_uniqueness(h1_count),
+        check_content_depth(word_count),
+        check_image_alt_tags(image_count, images_missing_alt),
+        check_geo_citation_density(first_30_pct_words),
+        check_schema_markup(schema_found),
+        check_canonical_reference(canonical_found),
+        check_opengraph_metadata(og_tags_found),
+    ];
 
     Ok(AuditReport {
         file_path: path_str.to_string(),
@@ -354,7 +370,7 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
             missing_descriptions.push(path_str.to_string());
         }
         let mut thin_pages = Vec::new();
-        if single.word_count < 300 {
+        if single.word_count < MIN_CONTENT_WORDS {
             thin_pages.push((path_str.to_string(), single.word_count));
         }
         let passed = single.checks.iter().filter(|c| c.passed).count();
@@ -413,7 +429,7 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
                 }
             }
 
-            if rep.word_count < 300 {
+            if rep.word_count < MIN_CONTENT_WORDS {
                 thin_pages.push((p_str.clone(), rep.word_count));
             }
             if !rep.canonical_found {
@@ -433,7 +449,7 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
         .collect();
 
     let total_files = reports.len();
-    let avg_words_per_file = if total_files > 0 { total_words / total_files } else { 0 };
+    let avg_words_per_file = total_words.checked_div(total_files).unwrap_or(0);
     let pass_rate = if total_checks > 0 {
         (total_passed as f64 / total_checks as f64) * 100.0
     } else {

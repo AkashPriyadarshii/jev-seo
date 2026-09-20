@@ -107,8 +107,7 @@ mod urlencoding {
     pub fn decode(s: &str) -> Result<String, std::string::FromUtf8Error> {
         let decoded: Vec<u8> = url::form_urlencoded::parse(s.as_bytes())
             .into_owned()
-            .map(|(k, _)| k.into_bytes())
-            .flatten()
+            .flat_map(|(k, _)| k.into_bytes())
             .collect();
         String::from_utf8(decoded)
     }
