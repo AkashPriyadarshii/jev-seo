@@ -126,6 +126,21 @@ jev-seo geo README.md --query "agentic skills framework for coding agents"
 ```
 Calculates citation probability for Perplexity, SearchGPT, and Gemini Overviews using Jev `Score` (1-10) and `Noul`.
 
+### 6. XML Sitemap & International Hreflang Auditor
+```bash
+jev-seo sitemap sitemap.xml
+jev-seo sitemap https://example.com/sitemap.xml
+```
+Validates sitemaps against Google webmaster standards: enforces canonical HTTPS protocols, flags parameter pollution, verifies the 50,000 URL limit, and audits international `hreflang` codes (flagging malformed codes like `en-UK` vs `en-GB` and enforcing `x-default`).
+
+### 7. Google Helpful Content & AI Slop Radar
+Integrated into `jev-seo audit`:
+* **Em-dash density scanner**: Flags excessive em-dash saturation (>2 per 500 words).
+* **AI Vocabulary Detector**: Flags 17 pervasive AI boilerplate crutches (`delve`, `leverage`, `testament`, `foster`, `seamless`, `crucial`, `robust`, `landscape`, etc.).
+* **Heading Hierarchy Auditor**: Flags illegal skip-levels (e.g. `H1 -> H3` without `H2`).
+* **Internal Link Graph**: Pinpoints orphan pages with 0 inbound internal links across directories.
+* **Keyword Cannibalization Radar**: Identifies competing articles targeting identical keyword stems.
+
 ---
 
 ## Architecture
@@ -141,8 +156,9 @@ jev-seo
 │   ├── robots.rs       Robots.txt & AI crawler permission analyzer
 │   ├── brief.rs        SERP-driven content brief generator
 │   ├── rank.rs         Local SQLite rank drift tracker (.jev-seo.db)
-│   ├── mcp.rs          Native stdio JSON-RPC 2.0 MCP server (7 tools)
-│   └── tests.rs        Unit & integration test harness (8 tests passing)
+│   ├── sitemap.rs      XML sitemap & international hreflang auditor
+│   ├── mcp.rs          Native stdio JSON-RPC 2.0 MCP server (8 tools)
+│   └── tests.rs        Unit & integration test harness (21 tests passing)
 ├── Cargo.toml
 └── README.md
 ```

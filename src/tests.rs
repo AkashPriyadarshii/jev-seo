@@ -223,7 +223,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(resp.error.is_none());
         let res = resp.result.unwrap();
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
-        assert_eq!(tools.len(), 7, "All 7 agent SEO tools must be exposed");
+        assert_eq!(tools.len(), 8, "All 8 agent SEO tools must be exposed");
 
         let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(|n| n.as_str())).collect();
         assert!(names.contains(&"seo_keywords"));
@@ -233,6 +233,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(names.contains(&"seo_schema"));
         assert!(names.contains(&"seo_robots"));
         assert!(names.contains(&"seo_brief"));
+        assert!(names.contains(&"seo_sitemap"));
     }
 
     #[test]
@@ -257,6 +258,139 @@ Sitemap: https://example.com/sitemap.xml
         let content = resp.result.unwrap().get("content").and_then(|c| c.as_array()).cloned().unwrap();
         let text = content[0].get("text").and_then(|t| t.as_str()).unwrap();
         assert!(text.contains("\"is_valid\": true"));
+    }
+
+    #[test]
+    fn test_mcp_tool_call_sitemap() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        let sample_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url><loc>https://example.com/page1</loc><lastmod>2026-09-20</lastmod></url>
+            <url><loc>https://example.com/page2</loc></url>
+        </urlset>"#;
+
+        let dir = tempfile::tempdir().unwrap();
+        let sitemap_path = dir.path().join("sitemap.xml");
+        std::fs::write(&sitemap_path, sample_xml).unwrap();
+
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(3)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_sitemap",
+                "arguments": {
+                    "target": sitemap_path.to_str().unwrap()
+                }
+            })),
+        };
+
+        let resp = handle_request(&req);
+        assert!(resp.error.is_none());
+        let content = resp.result.unwrap().get("content").and_then(|c| c.as_array()).cloned().unwrap();
+        let text = content[0].get("text").and_then(|t| t.as_str()).unwrap();
+        assert!(text.contains("\"total_urls\": 2"));
+        assert!(text.contains("\"is_valid\": true"));
+    }
+
+    #[test]
+    fn test_heading_hierarchy_skip_level() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("skip_heading.md");
+        std::fs::write(
+            &path,
+            "---\ntitle: Heading Test\ndescription: Test heading hierarchy skip levels in markdown.\n---\n# Title\n### Jumped to H3\n"
+        ).unwrap();
+
+        let rep = audit_file(path.to_str().unwrap()).unwrap();
+        assert!(!rep.heading_skipped_levels.is_empty(), "Should detect skipped H2 level");
+        assert!(rep.heading_skipped_levels[0].contains("H1 -> H3"));
+        assert!(rep.checks.iter().any(|c| c.name == "Heading Hierarchy" && !c.passed));
+    }
+
+    #[test]
+    fn test_ai_slop_and_em_dash_detection() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("slop_test.md");
+        std::fs::write(
+            &path,
+            "---\ntitle: AI Slop Test Page\ndescription: A test page to verify automated detection of synthetic content tells.\n---\n# AI Slop Detection\n\nWe delve into this crucial landscape — a testament to modern engineering — to seamlessly foster leverage across systems.\n"
+        ).unwrap();
+
+        let rep = audit_file(path.to_str().unwrap()).unwrap();
+        assert!(rep.em_dash_count >= 2, "Should count em-dashes");
+        assert!(!rep.ai_slop_words_found.is_empty(), "Should find AI crutch words");
+        assert!(rep.ai_slop_words_found.contains(&"delve".to_string()));
+        assert!(rep.ai_slop_words_found.contains(&"testament".to_string()));
+        assert!(rep.checks.iter().any(|c| c.name == "Helpful Content (AI Slop)" && !c.passed));
+    }
+
+    #[test]
+    fn test_orphan_pages_and_cannibalization() {
+        let dir = tempfile::tempdir().unwrap();
+        let index = dir.path().join("index.md");
+        let about = dir.path().join("about.md");
+        let orphan = dir.path().join("isolated.md");
+
+        std::fs::write(
+            &index,
+            "---\ntitle: Best Rust SEO Framework Guide\ndescription: Guide to rust SEO tools.\n---\n# Best Rust SEO Framework Guide\nCheck [About Us](/about.md) for details.\n"
+        ).unwrap();
+
+        std::fs::write(
+            &about,
+            "---\ntitle: Best Rust SEO Framework Overview\ndescription: Overview of rust SEO tools.\n---\n# Best Rust SEO Framework Overview\nBack to [Home](/index.md).\n"
+        ).unwrap();
+
+        std::fs::write(
+            &orphan,
+            "---\ntitle: Totally Orphaned Page\ndescription: An isolated page with no inbound internal links anywhere.\n---\n# Orphan Page\nNo one links to me.\n"
+        ).unwrap();
+
+        let dir_rep = audit_path(dir.path().to_str().unwrap()).unwrap();
+        assert_eq!(dir_rep.total_files, 3);
+        assert!(!dir_rep.orphan_pages.is_empty(), "Should detect orphan page");
+        assert!(dir_rep.orphan_pages.iter().any(|p| p.contains("isolated.md")));
+
+        assert!(!dir_rep.keyword_cannibalization.is_empty(), "Should detect title keyword cannibalization");
+        assert!(dir_rep.keyword_cannibalization.iter().any(|c| c.keyword_stem.contains("best rust seo")));
+    }
+
+    #[test]
+    fn test_sitemap_xml_parsing_and_hreflang() {
+        use crate::sitemap::parse_sitemap_xml;
+
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+                xmlns:xhtml="http://www.w3.org/1999/xhtml">
+            <url>
+                <loc>https://example.com/en/page</loc>
+                <lastmod>2026-09-20</lastmod>
+                <xhtml:link rel="alternate" hreflang="en-US" href="https://example.com/en/page"/>
+                <xhtml:link rel="alternate" hreflang="en-UK" href="https://example.com/uk/page"/>
+                <xhtml:link rel="alternate" hreflang="x-default" href="https://example.com/"/>
+            </url>
+            <url>
+                <loc>http://example.com/insecure-page</loc>
+            </url>
+            <url>
+                <loc>https://example.com/search?q=rust&amp;page=2</loc>
+            </url>
+        </urlset>"#;
+
+        let rep = parse_sitemap_xml("https://example.com/sitemap.xml", xml).unwrap();
+        assert_eq!(rep.total_urls, 3);
+        assert_eq!(rep.https_urls, 2);
+        assert_eq!(rep.insecure_http_urls, 1);
+        assert_eq!(rep.urls_with_params, 1);
+        assert_eq!(rep.urls_with_lastmod, 1);
+        assert_eq!(rep.hreflang_count, 3);
+        assert!(!rep.invalid_hreflang_codes.is_empty(), "en-UK should be flagged as invalid");
+        assert!(rep.invalid_hreflang_codes[0].contains("en-GB"));
+        assert!(rep.warnings.iter().any(|w| w.contains("Insecure HTTP")));
+        assert!(rep.warnings.iter().any(|w| w.contains("Query Parameters")));
     }
 
     #[test]

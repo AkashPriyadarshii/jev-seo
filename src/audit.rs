@@ -24,6 +24,10 @@ pub struct AuditReport {
     pub canonical_found: bool,
     pub og_tags_found: bool,
     pub geo_opening_words: usize,
+    pub heading_skipped_levels: Vec<String>,
+    pub em_dash_count: usize,
+    pub ai_slop_words_found: Vec<String>,
+    pub internal_link_targets: Vec<String>,
     pub checks: Vec<CheckItem>,
 }
 
@@ -41,6 +45,69 @@ pub const MAX_DESC_CHARS: usize = 165;
 pub const MIN_CONTENT_WORDS: usize = 300;
 pub const GEO_MIN_WORDS: usize = 100;
 pub const GEO_MAX_WORDS: usize = 200;
+
+pub const AI_SLOP_PHRASES: &[&str] = &[
+    "delve",
+    "leverage",
+    "testament",
+    "bolster",
+    "foster",
+    "seamless",
+    "seamlessly",
+    "crucial",
+    "robust",
+    "landscape",
+    "furthermore",
+    "moreover",
+    "underscores",
+    "unveil",
+    "tapestry",
+    "beacon",
+    "in summary",
+    "in today's",
+];
+
+pub fn check_heading_hierarchy(skipped: &[String]) -> CheckItem {
+    let passed = skipped.is_empty();
+    CheckItem {
+        name: "Heading Hierarchy".into(),
+        passed,
+        message: if passed {
+            "Logical heading progression (no skipped levels)".into()
+        } else {
+            format!("Skipped levels detected: [{}]", skipped.join(", "))
+        },
+    }
+}
+
+pub fn check_ai_slop(em_dash_count: usize, slop_words: &[String], word_count: usize) -> CheckItem {
+    let em_dash_density = if word_count > 0 {
+        (em_dash_count as f64 / word_count as f64) * 500.0
+    } else {
+        0.0
+    };
+    let is_excessive_dashes = em_dash_density > 2.0 && em_dash_count >= 2;
+    let is_excessive_words = slop_words.len() >= 3;
+    let passed = !is_excessive_dashes && !is_excessive_words;
+
+    let message = if passed {
+        format!("Natural writing tone ({} em-dashes, {} AI crutches)", em_dash_count, slop_words.len())
+    } else {
+        format!(
+            "Helpful Content risk: {} em-dashes ({:.1}/500w) and {} AI tells [{}]",
+            em_dash_count,
+            em_dash_density,
+            slop_words.len(),
+            slop_words.join(", ")
+        )
+    };
+
+    CheckItem {
+        name: "Helpful Content (AI Slop)".into(),
+        passed,
+        message,
+    }
+}
 
 pub fn check_title_length(title_len: usize) -> CheckItem {
     let passed = (MIN_TITLE_CHARS..=MAX_TITLE_CHARS).contains(&title_len);
@@ -175,23 +242,48 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
     let mut images_missing_alt = 0;
     let mut internal_links = 0;
     let mut external_links = 0;
+    let mut internal_link_targets = Vec::new();
+    let mut prev_heading_level: Option<usize> = None;
+    let mut heading_skipped_levels = Vec::new();
 
     let mut first_section_words = 0;
     let mut past_first_heading = false;
 
+    let link_re = Regex::new(r#"\[([^\]]*)\]\(([^)]+)\)"#)?;
+
     for line in body.lines() {
         let trimmed = line.trim();
-        if let Some(stripped) = trimmed.strip_prefix("# ") {
+        let heading_lvl = if let Some(stripped) = trimmed.strip_prefix("# ") {
             h1_count += 1;
             past_first_heading = true;
             if title.is_none() {
                 title = Some(stripped.trim().to_string());
             }
+            Some(1)
         } else if trimmed.starts_with("## ") {
             h2_count += 1;
             past_first_heading = true;
+            Some(2)
         } else if trimmed.starts_with("### ") {
             h3_count += 1;
+            Some(3)
+        } else if trimmed.starts_with("#### ") {
+            Some(4)
+        } else if trimmed.starts_with("##### ") {
+            Some(5)
+        } else if trimmed.starts_with("###### ") {
+            Some(6)
+        } else {
+            None
+        };
+
+        if let Some(lvl) = heading_lvl {
+            if let Some(prev) = prev_heading_level {
+                if lvl > prev + 1 {
+                    heading_skipped_levels.push(format!("H{} -> H{}", prev, lvl));
+                }
+            }
+            prev_heading_level = Some(lvl);
         } else if !past_first_heading || h2_count == 0 {
             first_section_words += trimmed.split_whitespace().count();
         }
@@ -203,10 +295,14 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
             }
         }
 
-        if trimmed.contains("http://") || trimmed.contains("https://") {
-            external_links += 1;
-        } else if trimmed.contains("](") {
-            internal_links += 1;
+        for cap in link_re.captures_iter(trimmed) {
+            let target = cap[2].trim().split('#').next().unwrap_or("").trim();
+            if target.starts_with("http://") || target.starts_with("https://") {
+                external_links += 1;
+            } else if !target.is_empty() && !target.starts_with('#') && !target.starts_with("mailto:") {
+                internal_links += 1;
+                internal_link_targets.push(target.to_string());
+            }
         }
     }
 
@@ -216,13 +312,24 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
     let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
     let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
 
+    let em_dash_count = content.chars().filter(|&c| c == '\u{2014}').count();
+    let lower_body = body.to_lowercase();
+    let mut ai_slop_words_found = Vec::new();
+    for &phrase in AI_SLOP_PHRASES {
+        if lower_body.contains(phrase) {
+            ai_slop_words_found.push(phrase.to_string());
+        }
+    }
+
     let checks = vec![
         check_title_length(title_len),
         check_meta_description(description_len),
         check_h1_uniqueness(h1_count),
+        check_heading_hierarchy(&heading_skipped_levels),
         check_content_depth(word_count),
         check_image_alt_tags(image_count, images_missing_alt),
         check_geo_citation_density(first_section_words),
+        check_ai_slop(em_dash_count, &ai_slop_words_found, word_count),
         check_schema_markup(schema_found),
         check_canonical_reference(canonical_found),
     ];
@@ -245,6 +352,10 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         canonical_found,
         og_tags_found,
         geo_opening_words: first_section_words,
+        heading_skipped_levels,
+        em_dash_count,
+        ai_slop_words_found,
+        internal_link_targets,
         checks,
     })
 }
@@ -252,9 +363,6 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
 fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
     let title_re = Regex::new(r#"(?is)<title[^>]*>(.*?)</title>"#)?;
     let meta_desc_re = Regex::new(r#"(?is)<meta[^>]*name=["']description["'][^>]*content=["'](.*?)["']"#)?;
-    let h1_re = Regex::new(r#"(?is)<h1[^>]*>.*?</h1>"#)?;
-    let h2_re = Regex::new(r#"(?is)<h2[^>]*>.*?</h2>"#)?;
-    let h3_re = Regex::new(r#"(?is)<h3[^>]*>.*?</h3>"#)?;
     let img_re = Regex::new(r#"(?is)<img\b([^>]*)>"#)?;
     let alt_re = Regex::new(r#"(?is)alt=["']([^"']+)["']"#)?;
     let a_re = Regex::new(r#"(?is)<a\b[^>]*href=["']([^"']*)["']"#)?;
@@ -266,9 +374,26 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
     let title = title_re.captures(content).map(|c| c[1].trim().to_string());
     let description = meta_desc_re.captures(content).map(|c| c[1].trim().to_string());
 
-    let h1_count = h1_re.find_iter(content).count();
-    let h2_count = h2_re.find_iter(content).count();
-    let h3_count = h3_re.find_iter(content).count();
+    let h1_count = Regex::new(r#"(?is)<h1\b[^>]*>.*?</h1>"#)?.find_iter(content).count();
+    let h2_count = Regex::new(r#"(?is)<h2\b[^>]*>.*?</h2>"#)?.find_iter(content).count();
+    let h3_count = Regex::new(r#"(?is)<h3\b[^>]*>.*?</h3>"#)?.find_iter(content).count();
+
+    let heading_seq_re = Regex::new(r#"(?is)<(h[1-6])\b[^>]*>"#)?;
+    let mut prev_heading_level: Option<usize> = None;
+    let mut heading_skipped_levels = Vec::new();
+    for cap in heading_seq_re.captures_iter(content) {
+        let tag = &cap[1];
+        if let Some(lvl_char) = tag.chars().nth(1) {
+            if let Some(lvl) = lvl_char.to_digit(10).map(|d| d as usize) {
+                if let Some(prev) = prev_heading_level {
+                    if lvl > prev + 1 {
+                        heading_skipped_levels.push(format!("H{} -> H{}", prev, lvl));
+                    }
+                }
+                prev_heading_level = Some(lvl);
+            }
+        }
+    }
 
     let schema_found = schema_re.is_match(content);
     let canonical_found = canonical_re.is_match(content);
@@ -286,12 +411,15 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
 
     let mut internal_links = 0;
     let mut external_links = 0;
+    let mut internal_link_targets = Vec::new();
     for cap in a_re.captures_iter(content) {
-        let href = &cap[1];
-        if href.starts_with("http://") || href.starts_with("https://") {
+        let href = cap[1].trim();
+        let target = href.split('#').next().unwrap_or("").trim();
+        if target.starts_with("http://") || target.starts_with("https://") {
             external_links += 1;
-        } else if !href.starts_with('#') {
+        } else if !target.is_empty() && !target.starts_with('#') && !target.starts_with("mailto:") {
             internal_links += 1;
+            internal_link_targets.push(target.to_string());
         }
     }
 
@@ -304,13 +432,24 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
     let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
     let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
 
+    let em_dash_count = content.chars().filter(|&c| c == '\u{2014}').count();
+    let lower_content = plain_text.to_lowercase();
+    let mut ai_slop_words_found = Vec::new();
+    for &phrase in AI_SLOP_PHRASES {
+        if lower_content.contains(phrase) {
+            ai_slop_words_found.push(phrase.to_string());
+        }
+    }
+
     let checks = vec![
         check_title_length(title_len),
         check_meta_description(description_len),
         check_h1_uniqueness(h1_count),
+        check_heading_hierarchy(&heading_skipped_levels),
         check_content_depth(word_count),
         check_image_alt_tags(image_count, images_missing_alt),
         check_geo_citation_density(first_30_pct_words),
+        check_ai_slop(em_dash_count, &ai_slop_words_found, word_count),
         check_schema_markup(schema_found),
         check_canonical_reference(canonical_found),
         check_opengraph_metadata(og_tags_found),
@@ -334,8 +473,18 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
         canonical_found,
         og_tags_found,
         geo_opening_words: first_30_pct_words,
+        heading_skipped_levels,
+        em_dash_count,
+        ai_slop_words_found,
+        internal_link_targets,
         checks,
     })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CannibalizationItem {
+    pub keyword_stem: String,
+    pub colliding_files: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -350,6 +499,8 @@ pub struct DirectoryAuditReport {
     pub thin_pages: Vec<(String, usize)>,
     pub missing_canonicals: Vec<String>,
     pub missing_descriptions: Vec<String>,
+    pub orphan_pages: Vec<String>,
+    pub keyword_cannibalization: Vec<CannibalizationItem>,
 }
 
 pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
@@ -391,6 +542,8 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
             thin_pages,
             missing_canonicals,
             missing_descriptions,
+            orphan_pages: Vec::new(),
+            keyword_cannibalization: Vec::new(),
         });
     }
 
@@ -448,6 +601,74 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
         .filter(|(_, paths)| paths.len() > 1)
         .collect();
 
+    // Internal Link Graph & Orphan Page Detection
+    let mut inbound_map: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for rep in &reports {
+        let rep_norm = rep.file_path.replace('\\', "/");
+        let rep_stem = Path::new(&rep.file_path).file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+
+        for raw_target in &rep.internal_link_targets {
+            let clean = raw_target.trim().trim_start_matches("./").replace('\\', "/");
+            let clean_stem = clean.split('/').next_back().unwrap_or("").to_string();
+
+            for f in &files {
+                let f_norm = f.to_string_lossy().replace('\\', "/");
+                let f_name = f.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let f_stem = f.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+
+                if (f_norm.ends_with(&clean) || f_name == clean_stem || f_stem == clean_stem)
+                    && f_norm != rep_norm
+                    && f_name != rep_stem
+                {
+                    *inbound_map.entry(f_norm.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    let mut orphan_pages = Vec::new();
+    if files.len() > 1 {
+        for f in &files {
+            let f_norm = f.to_string_lossy().replace('\\', "/");
+            let f_name = f.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+            // Skip root index / readme as landing entrypoint
+            if f_name.starts_with("readme") || f_name.starts_with("index") {
+                continue;
+            }
+            if inbound_map.get(&f_norm).copied().unwrap_or(0) == 0 {
+                orphan_pages.push(f.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    // Keyword Cannibalization Radar
+    let stop_words: std::collections::HashSet<&str> = [
+        "a", "an", "the", "in", "on", "at", "for", "to", "of", "and", "or", "with", "by", "is", "vs", "how"
+    ].into_iter().collect();
+
+    let mut stem_to_files: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for rep in &reports {
+        if let Some(title) = &rep.title {
+            let words: Vec<String> = title
+                .to_lowercase()
+                .split(|c: char| !c.is_alphanumeric())
+                .filter(|w| !w.is_empty() && !stop_words.contains(w) && w.len() > 2)
+                .map(|s| s.to_string())
+                .collect();
+
+            if words.len() >= 2 {
+                let stem = words[..words.len().min(3)].join(" ");
+                stem_to_files.entry(stem).or_default().push(rep.file_path.clone());
+            }
+        }
+    }
+
+    let keyword_cannibalization: Vec<CannibalizationItem> = stem_to_files
+        .into_iter()
+        .filter(|(_, paths)| paths.len() > 1)
+        .map(|(keyword_stem, colliding_files)| CannibalizationItem { keyword_stem, colliding_files })
+        .collect();
+
     let total_files = reports.len();
     let avg_words_per_file = total_words.checked_div(total_files).unwrap_or(0);
     let pass_rate = if total_checks > 0 {
@@ -467,6 +688,8 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
         thin_pages,
         missing_canonicals,
         missing_descriptions,
+        orphan_pages,
+        keyword_cannibalization,
     })
 }
 

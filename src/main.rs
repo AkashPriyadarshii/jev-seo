@@ -11,6 +11,7 @@ mod rank;
 mod robots;
 mod schema;
 mod serp;
+mod sitemap;
 
 #[cfg(test)]
 mod tests;
@@ -92,6 +93,13 @@ enum Commands {
         domain: String,
         #[arg(long)]
         query: String,
+    },
+    /// Inspect and validate XML sitemaps for protocols, URL limits, and hreflang
+    Sitemap {
+        /// URL or local file path to sitemap.xml
+        target: String,
+        #[arg(long)]
+        json: bool,
     },
     /// Start native stdio JSON-RPC 2.0 Agent MCP Server
     Mcp,
@@ -182,6 +190,30 @@ fn main() -> Result<()> {
                     println!("  Title Collisions:    {}", "0 (Clean)".green());
                 }
 
+                if !dir_report.keyword_cannibalization.is_empty() {
+                    println!("\n{}", "Keyword Cannibalization Detected:".yellow().bold());
+                    for item in &dir_report.keyword_cannibalization {
+                        println!("  - Target Stem: \"{}\" in {} pages:", item.keyword_stem.cyan(), item.colliding_files.len());
+                        for f in &item.colliding_files {
+                            println!("      {}", f.dimmed());
+                        }
+                    }
+                } else {
+                    println!("  Cannibalization:     {}", "0 (Unique Intent)".green());
+                }
+
+                if !dir_report.orphan_pages.is_empty() {
+                    println!("\n{}", format!("Orphan Pages (0 incoming internal links, {} files):", dir_report.orphan_pages.len()).yellow().bold());
+                    for f in dir_report.orphan_pages.iter().take(5) {
+                        println!("  - {}", f.yellow());
+                    }
+                    if dir_report.orphan_pages.len() > 5 {
+                        println!("    ... and {} more", dir_report.orphan_pages.len() - 5);
+                    }
+                } else {
+                    println!("  Orphan Pages:        {}", "0 (Fully Interlinked)".green());
+                }
+
                 if !dir_report.thin_pages.is_empty() {
                     println!("\n{}", format!("Thin Pages (<300 words, {} files):", dir_report.thin_pages.len()).yellow().bold());
                     for (f, wc) in dir_report.thin_pages.iter().take(5) {
@@ -201,7 +233,13 @@ fn main() -> Result<()> {
                 println!("  Title:       {}", report.title.as_deref().unwrap_or("N/A"));
                 println!("  Description: {}", report.description.as_deref().unwrap_or("N/A"));
                 println!("  Headings:    H1: {}, H2: {}, H3: {}", report.h1_count, report.h2_count, report.h3_count);
+                if !report.heading_skipped_levels.is_empty() {
+                    println!("  Skipped H*:  {}", report.heading_skipped_levels.join(", ").yellow());
+                }
                 println!("  Word Count:  {}", report.word_count);
+                if report.em_dash_count > 0 || !report.ai_slop_words_found.is_empty() {
+                    println!("  AI Tells:    {} em-dashes, words: [{}]", report.em_dash_count, report.ai_slop_words_found.join(", "));
+                }
                 println!("  Links:       Internal: {}, External: {}", report.internal_links, report.external_links);
 
                 println!("\n{}", "Check Results:".bold());
@@ -386,6 +424,50 @@ fn main() -> Result<()> {
                 }
             } else {
                 println!("  Previous: First recorded check");
+            }
+        }
+        Commands::Sitemap { target, json } => {
+            let report = sitemap::audit_sitemap(&target)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                return Ok(());
+            }
+
+            println!("\n{} {}", "XML Sitemap & Hreflang Audit:".cyan().bold(), report.target);
+            println!("  Valid Sitemap:   {}", if report.is_valid { "YES".green().bold() } else { "NO".red().bold() });
+            println!("  Total URLs:      {}", report.total_urls);
+            println!("  HTTPS URLs:      {}/{} ({:.1}%)", 
+                report.https_urls, 
+                report.total_urls,
+                if report.total_urls > 0 { (report.https_urls as f64 / report.total_urls as f64) * 100.0 } else { 0.0 }
+            );
+            if report.insecure_http_urls > 0 {
+                println!("  Insecure HTTP:   {}", format!("{} URLs", report.insecure_http_urls).red().bold());
+            }
+            if report.urls_with_params > 0 {
+                println!("  Query Params:    {}", format!("{} URLs with '?'", report.urls_with_params).yellow());
+            }
+            println!("  With <lastmod>:  {}/{}", report.urls_with_lastmod, report.total_urls);
+            println!("  Hreflang Tags:   {}", report.hreflang_count);
+
+            if !report.sample_urls.is_empty() {
+                println!("\n{}", "Sample URLs:".bold());
+                for u in &report.sample_urls {
+                    println!("  - {}", u.dimmed());
+                }
+            }
+
+            if !report.errors.is_empty() {
+                println!("\n{}", "Errors:".red().bold());
+                for e in &report.errors {
+                    println!("  ✖ {}", e);
+                }
+            }
+            if !report.warnings.is_empty() {
+                println!("\n{}", "Warnings:".yellow().bold());
+                for w in &report.warnings {
+                    println!("  ⚠ {}", w);
+                }
             }
         }
         Commands::Mcp => {

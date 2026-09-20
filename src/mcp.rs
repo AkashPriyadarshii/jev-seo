@@ -135,6 +135,17 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
                             },
                             "required": ["topic"]
                         }
+                    },
+                    {
+                        "name": "seo_sitemap",
+                        "description": "Inspect and validate XML sitemaps for protocols, 50k URL limits, and international hreflang tags",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "target": { "type": "string", "description": "URL or local file path to sitemap.xml" }
+                            },
+                            "required": ["target"]
+                        }
                     }
                 ]
             })),
@@ -226,6 +237,13 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
             match crate::brief::generate_brief(topic, limit) {
                 Ok(brief) => serde_json::to_string_pretty(&brief).unwrap_or_default(),
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_sitemap" => {
+            let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::sitemap::audit_sitemap(target) {
+                Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }
         }
