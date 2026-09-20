@@ -12,3 +12,19 @@
 - [x] Module 6: Native Agent MCP Server (`mcp.rs` - stdio JSON-RPC 2.0 server for Claude Code/Gemini CLI)
 - [x] Unit & Integration Tests with mock fixtures (4/4 passed)
 - [x] Built and verified release binary (`target/release/jev-seo.exe`)
+
+## Phase 1: Content Quality & Hierarchy Audits (Completed)
+- [x] Heading hierarchy skip-level detection (`H1 -> H3` without `H2`) in Markdown and HTML
+- [x] Google Helpful Content and AI slop detection (em-dash density per 500 words plus 17 synthetic writing tells)
+
+## Phase 2: Internal Linking & Keyword Cannibalization (Completed)
+- [x] Internal link extraction across Markdown and HTML files
+- [x] In-memory link graph with orphan page detection (pages receiving 0 inbound links)
+- [x] Keyword cannibalization radar grouping colliding pages targeting identical keyword stems
+
+## Phase 3: XML Sitemap & International Hreflang (Completed)
+- [x] XML sitemap inspection (`<loc>`, `<lastmod>`, canonical HTTPS enforcement, 50,000 URL limit, query param detection)
+- [x] International hreflang tag validation (flags malformed `en-UK`, verifies `x-default` fallback)
+- [x] Native MCP server expansion (`seo_sitemap` tool added, 8 tools active)
+- [x] Test suite expanded to 21 passing tests with zero clippy warnings
+- [x] Production binary installed to `C:\Users\saves\.local\bin\jev-seo.exe`
