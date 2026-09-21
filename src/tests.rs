@@ -410,4 +410,91 @@ Sitemap: https://example.com/sitemap.xml
         let err = resp.error.unwrap();
         assert_eq!(err.get("code").and_then(|c| c.as_i64()), Some(-32601));
     }
+
+    #[test]
+    fn test_policy_gate() {
+        use crate::policy::{gate, Verdict};
+        assert_eq!(gate("geo", 0.9), Verdict::Act);
+        assert_eq!(gate("geo", 0.6), Verdict::Flag);
+        assert_eq!(gate("geo", 0.2), Verdict::Drop);
+    }
+
+    #[test]
+    fn test_composite_geo() {
+        use crate::policy::composite_geo;
+        use serde_json::json;
+        let mut extra = serde_json::Map::new();
+        for id in ["geo_structure", "geo_density", "geo_directness", "geo_statistics", "geo_freshness"] {
+            extra.insert(id.into(), json!({"score": 4.0, "confidence": 0.9}));
+        }
+        assert_eq!(composite_geo(&extra), Some((10, 0.9)));
+        extra.remove("geo_density");
+        assert_eq!(composite_geo(&extra), None);
+    }
+
+    #[test]
+    fn test_url_matches_domain() {
+        use crate::paths::url_matches_domain;
+        assert!(url_matches_domain("https://crates.io/crates/rg", "crates.io"));
+        assert!(url_matches_domain("https://docs.crates.io/x", "crates.io"));
+        assert!(!url_matches_domain("https://evilcrates.io/x", "crates.io"));
+        assert!(!url_matches_domain("not a url", "crates.io"));
+    }
+
+    #[test]
+    fn test_reject_private_url() {
+        use crate::paths::reject_private_url;
+        assert!(reject_private_url("https://example.com/robots.txt").is_ok());
+        for bad in [
+            "http://localhost/x",
+            "http://127.0.0.1/x",
+            "http://10.0.0.5/x",
+            "http://169.254.169.254/",
+            "ftp://example.com/x",
+        ] {
+            assert!(reject_private_url(bad).is_err(), "{}", bad);
+        }
+    }
+
+    #[test]
+    fn test_read_user_file_guards() {
+        use crate::paths::read_user_file;
+        let dir = tempfile::tempdir().unwrap();
+        let dot = dir.path().join(".hidden.md");
+        std::fs::write(&dot, "x").unwrap();
+        assert!(read_user_file(dot.to_str().unwrap(), &["md"]).is_err());
+        let exe = dir.path().join("run.sh");
+        std::fs::write(&exe, "x").unwrap();
+        assert!(read_user_file(exe.to_str().unwrap(), &["md"]).is_err());
+        let ok = dir.path().join("page.md");
+        std::fs::write(&ok, "hello").unwrap();
+        assert_eq!(read_user_file(ok.to_str().unwrap(), &["md"]).unwrap(), "hello");
+        assert_eq!(read_user_file("just a snippet", &["md"]).unwrap(), "just a snippet");
+        assert!(read_user_file("https://example.com/x", &["md"]).is_err());
+    }
+
+    #[test]
+    fn test_mcp_initialize_and_is_error() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        let init = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "initialize".into(),
+            params: None,
+        };
+        let resp = handle_request(&init);
+        assert!(resp.result.as_ref().unwrap().get("protocolVersion").is_some());
+
+        let call = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(2)),
+            method: "tools/call".into(),
+            params: Some(json!({"name": "nope", "arguments": {}})),
+        };
+        let resp = handle_request(&call);
+        let result = resp.result.unwrap();
+        assert_eq!(result.get("isError").and_then(|v| v.as_bool()), Some(true));
+    }
 }

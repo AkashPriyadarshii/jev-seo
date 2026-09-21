@@ -156,7 +156,7 @@ fn main() -> Result<()> {
 
             // Rerank by Jev relevance: one Score per result in the same request.
             let mut rel_questions = serde_json::Map::new();
-            for (i, item) in items.iter().enumerate() {
+            for (i, _) in items.iter().enumerate() {
                 rel_questions.insert(
                     format!("rel_{}", i),
                     json!({
@@ -330,7 +330,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Geo { target, query, json } => {
-            let content = match geo_target_content(&target) {
+            let content = match crate::paths::read_user_file(&target, &["md", "mdx", "markdown", "html", "htm", "txt"]) {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("{}", format!("Error: {e:#}").red());
@@ -568,10 +568,6 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn geo_target_content(target: &str) -> Result<String> {
-    crate::paths::read_user_file(target, &["md", "mdx", "markdown", "html", "htm", "txt"])
 }
 
 /// Run a Jev eval gated by policy. Returns None on low confidence or API

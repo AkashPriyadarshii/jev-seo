@@ -47,6 +47,7 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
 
     match resp {
         Ok(response) => {
+            crate::paths::reject_redirect_target(response.get_url())?;
             let status_code = response.status();
             let body = response.into_string().unwrap_or_default();
             parse_robots_txt(&domain, &robots_url, status_code, &body)

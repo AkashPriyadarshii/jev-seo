@@ -164,7 +164,7 @@ impl JevClient {
             .as_f64()
             .context("Jev response missing answers.geo_score.score")?;
         let geo_confidence = geo_obj["confidence"].as_f64().unwrap_or(0.0);
-        let geo_score = ((geo_val + 1.0) * 2.0).round().clamp(1.0, 10.0) as u32;
+        let geo_score = ((geo_val / 4.0 * 9.0) + 1.0).round().clamp(1.0, 10.0) as u32;
 
         let direct_obj = &answers["direct_answer"];
         let direct_answer_p = direct_obj["noul"]
@@ -211,7 +211,8 @@ fn truncate_state(value: serde_json::Value) -> serde_json::Value {
     match value {
         serde_json::Value::String(s) => {
             if s.len() > LIMIT {
-                serde_json::Value::String(format!("{}…[truncated]", &s[..LIMIT]))
+                let cut = s.floor_char_boundary(LIMIT);
+                serde_json::Value::String(format!("{}…[truncated]", &s[..cut]))
             } else {
                 serde_json::Value::String(s)
             }
