@@ -29,3 +29,5 @@
 - Maximum performance, zero runtime allocations on hot paths.
 - Error handling with `thiserror` / `anyhow`.
 - Pre-commit gates: `git jev check` or `jev-axi diff --staged`.
+
+- Profile: release-order touch 2026-09-22
