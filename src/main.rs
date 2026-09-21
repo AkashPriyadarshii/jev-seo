@@ -54,6 +54,9 @@ enum Commands {
         target_query: Option<String>,
         #[arg(long)]
         json: bool,
+        /// Exit nonzero when pass rate falls below this percent (CI gate)
+        #[arg(long)]
+        min_pass: Option<f64>,
     },
     /// Generative Engine Optimization (GEO) citation scoring via Jev
     Geo {
@@ -215,8 +218,18 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json } => {
+        Commands::Audit { path, target_query, json, min_pass } => {
             let dir_report = audit::audit_path(&path)?;
+
+            if let Some(floor) = min_pass {
+                if dir_report.pass_rate < floor {
+                    anyhow::bail!(
+                        "pass rate {:.1}% below gate {:.1}%",
+                        dir_report.pass_rate,
+                        floor
+                    );
+                }
+            }
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&dir_report)?);
@@ -348,6 +361,16 @@ fn main() -> Result<()> {
                             }
                             println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
                             println!("  Primary Gap:     {}", eval.content_gap.yellow());
+                            if let Ok(db) = rank::DbStore::open() {
+                                match db.record_geo(&target, &query, eval.geo_score) {
+                                    Ok(Some(prev)) if prev != eval.geo_score => {
+                                        let arrow = if eval.geo_score > prev { "▲".green() } else { "▼".red() };
+                                        println!("  Since Last:      {} {} → {}", arrow, prev, eval.geo_score);
+                                    }
+                                    Ok(Some(prev)) => println!("  Since Last:      {} (no change)", prev),
+                                    _ => println!("  Since Last:      first recorded check"),
+                                }
+                            }
                         }
                     }
                     Err(e) => eprintln!("{}", format!("Error: Jev scoring failed ({e:#}).").red()),
