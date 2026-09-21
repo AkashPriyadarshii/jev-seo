@@ -1,0 +1,26 @@
+# jev-seo
+
+> FOSS zero-cost SEO & GEO search radar for developers and AI agents. Rust CLI + MCP. No subscriptions, no credit card.
+
+- Homepage: https://jevseo.vercel.app/
+- Repo: https://github.com/AkashPriyadarshii/jev-seo
+- Sitemap: https://jevseo.vercel.app/sitemap.xml
+
+## When to use this
+
+Reach for jev-seo when you need to:
+
+- Audit markdown or HTML files for on-page SEO issues, thin pages, title collisions, orphan pages, or AI slop: `jev-seo audit docs/`
+- Validate Schema.org JSON-LD markup: `jev-seo schema index.html`
+- Check robots.txt for AI crawler permissions (GPTBot, ClaudeBot, PerplexityBot, Google-Extended): `jev-seo robots example.com`
+- Score content for AI citation likelihood (GEO 1-10): `jev-seo geo page.md --query "your topic"`
+- Inspect live SERP competitors and rerank by relevance: `jev-seo query "your keyword"`
+- Generate a content brief from live competitors: `jev-seo brief "your topic"`
+- Track domain rank over time: `jev-seo rank --domain example.com --query "your keyword"`
+- Inspect XML sitemaps: `jev-seo sitemap https://example.com/sitemap.xml`
+
+Do not use jev-seo for paid keyword data, backlink graphs, or site crawling at scale. It scrapes free endpoints and audits local files.
+
+## Call it
+
+CLI: `cargo install jev-seo`, then `jev-seo --help`. MCP: run `jev-seo mcp` for a stdio JSON-RPC 2.0 server with 8 tools (seo_audit, seo_geo, seo_schema, seo_robots, seo_brief, seo_sitemap, seo_keywords, seo_serp_inspect).
