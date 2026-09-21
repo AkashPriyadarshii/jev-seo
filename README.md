@@ -240,8 +240,8 @@ The live site is scored by [is-agentic](https://is-agentic.com/scan/jevseo.verce
 
 ## Ecosystem
 
-* [design-genius](https://github.com/AkashPriyadarshii/design-genius) — Autonomous design system intelligence for web applications
-* [akash-design-engineering](https://github.com/AkashPriyadarshii/akash-design-engineering) — High-performance editorial brutalist design tokens and cookbook
+* [jev-superpowers](https://github.com/AkashPriyadarshii/jev-superpowers) — Jev-powered agent superpowers
+* [jev-curate](https://github.com/AkashPriyadarshii/jev-curate) — Jev-curated content toolkit
 * [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android) — Precompiled TDLib native binaries for all 4 Android ABIs
 * [kharcha](https://github.com/AkashPriyadarshii/kharcha) — India-first offline-first UPI expense tracker for Android
 
