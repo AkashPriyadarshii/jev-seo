@@ -88,19 +88,32 @@ impl JevClient {
         let answers = body.get("answers").context("Invalid Jev response schema")?;
 
         let intent_obj = &answers["intent"];
-        let intent = intent_obj["choice"].as_str().unwrap_or("informational").to_string();
-        let intent_confidence = intent_obj["confidence"].as_f64().unwrap_or(0.5);
+        let intent = intent_obj["choice"]
+            .as_str()
+            .context("Jev response missing answers.intent.choice")?
+            .to_string();
+        let intent_confidence = intent_obj["confidence"]
+            .as_f64()
+            .context("Jev response missing answers.intent.confidence")?;
 
         let geo_obj = &answers["geo_score"];
-        let geo_val = geo_obj["score"].as_f64().unwrap_or(2.0);
+        let geo_val = geo_obj["score"]
+            .as_f64()
+            .context("Jev response missing answers.geo_score.score")?;
         let geo_score = ((geo_val + 1.0) * 2.0).round().clamp(1.0, 10.0) as u32;
 
         let direct_obj = &answers["direct_answer"];
-        let direct_answer_p = direct_obj["noul"].as_f64().unwrap_or(direct_obj["probability"].as_f64().unwrap_or(0.5));
+        let direct_answer_p = direct_obj["noul"]
+            .as_f64()
+            .or_else(|| direct_obj["probability"].as_f64())
+            .context("Jev response missing answers.direct_answer.noul")?;
         let direct_answer = direct_answer_p >= 0.5;
 
         let gap_obj = &answers["content_gap"];
-        let content_gap = gap_obj["choice"].as_str().unwrap_or("none").to_string();
+        let content_gap = gap_obj["choice"]
+            .as_str()
+            .context("Jev response missing answers.content_gap.choice")?
+            .to_string();
 
         Ok(AnalysisResult {
             intent,

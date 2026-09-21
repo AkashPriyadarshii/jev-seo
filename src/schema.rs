@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use gray_matter::engine::YAML;
 use gray_matter::Matter;
 use regex::Regex;
@@ -28,12 +28,10 @@ pub struct SchemaDetail {
 }
 
 pub fn validate_target(target_str: &str) -> Result<SchemaValidationReport> {
-    let content = if std::path::Path::new(target_str).exists() {
-        std::fs::read_to_string(target_str)
-            .with_context(|| format!("Failed to read target file: {}", target_str))?
-    } else {
-        target_str.to_string()
-    };
+    let content = crate::paths::read_user_file(
+        target_str,
+        &["html", "htm", "md", "mdx", "markdown", "json", "txt"],
+    )?;
 
     validate_content(target_str, &content)
 }

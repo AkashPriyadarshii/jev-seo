@@ -31,7 +31,7 @@ pub fn audit_sitemap(target: &str) -> Result<SitemapReport> {
             .into_string()
             .with_context(|| format!("Failed to read sitemap body from {}", target))?
     } else {
-        std::fs::read_to_string(target)
+        crate::paths::read_user_file(target, &["xml"])
             .with_context(|| format!("Failed to read local sitemap file: {}", target))?
     };
 
