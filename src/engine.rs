@@ -12,9 +12,20 @@ pub struct AnalysisResult {
     pub intent: String,
     pub intent_confidence: f64,
     pub geo_score: u32,
+    pub geo_confidence: f64,
     pub direct_answer: bool,
     pub direct_answer_p: f64,
     pub content_gap: String,
+    pub gap_confidence: f64,
+}
+
+impl AnalysisResult {
+    /// Lowest confidence across the semantic answers. Gate on this.
+    pub fn confidence(&self) -> f64 {
+        self.intent_confidence
+            .min(self.geo_confidence)
+            .min(self.gap_confidence)
+    }
 }
 
 impl JevClient {
@@ -30,6 +41,7 @@ impl JevClient {
     }
 
     pub fn fanout_eval(&self, state: serde_json::Value) -> Result<AnalysisResult> {
+        let state = truncate_state(state);
         let payload = json!({
             "model": "jev-1.13.0",
             "state": state,
@@ -100,6 +112,7 @@ impl JevClient {
         let geo_val = geo_obj["score"]
             .as_f64()
             .context("Jev response missing answers.geo_score.score")?;
+        let geo_confidence = geo_obj["confidence"].as_f64().unwrap_or(0.0);
         let geo_score = ((geo_val + 1.0) * 2.0).round().clamp(1.0, 10.0) as u32;
 
         let direct_obj = &answers["direct_answer"];
@@ -114,14 +127,38 @@ impl JevClient {
             .as_str()
             .context("Jev response missing answers.content_gap.choice")?
             .to_string();
+        let gap_confidence = gap_obj["confidence"].as_f64().unwrap_or(0.0);
 
         Ok(AnalysisResult {
             intent,
             intent_confidence,
             geo_score,
+            geo_confidence,
             direct_answer,
             direct_answer_p,
             content_gap,
+            gap_confidence,
         })
+    }
+}
+
+/// Cap every string in the state so oversized pages never 400 the API.
+fn truncate_state(value: serde_json::Value) -> serde_json::Value {
+    const LIMIT: usize = 8000;
+    match value {
+        serde_json::Value::String(s) => {
+            if s.len() > LIMIT {
+                serde_json::Value::String(format!("{}…[truncated]", &s[..LIMIT]))
+            } else {
+                serde_json::Value::String(s)
+            }
+        }
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.into_iter().map(truncate_state).collect())
+        }
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.into_iter().map(|(k, v)| (k, truncate_state(v))).collect(),
+        ),
+        other => other,
     }
 }
