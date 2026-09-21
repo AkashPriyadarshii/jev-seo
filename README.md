@@ -210,8 +210,14 @@ jev-seo
 ├── Cargo.toml
 └── README.md
 ```
+---
+
+## Agent Readiness
+
+The live site is scored by [is-agentic](https://is-agentic.com/scan/jevseo.vercel.app): **51/100** on the last snapshot, with trust pages, JSON-LD, metadata, and `llms.txt` shipped since. Jev predicts **65-74** on rescan (medium confidence); homepage markdown negotiation needs server compute and stays red on static hosting.
 
 ---
+
 ## Star History
 
 <a href="https://www.star-history.com/?repos=akashpriyadarshii%2Fjev-seo&type=date&legend=top-left">
