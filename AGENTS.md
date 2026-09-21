@@ -12,6 +12,6 @@
 
 ## Ecosystem Footer Standard
 Every marketing page or documentation footer must reference:
-- **Ecosystem**: `design-genius`, `akash-design-engineering`, `tdlib-android`, `kharcha`
+- **Ecosystem**: `jev-superpowers`, `jev-curate`, `tdlib-android`, `kharcha`
 - **Author**: Akash Priyadarshi (Patna, Bihar, India)
 - **Links**: Portfolio (https://akashpriyadarshi.vercel.app), GitHub (https://github.com/AkashPriyadarshii)
