@@ -267,7 +267,13 @@ fn main() -> Result<()> {
             }
         }
         Commands::Geo { target, query, json } => {
-            let content = std::fs::read_to_string(&target).unwrap_or_else(|_| target.clone());
+            let content = match geo_target_content(&target) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("{}", format!("Error: {e:#}").red());
+                    return Ok(());
+                }
+            };
             if let Some(client) = engine::JevClient::new() {
                 let state = json!({
                     "query": query,
@@ -476,4 +482,43 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn geo_target_content(target: &str) -> Result<String> {
+    const ALLOWED: &[&str] = &["md", "mdx", "markdown", "html", "htm", "txt"];
+    let trimmed = target.trim();
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        anyhow::bail!("geo does not fetch URLs — pass a local content file path or an inline snippet");
+    }
+    let path = std::path::Path::new(trimmed);
+    let looks_like_path = path.exists()
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+        || (trimmed.starts_with('.') && trimmed.len() > 1);
+    if !looks_like_path {
+        return Ok(trimmed.to_string());
+    }
+    if !path.exists() {
+        anyhow::bail!("file not found: {}", trimmed);
+    }
+    if !path.is_file() {
+        anyhow::bail!("not a file: {}", trimmed);
+    }
+    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+        if name.starts_with('.') {
+            anyhow::bail!("refusing dot-file: {}", trimmed);
+        }
+    }
+    let ext_ok = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| ALLOWED.contains(&e.to_ascii_lowercase().as_str()))
+        .unwrap_or(false);
+    if !ext_ok {
+        anyhow::bail!(
+            "refusing non-content file (allowed: .md .mdx .markdown .html .htm .txt): {}",
+            trimmed
+        );
+    }
+    Ok(std::fs::read_to_string(path)?)
 }
