@@ -1,0 +1,4 @@
+target/
+.agents/
+skills-lock.json
+.jev-seo.db

@@ -5,6 +5,14 @@
       "source": "/",
       "has": [{ "type": "header", "key": "accept", "value": "(.*)text/markdown(.*)" }],
       "destination": "/index.md"
+    },
+    {
+      "source": "/",
+      "destination": "/home.html"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/home.html"
     }
   ],
   "headers": [
