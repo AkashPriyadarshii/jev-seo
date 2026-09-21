@@ -76,7 +76,7 @@ impl DbStore {
         let prev_rank: Option<usize> = self
             .conn
             .query_row(
-                "SELECT position FROM rank_history WHERE keyword_id = ?1 ORDER BY checked_at DESC LIMIT 1",
+                "SELECT position FROM rank_history WHERE keyword_id = ?1 ORDER BY id DESC LIMIT 1",
                 params![keyword_id],
                 |row| {
                     let pos: Option<i64> = row.get(0)?;
@@ -105,7 +105,7 @@ impl DbStore {
         let prev: Option<u32> = self
             .conn
             .query_row(
-                "SELECT score FROM geo_history WHERE target = ?1 AND term = ?2 ORDER BY checked_at DESC LIMIT 1",
+                "SELECT score FROM geo_history WHERE target = ?1 AND term = ?2 ORDER BY id DESC LIMIT 1",
                 params![target, term],
                 |row| row.get(0),
             )

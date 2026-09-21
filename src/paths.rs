@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::net::ToSocketAddrs;
 
 /// Read a user-named file with guard rails shared by CLI and MCP tools.
 /// Non-path input (no separators, not an existing path) is returned as-is so
@@ -64,17 +65,40 @@ pub fn reject_private_url(raw: &str) -> anyhow::Result<url::Url> {
         anyhow::bail!("refusing non-http URL: {}", raw);
     }
     let host = url.host_str().unwrap_or("").to_ascii_lowercase();
-    let blocked = host == "localhost"
-        || host == "::1"
-        || host.ends_with(".localhost")
-        || host.parse::<std::net::IpAddr>().is_ok_and(|ip| match ip {
-            std::net::IpAddr::V4(v4) => {
-                v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
-            }
-            std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
-        });
-    if blocked {
+    if host == "localhost" || host == "::1" || host.ends_with(".localhost") {
         anyhow::bail!("refusing private fetch target: {}", host);
     }
-    Ok(url)
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        if is_private_ip(ip) {
+            anyhow::bail!("refusing private fetch target: {}", host);
+        }
+        return Ok(url);
+    }
+    // Hostname: resolve and check every addr (blocks DNS rebinding at request time).
+    let port = url.port_or_known_default().unwrap_or(443);
+    match (host.as_str(), port).to_socket_addrs() {
+        Ok(addrs) => {
+            for addr in addrs {
+                if is_private_ip(addr.ip()) {
+                    anyhow::bail!("refusing private fetch target: {} resolves privately", host);
+                }
+            }
+            Ok(url)
+        }
+        Err(_) => Ok(url),
+    }
+}
+
+fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
+        }
+        std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
+    }
+}
+
+/// Re-check the final URL after fetches that follow redirects.
+pub fn reject_redirect_target(final_url: &str) -> anyhow::Result<()> {
+    reject_private_url(final_url).map(|_| ())
 }

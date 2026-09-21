@@ -48,7 +48,6 @@ pub fn run_stdio_server() -> Result<()> {
 
         // Notifications carry no id and get no reply.
         if req.id.is_none() {
-            handle_request(&req);
             continue;
         }
 
@@ -211,10 +210,6 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
     }
 }
 
-fn read_geo_target(target: &str) -> anyhow::Result<String> {
-    crate::paths::read_user_file(target, &["md", "mdx", "markdown", "html", "htm", "txt"])
-}
-
 /// Second-layer guard for agent-chosen targets. Static path rules already ran;
 /// this asks Jev whether the target smells like a secret. Fails open offline.
 fn safety_gate(tool: &str, target: &str) -> Option<String> {
@@ -259,7 +254,7 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             if let Some(err) = safety_gate("seo_geo", target) {
                 return err;
             }
-            let content = match read_geo_target(target) {
+            let content = match crate::paths::read_user_file(target, &["md", "mdx", "markdown", "html", "htm", "txt"]) {
                 Ok(c) => c,
                 Err(e) => return format!("Error: {}", e),
             };
@@ -313,6 +308,6 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
                 Err(e) => format!("Error: {}", e),
             }
         }
-        _ => format!("Unknown tool: {}", name),
+        _ => format!("Error: unknown tool: {}", name),
     }
 }
