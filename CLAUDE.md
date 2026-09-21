@@ -1,5 +1,12 @@
 # CLAUDE.md for jev-seo
 
+## Live Site (deploy model)
+- Site source lives on the **`site` branch**, not `master`. Multi-file static site: `index.html`, `styles.css`, `script.js`, `about.html`, `contact.html`, `privacy.html`, plus `vercel.json` / `.vercelignore`.
+- **GitHub Pages**: https://akashpriyadarshii.github.io/jev-seo/ (source = `site` branch, root `/`). Auto-deploys on push to `site`.
+- **Vercel**: https://jevseo.vercel.app (managed by the user, keeps its own link).
+- To change the site: checkout/commit on `site` branch only. Never touch `site` from `master`.
+- Local: `git checkout site && python -m http.server` to preview.
+
 ## Development Commands
 - Build: `cargo build --release`
 - Test: `cargo test`

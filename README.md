@@ -36,6 +36,10 @@ Keywords: seo, geo, generative engine optimization, typesafe ai, jev, foss, rust
     <a href="#non-goals">Non-Goals</a> •
     <a href="#ecosystem">Ecosystem</a>
   </p>
+  <p>
+    <a href="https://jevseo.vercel.app"><img src="https://img.shields.io/badge/live%20-%20vercel-black?style=flat-square" alt="Vercel"></a>
+    <a href="https://akashpriyadarshii.github.io/jev-seo/"><img src="https://img.shields.io/badge/live%20-%20github%20pages-222?style=flat-square" alt="GitHub Pages"></a>
+  </p>
 </div>
 
 ---

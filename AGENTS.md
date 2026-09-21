@@ -15,3 +15,9 @@ Every marketing page or documentation footer must reference:
 - **Ecosystem**: `jev-superpowers`, `jev-curate`, `tdlib-android`, `kharcha`
 - **Author**: Akash Priyadarshi (Patna, Bihar, India)
 - **Links**: Portfolio (https://akashpriyadarshi.vercel.app), GitHub (https://github.com/AkashPriyadarshii)
+
+## Live Site Deploy (site branch)
+- Site files live on the **`site` branch** (never `master`).
+- GitHub Pages: https://akashpriyadarshii.github.io/jev-seo/ auto-deploys on push to `site`.
+- Vercel: https://jevseo.vercel.app (user-managed link, independent of Pages).
+- Edit flow: `git checkout site` → edit → commit → push origin site. `master` stays pure Rust crate.
