@@ -17,3 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keyword cannibalization radar identifying colliding pages targeting identical multi-word keyword stems.
 - New `seo_sitemap` tool added to the native MCP server, expanding the exposed toolset to 8 tools.
 - Expanded test harness to 21 passing unit and integration tests.
+- MCP `initialize` handshake, silent notifications, parse-error replies, and `isError` on tool failures.
+- Shared guarded file reader for CLI and MCP tools plus a Jev safety classifier blocking secret-looking targets.
+- SSRF block on remote fetches covering literal hosts, resolved DNS, and redirect landings.
+- Confidence-gated Jev verdicts with per-command thresholds in `src/policy.rs`; strict response parsing and 8k state truncation.
+- Composite five-dimension GEO score, intent routing hints, and per-command speculative fan-out.
+- SERP relevance rerank with per-section confidence gating.
+- `audit --min-pass` CI gate with a GitHub Actions workflow, GEO score trend history, and home-directory database.
+- Expanded test harness to 27 passing unit and integration tests.

@@ -127,7 +127,16 @@ Pulls live DuckDuckGo competitors, calculates optimal word count, and uses Jev S
 ```bash
 jev-seo geo README.md --query "agentic skills framework for coding agents"
 ```
-Calculates citation probability for Perplexity, SearchGPT, and Gemini Overviews using Jev `Score` (1-10) and `Noul`.
+Calculates citation probability for Perplexity, SearchGPT, and Gemini Overviews using Jev `Score` (1-10) and `Noul`. Prints a five-dimension composite (structure, density, directness, statistics, freshness) with code-owned weights, plus the score delta since your last check. Low-confidence answers are withheld instead of printed.
+
+### 8. Confidence-Gated Scoring
+Every Jev verdict carries calibrated confidence. Confident scores print as facts, shaky ones are marked `[verify]`, and unsure ones are withheld with a note. Thresholds live in one place (`src/policy.rs`) and scale with the stakes of each command.
+
+### 9. SEO Gate for CI
+```bash
+jev-seo audit docs/ --min-pass 40
+```
+Exits nonzero when the pass rate falls below the floor. A ready-made workflow (`.github/workflows/seo-gate.yml`) runs tests plus the gate on every push and pull request.
 
 ### 6. XML Sitemap & International Hreflang Auditor
 ```bash
@@ -151,13 +160,13 @@ Integrated into `jev-seo audit`:
 | Command | Description | Flags |
 |---|---|---|
 | `keywords <query>` | Autocomplete discovery and Jev intent classification | `--json` |
-| `query <query>` | Live SERP competitor scraping and winning gap analysis | `--json` |
-| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit | `--target-query <query>`, `--json` |
-| `geo <target>` | Generative Engine Optimization citation scoring (1-10) | `--query <query>`, `--json` |
+| `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--json` |
+| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit | `--target-query <query>`, `--json`, `--min-pass <pct>` |
+| `geo <target>` | Generative Engine Optimization citation scoring (1-10), composite dimensions, score trend | `--query <query>`, `--json` |
 | `schema <target>` | Schema.org JSON-LD structural and deprecation validator | `--json` |
 | `robots <domain>` | Robots.txt and AI crawler permission auditor | `--json` |
 | `brief <topic>` | SERP-driven heading outline and 150-word GEO direct-answer | `--limit <n>`, `--markdown`, `--json` |
-| `rank` | SQLite rank drift tracker (.jev-seo.db) | `--domain <domain>`, `--query <query>` |
+| `rank` | SQLite rank drift tracker (~/.jev-seo/jev-seo.db) | `--domain <domain>`, `--query <query>` |
 | `sitemap <target>` | XML sitemap, 50k limit, HTTPS, and hreflang validator | `--json` |
 | `mcp` | Native Stdio JSON-RPC 2.0 Agent MCP Server | (None) |
 
@@ -165,7 +174,7 @@ Integrated into `jev-seo audit`:
 
 ## Native MCP Server (8 Tools)
 
-When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 8 tools:
+When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 8 tools. It answers the `initialize` handshake, stays silent on notifications, reports parse errors, and flags tool failures with `isError`. File tools share a guarded reader (content extensions only, no dot-files, no URLs) plus a Jev safety classifier that blocks secret-looking targets. Remote fetches refuse private hosts, resolved DNS, and redirect landings.
 
 | MCP Tool | Arguments | Purpose |
 |---|---|---|
@@ -187,15 +196,17 @@ jev-seo
 ├── src
 │   ├── main.rs         CLI entrypoint & command dispatch
 │   ├── engine.rs       TypeSafe Jev client & speculative fan-out
+│   ├── paths.rs        Shared guarded file reader, domain match, SSRF block
+│   ├── policy.rs       Confidence thresholds, GEO weights, intent routing
 │   ├── serp.rs         DuckDuckGo HTML & suggest scraper
 │   ├── audit.rs        Batch directory & file on-page meta auditor
 │   ├── schema.rs       JSON-LD Schema.org structural & semantic validator
 │   ├── robots.rs       Robots.txt & AI crawler permission analyzer
 │   ├── brief.rs        SERP-driven content brief generator
-│   ├── rank.rs         Local SQLite rank drift tracker (.jev-seo.db)
+│   ├── rank.rs         Local SQLite rank drift tracker (~/.jev-seo/jev-seo.db)
 │   ├── sitemap.rs      XML sitemap & international hreflang auditor
 │   ├── mcp.rs          Native stdio JSON-RPC 2.0 MCP server (8 tools)
-│   └── tests.rs        Unit & integration test harness (21 tests passing)
+│   └── tests.rs        Unit & integration test harness (27 tests passing)
 ├── Cargo.toml
 └── README.md
 ```
