@@ -17,7 +17,17 @@ pub struct DbStore {
 
 impl DbStore {
     pub fn open() -> Result<Self> {
-        let conn = Connection::open(".jev-seo.db")?;
+        let path = std::env::var("JEV_SEO_DB").ok().unwrap_or_else(|| {
+            std::env::var("HOME")
+                .map(|h| format!("{}/.jev-seo/jev-seo.db", h))
+                .unwrap_or_else(|_| ".jev-seo.db".to_string())
+        });
+        if let Some(parent) = std::path::Path::new(&path).parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+        let conn = Connection::open(&path)?;
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              CREATE TABLE IF NOT EXISTS keywords (
@@ -27,13 +37,20 @@ impl DbStore {
                  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                  UNIQUE(domain, term)
              );
-             CREATE TABLE IF NOT EXISTS rank_history (
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 keyword_id INTEGER NOT NULL REFERENCES keywords(id),
-                 position INTEGER,
-                 serp_url TEXT,
-                 checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
-             );",
+              CREATE TABLE IF NOT EXISTS rank_history (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  keyword_id INTEGER NOT NULL REFERENCES keywords(id),
+                  position INTEGER,
+                  serp_url TEXT,
+                  checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+              );
+              CREATE TABLE IF NOT EXISTS geo_history (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  target TEXT NOT NULL,
+                  term TEXT NOT NULL,
+                  score INTEGER NOT NULL,
+                  checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+              );",
         )?;
         Ok(Self { conn })
     }
@@ -81,5 +98,22 @@ impl DbStore {
             curr_rank,
             serp_url: serp_url.map(|s| s.to_string()),
         })
+    }
+
+    /// Record a GEO score, returning the previous score for the delta line.
+    pub fn record_geo(&self, target: &str, term: &str, score: u32) -> Result<Option<u32>> {
+        let prev: Option<u32> = self
+            .conn
+            .query_row(
+                "SELECT score FROM geo_history WHERE target = ?1 AND term = ?2 ORDER BY checked_at DESC LIMIT 1",
+                params![target, term],
+                |row| row.get(0),
+            )
+            .unwrap_or(None);
+        self.conn.execute(
+            "INSERT INTO geo_history (target, term, score) VALUES (?1, ?2, ?3)",
+            params![target, term, score as i64],
+        )?;
+        Ok(prev)
     }
 }
