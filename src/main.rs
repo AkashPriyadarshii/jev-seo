@@ -131,6 +131,7 @@ fn main() -> Result<()> {
                 println!("\n{}", "Intent & Semantic Classification:".cyan().bold());
                 println!("  Primary Intent: {} (confidence: {:.2}){}", eval.intent.green(), eval.intent_confidence, policy::marker(v));
                 println!("  Content Gap:    {}", eval.content_gap.yellow());
+                println!("  Suggested Next: jev-seo {}", policy::route_for_intent(&eval.intent));
             }
         }
         Commands::Query { query, limit, json } => {
@@ -275,11 +276,11 @@ fn main() -> Result<()> {
                     "query": query,
                     "content": content
                 });
-                match client.fanout_eval(state) {
+                match client.fanout_eval_with(state, policy::geo_questions()) {
                     Ok(eval) => {
                         let v = policy::gate("geo", eval.confidence());
                         if v == policy::Verdict::Drop {
-                            eprintln!("{}", "Jev unsure (low confidence), no score.".yellow());
+                            eprintln!("{}", format!("Jev unsure (confidence {:.2}), no score.", eval.confidence()).yellow());
                             return Ok(());
                         }
                         let m = policy::marker(v);
@@ -289,6 +290,9 @@ fn main() -> Result<()> {
                             println!("\n{}", "Generative Engine Optimization (GEO) Report:".cyan().bold());
                             println!("  Target Query:    {}", query);
                             println!("  GEO Score:       {}/10{}", eval.geo_score, m);
+                            if let Some((composite, cconf)) = policy::composite_geo(&eval.extra) {
+                                println!("  Composite:       {}/10 (confidence: {:.2})", composite, cconf);
+                            }
                             println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
                             println!("  Primary Gap:     {}", eval.content_gap.yellow());
                         }
@@ -497,12 +501,20 @@ fn geo_target_content(target: &str) -> Result<String> {
 /// Run a Jev eval gated by policy. Returns None on low confidence or API
 /// failure, after telling the user the output is local-only. Never silent.
 fn gated_eval(command: &str, state: serde_json::Value) -> Option<(engine::AnalysisResult, policy::Verdict)> {
+    gated_eval_with(command, state, serde_json::json!({}))
+}
+
+fn gated_eval_with(
+    command: &str,
+    state: serde_json::Value,
+    extra: serde_json::Value,
+) -> Option<(engine::AnalysisResult, policy::Verdict)> {
     let client = engine::JevClient::new()?;
-    match client.fanout_eval(state) {
+    match client.fanout_eval_with(state, extra) {
         Ok(eval) => {
             let v = policy::gate(command, eval.confidence());
             if v == policy::Verdict::Drop {
-                eprintln!("{}", "Note: Jev unsure (low confidence), showing local-only output.".yellow());
+                eprintln!("{}", format!("Note: Jev unsure (confidence {:.2}), showing local-only output.", eval.confidence()).yellow());
                 return None;
             }
             Some((eval, v))
