@@ -96,7 +96,7 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
                     },
                     {
                         "name": "seo_serp_inspect",
-                        "description": "Scrape live DuckDuckGo SERP competitors and analyze gaps",
+                        "description": "Search live SERP competitors (search API, DuckDuckGo fallback) and analyze content gaps",
                         "inputSchema": {
                             "type": "object",
                             "properties": {

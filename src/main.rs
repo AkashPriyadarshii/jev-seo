@@ -138,7 +138,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Query { query, limit, json } => {
-            println!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
+            println!("{}", format!("Fetching live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
             let items = serp::scrape_serp(&query, limit)?;
 
             if json {
@@ -146,7 +146,7 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{}", "Top Competitors on DuckDuckGo:".cyan().bold());
+            println!("\n{}", "Top Competitors:".cyan().bold());
             for item in &items {
                 println!("  #{:<2} {} - {}", item.position.to_string().green().bold(), item.title, item.url.dimmed());
                 if !item.snippet.is_empty() {
@@ -485,7 +485,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Rank { domain, query } => {
-            println!("{}", format!("Searching DuckDuckGo rank for domain: \"{}\" on query: \"{}\"...", domain, query).dimmed());
+            println!("{}", format!("Searching rank for domain: \"{}\" on query: \"{}\"...", domain, query).dimmed());
             let items = serp::scrape_serp(&query, 30)?;
             let position = items.iter().position(|i| paths::url_matches_domain(&i.url, &domain)).map(|p| p + 1);
             let target_url = position.and_then(|p| items.get(p - 1)).map(|i| i.url.as_str());
