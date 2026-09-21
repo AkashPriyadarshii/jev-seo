@@ -23,6 +23,7 @@ pub const MAX_SITEMAP_URLS: usize = 50_000;
 
 pub fn audit_sitemap(target: &str) -> Result<SitemapReport> {
     let xml_content = if target.starts_with("http://") || target.starts_with("https://") {
+        crate::paths::reject_private_url(target)?;
         ureq::get(target)
             .timeout(Duration::from_secs(10))
             .set("User-Agent", "jev-seo/0.1.0 (TypeSafe Jev XML Sitemap Inspector)")

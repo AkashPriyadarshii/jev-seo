@@ -35,6 +35,7 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
     } else {
         Url::parse(&format!("https://{}", target))?
     };
+    crate::paths::reject_private_url(base_url.as_str())?;
 
     let domain = base_url.host_str().unwrap_or(target).to_string();
     let robots_url = format!("{}://{}/robots.txt", base_url.scheme(), domain);

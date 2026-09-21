@@ -55,3 +55,26 @@ pub fn url_matches_domain(result_url: &str, domain: &str) -> bool {
         None => false,
     }
 }
+
+/// Refuse non-public fetch targets. Blocks SSRF to loopback, LAN, link-local
+/// (cloud metadata), and non-http schemes.
+pub fn reject_private_url(raw: &str) -> anyhow::Result<url::Url> {
+    let url = url::Url::parse(raw).map_err(|_| anyhow::anyhow!("not a valid URL: {}", raw))?;
+    if !matches!(url.scheme(), "http" | "https") {
+        anyhow::bail!("refusing non-http URL: {}", raw);
+    }
+    let host = url.host_str().unwrap_or("").to_ascii_lowercase();
+    let blocked = host == "localhost"
+        || host == "::1"
+        || host.ends_with(".localhost")
+        || host.parse::<std::net::IpAddr>().is_ok_and(|ip| match ip {
+            std::net::IpAddr::V4(v4) => {
+                v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
+            }
+            std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
+        });
+    if blocked {
+        anyhow::bail!("refusing private fetch target: {}", host);
+    }
+    Ok(url)
+}

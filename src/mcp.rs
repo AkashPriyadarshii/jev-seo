@@ -37,8 +37,20 @@ pub fn run_stdio_server() -> Result<()> {
 
         let req: RpcRequest = match serde_json::from_str(&text) {
             Ok(r) => r,
-            Err(_) => continue,
+            Err(_) => {
+                let err = json!({ "jsonrpc": "2.0", "id": null,
+                    "error": { "code": -32700, "message": "Parse error" } });
+                writeln!(stdout, "{}", err)?;
+                stdout.flush()?;
+                continue;
+            }
         };
+
+        // Notifications carry no id and get no reply.
+        if req.id.is_none() {
+            handle_request(&req);
+            continue;
+        }
 
         let resp = handle_request(&req);
         let resp_str = serde_json::to_string(&resp)?;
@@ -173,6 +185,7 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
             let args = params.and_then(|p| p.get("arguments")).cloned().unwrap_or(json!({}));
 
             let result_content = execute_tool(tool_name, &args);
+            let is_error = result_content.starts_with("Error:");
             RpcResponse {
                 jsonrpc: "2.0".into(),
                 id: req.id.clone(),
@@ -180,9 +193,11 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
                     "content": [
                         {
                             "type": "text",
-                            "text": result_content
+                            "text": result_content,
+                            "isError": is_error
                         }
-                    ]
+                    ],
+                    "isError": is_error
                 })),
                 error: None,
             }
@@ -198,6 +213,17 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
 
 fn read_geo_target(target: &str) -> anyhow::Result<String> {
     crate::paths::read_user_file(target, &["md", "mdx", "markdown", "html", "htm", "txt"])
+}
+
+/// Second-layer guard for agent-chosen targets. Static path rules already ran;
+/// this asks Jev whether the target smells like a secret. Fails open offline.
+fn safety_gate(tool: &str, target: &str) -> Option<String> {
+    match crate::engine::JevClient::new() {
+        Some(client) if client.safety_block(tool, target) => {
+            Some(format!("Error: blocked unsafe target for {}: {}", tool, target))
+        }
+        _ => None,
+    }
 }
 
 fn execute_tool(name: &str, args: &serde_json::Value) -> String {
@@ -219,6 +245,9 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         }
         "seo_audit" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(err) = safety_gate("seo_audit", path) {
+                return err;
+            }
             match crate::audit::audit_path(path) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
@@ -227,6 +256,9 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         "seo_geo" => {
             let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
             let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(err) = safety_gate("seo_geo", target) {
+                return err;
+            }
             let content = match read_geo_target(target) {
                 Ok(c) => c,
                 Err(e) => return format!("Error: {}", e),
@@ -248,6 +280,9 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         }
         "seo_schema" => {
             let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(err) = safety_gate("seo_schema", target) {
+                return err;
+            }
             match crate::schema::validate_target(target) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
@@ -270,6 +305,9 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         }
         "seo_sitemap" => {
             let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(err) = safety_gate("seo_sitemap", target) {
+                return err;
+            }
             match crate::sitemap::audit_sitemap(target) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
