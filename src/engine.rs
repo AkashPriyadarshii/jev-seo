@@ -45,6 +45,43 @@ impl JevClient {
         self.fanout_eval_with(state, serde_json::json!({}))
     }
 
+    /// Pre-execution safety classifier for agent-driven file/URL tools.
+    /// True = target looks like a secret, credential, or system path, block it.
+    /// API failure fails open: the static path guard already ran.
+    pub fn safety_block(&self, tool: &str, target: &str) -> bool {
+        let payload = json!({
+            "model": "jev-1.13.0",
+            "state": { "tool": tool, "target": target },
+            "questions": {
+                "unsafe_target": {
+                    "type": "noul",
+                    "instructions": "Does `target` name a secret, credential, private key, token, password, system directory, or dot-file that the tool must not read?",
+                }
+            }
+        });
+        let body: serde_json::Value = match self
+            .post(payload)
+            .and_then(|r| r.into_json().map_err(anyhow::Error::from))
+        {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+        body.get("answers")
+            .and_then(|a| a.get("unsafe_target"))
+            .and_then(|u| u.get("noul"))
+            .and_then(|n| n.as_f64())
+            .map(|p| p >= 0.7)
+            .unwrap_or(false)
+    }
+
+    fn post(&self, payload: serde_json::Value) -> Result<ureq::Response> {
+        ureq::post(&self.endpoint)
+            .set("Authorization", &format!("Bearer {}", self.api_key))
+            .set("Content-Type", "application/json")
+            .timeout(std::time::Duration::from_secs(12))
+            .send_json(payload)
+            .context("Failed to communicate with TypeSafe Jev API")
+    }
     /// Same as fanout_eval plus command-specific questions merged into the one
     /// request. Answers land in `extra` for code to consume.
     pub fn fanout_eval_with(
@@ -108,12 +145,7 @@ impl JevClient {
             "questions": questions
         });
 
-        let resp = ureq::post(&self.endpoint)
-            .set("Authorization", &format!("Bearer {}", self.api_key))
-            .set("Content-Type", "application/json")
-            .timeout(std::time::Duration::from_secs(12))
-            .send_json(payload)
-            .context("Failed to communicate with TypeSafe Jev API")?;
+        let resp = self.post(payload)?;
 
         let body: serde_json::Value = resp.into_json()?;
         let answers = body.get("answers").context("Invalid Jev response schema")?;
