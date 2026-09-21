@@ -151,15 +151,68 @@ fn main() -> Result<()> {
                 }
             }
 
+            // Rerank by Jev relevance: one Score per result in the same request.
+            let mut rel_questions = serde_json::Map::new();
+            for (i, item) in items.iter().enumerate() {
+                rel_questions.insert(
+                    format!("rel_{}", i),
+                    json!({
+                        "type": "score",
+                        "instructions": format!("How relevant is result {} to the query in `target_query`?", i),
+                        "criteria": ["Irrelevant or spam", "Tangential mention", "Relevant to the query", "Highly relevant, directly answers", "Exact best match"]
+                    }),
+                );
+            }
             let state = json!({
                 "target_query": query,
                 "competitor_serp": items
             });
-            if let Some((eval, v)) = gated_eval("query", state) {
-                println!("\n{}", "Competitive Gap Analysis (TypeSafe Jev):".cyan().bold());
-                println!("  Intent Class:    {}", eval.intent.green());
-                println!("  AI Citations:    {}/10 GEO Score{}", eval.geo_score, policy::marker(v));
-                println!("  Primary Gap:     {}", eval.content_gap.yellow());
+            match engine::JevClient::new().map(|c| c.fanout_eval_with(state, serde_json::Value::Object(rel_questions))) {
+                Some(Ok(eval)) => {
+                    // Rerank gated on its own answers, not the gap verdict.
+                    let rel_conf: f64 = (0..items.len())
+                        .map(|i| {
+                            eval.extra
+                                .get(&format!("rel_{}", i))
+                                .and_then(|a| a.get("confidence"))
+                                .and_then(|c| c.as_f64())
+                                .unwrap_or(0.0)
+                        })
+                        .sum::<f64>()
+                        / items.len().max(1) as f64;
+                    if rel_conf >= policy::thresholds("query").flag {
+                        let mut ranked: Vec<(usize, f64)> = items
+                            .iter()
+                            .enumerate()
+                            .map(|(i, _)| {
+                                let s = eval
+                                    .extra
+                                    .get(&format!("rel_{}", i))
+                                    .and_then(|a| a.get("score"))
+                                    .and_then(|s| s.as_f64())
+                                    .unwrap_or(0.0);
+                                (i, s)
+                            })
+                            .collect();
+                        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                        println!("\n{}", "Relevance Ranking (TypeSafe Jev):".cyan().bold());
+                        for (rank, (i, score)) in ranked.iter().enumerate() {
+                            let item = &items[*i];
+                            println!("  #{:<2} (rel {:.1}) {} - {}", rank + 1, score, item.title, item.url.dimmed());
+                        }
+                    }
+                    match policy::gate("query", eval.confidence()) {
+                        policy::Verdict::Drop => eprintln!("{}", format!("Note: Jev unsure on gap analysis (confidence {:.2}), local results above stand.", eval.confidence()).yellow()),
+                        v => {
+                            println!("\n{}", "Competitive Gap Analysis (TypeSafe Jev):".cyan().bold());
+                            println!("  Intent Class:    {}", eval.intent.green());
+                            println!("  AI Citations:    {}/10 GEO Score{}", eval.geo_score, policy::marker(v));
+                            println!("  Primary Gap:     {}", eval.content_gap.yellow());
+                        }
+                    }
+                }
+                Some(Err(e)) => eprintln!("{}", format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow()),
+                None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
         Commands::Audit { path, target_query, json } => {
