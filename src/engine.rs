@@ -17,14 +17,15 @@ pub struct AnalysisResult {
     pub direct_answer_p: f64,
     pub content_gap: String,
     pub gap_confidence: f64,
+    /// Answers to command-specific questions, keyed by question id.
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 impl AnalysisResult {
-    /// Lowest confidence across the semantic answers. Gate on this.
+    /// Gate on intent + geo only. Gap options often split probability across
+    /// near-winners, which must not veto the headline score.
     pub fn confidence(&self) -> f64 {
-        self.intent_confidence
-            .min(self.geo_confidence)
-            .min(self.gap_confidence)
+        self.intent_confidence.min(self.geo_confidence)
     }
 }
 
@@ -41,11 +42,18 @@ impl JevClient {
     }
 
     pub fn fanout_eval(&self, state: serde_json::Value) -> Result<AnalysisResult> {
+        self.fanout_eval_with(state, serde_json::json!({}))
+    }
+
+    /// Same as fanout_eval plus command-specific questions merged into the one
+    /// request. Answers land in `extra` for code to consume.
+    pub fn fanout_eval_with(
+        &self,
+        state: serde_json::Value,
+        extra_questions: serde_json::Value,
+    ) -> Result<AnalysisResult> {
         let state = truncate_state(state);
-        let payload = json!({
-            "model": "jev-1.13.0",
-            "state": state,
-            "questions": {
+        let mut questions = json!({
                 "intent": {
                     "type": "choice",
                     "instructions": "Select the primary search intent.",
@@ -86,7 +94,18 @@ impl JevClient {
                         "none": "Satisfies user query with high information density"
                     }
                 }
+        });
+        if let Some(map) = questions.as_object_mut() {
+            if let Some(extra) = extra_questions.as_object() {
+                for (k, v) in extra {
+                    map.insert(k.clone(), v.clone());
+                }
             }
+        }
+        let payload = json!({
+            "model": "jev-1.13.0",
+            "state": state,
+            "questions": questions
         });
 
         let resp = ureq::post(&self.endpoint)
@@ -138,6 +157,18 @@ impl JevClient {
             direct_answer_p,
             content_gap,
             gap_confidence,
+            extra: answers
+                .as_object()
+                .map(|m| {
+                    m.iter()
+                        .filter(|(k, _)| {
+                            !["intent", "geo_score", "direct_answer", "content_gap"]
+                                .contains(&k.as_str())
+                        })
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect()
+                })
+                .unwrap_or_default(),
         })
     }
 }
