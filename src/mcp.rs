@@ -234,7 +234,12 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             if let Some(client) = crate::engine::JevClient::new() {
                 let state = json!({ "query": query, "content": content });
                 match client.fanout_eval(state) {
-                    Ok(eval) => serde_json::to_string_pretty(&eval).unwrap_or_default(),
+                    Ok(eval) => {
+                        if crate::policy::gate("geo", eval.confidence()) == crate::policy::Verdict::Drop {
+                            return "Error: Jev unsure (low confidence), no score.".into();
+                        }
+                        serde_json::to_string_pretty(&eval).unwrap_or_default()
+                    }
                     Err(e) => format!("Error evaluating GEO via Jev: {}", e),
                 }
             } else {

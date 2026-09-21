@@ -8,6 +8,7 @@ mod brief;
 mod engine;
 mod mcp;
 mod paths;
+mod policy;
 mod rank;
 mod robots;
 mod schema;
@@ -122,16 +123,14 @@ fn main() -> Result<()> {
                 println!("  {}. {}", idx + 1, item);
             }
 
-            if let Some(client) = engine::JevClient::new() {
-                let state = json!({
-                    "root_query": query,
-                    "suggestions": suggestions
-                });
-                if let Ok(eval) = client.fanout_eval(state) {
-                    println!("\n{}", "Intent & Semantic Classification:".cyan().bold());
-                    println!("  Primary Intent: {} (confidence: {:.2})", eval.intent.green(), eval.intent_confidence);
-                    println!("  Content Gap:    {}", eval.content_gap.yellow());
-                }
+            let state = json!({
+                "root_query": query,
+                "suggestions": suggestions
+            });
+            if let Some((eval, v)) = gated_eval("keywords", state) {
+                println!("\n{}", "Intent & Semantic Classification:".cyan().bold());
+                println!("  Primary Intent: {} (confidence: {:.2}){}", eval.intent.green(), eval.intent_confidence, policy::marker(v));
+                println!("  Content Gap:    {}", eval.content_gap.yellow());
             }
         }
         Commands::Query { query, limit, json } => {
@@ -151,17 +150,15 @@ fn main() -> Result<()> {
                 }
             }
 
-            if let Some(client) = engine::JevClient::new() {
-                let state = json!({
-                    "target_query": query,
-                    "competitor_serp": items
-                });
-                if let Ok(eval) = client.fanout_eval(state) {
-                    println!("\n{}", "Competitive Gap Analysis (TypeSafe Jev):".cyan().bold());
-                    println!("  Intent Class:    {}", eval.intent.green());
-                    println!("  AI Citations:    {}/10 GEO Score", eval.geo_score);
-                    println!("  Primary Gap:     {}", eval.content_gap.yellow());
-                }
+            let state = json!({
+                "target_query": query,
+                "competitor_serp": items
+            });
+            if let Some((eval, v)) = gated_eval("query", state) {
+                println!("\n{}", "Competitive Gap Analysis (TypeSafe Jev):".cyan().bold());
+                println!("  Intent Class:    {}", eval.intent.green());
+                println!("  AI Citations:    {}/10 GEO Score{}", eval.geo_score, policy::marker(v));
+                println!("  Primary Gap:     {}", eval.content_gap.yellow());
             }
         }
         Commands::Audit { path, target_query, json } => {
@@ -250,19 +247,17 @@ fn main() -> Result<()> {
                 }
 
                 if let Some(query) = target_query {
-                    if let Some(client) = engine::JevClient::new() {
-                        let state = json!({
-                            "target_query": query,
-                            "page_title": report.title,
-                            "description": report.description,
-                            "checks": report.checks
-                        });
-                        if let Ok(eval) = client.fanout_eval(state) {
-                            println!("\n{}", "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold());
-                            println!("  GEO Score:       {}/10", eval.geo_score);
-                            println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
-                            println!("  Content Gap:     {}", eval.content_gap.yellow());
-                        }
+                    let state = json!({
+                        "target_query": query,
+                        "page_title": report.title,
+                        "description": report.description,
+                        "checks": report.checks
+                    });
+                    if let Some((eval, v)) = gated_eval("audit", state) {
+                        println!("\n{}", "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold());
+                        println!("  GEO Score:       {}/10{}", eval.geo_score, policy::marker(v));
+                        println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
+                        println!("  Content Gap:     {}", eval.content_gap.yellow());
                     }
                 }
             }
@@ -280,15 +275,25 @@ fn main() -> Result<()> {
                     "query": query,
                     "content": content
                 });
-                let eval = client.fanout_eval(state)?;
-                if json {
-                    println!("{}", serde_json::to_string_pretty(&eval)?);
-                } else {
-                    println!("\n{}", "Generative Engine Optimization (GEO) Report:".cyan().bold());
-                    println!("  Target Query:    {}", query);
-                    println!("  GEO Score:       {}/10", eval.geo_score);
-                    println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
-                    println!("  Primary Gap:     {}", eval.content_gap.yellow());
+                match client.fanout_eval(state) {
+                    Ok(eval) => {
+                        let v = policy::gate("geo", eval.confidence());
+                        if v == policy::Verdict::Drop {
+                            eprintln!("{}", "Jev unsure (low confidence), no score.".yellow());
+                            return Ok(());
+                        }
+                        let m = policy::marker(v);
+                        if json {
+                            println!("{}", serde_json::to_string_pretty(&eval)?);
+                        } else {
+                            println!("\n{}", "Generative Engine Optimization (GEO) Report:".cyan().bold());
+                            println!("  Target Query:    {}", query);
+                            println!("  GEO Score:       {}/10{}", eval.geo_score, m);
+                            println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
+                            println!("  Primary Gap:     {}", eval.content_gap.yellow());
+                        }
+                    }
+                    Err(e) => eprintln!("{}", format!("Error: Jev scoring failed ({e:#}).").red()),
                 }
             } else {
                 eprintln!("{}", "Error: TYPESAFE_API_KEY environment variable not set.".red());
@@ -487,4 +492,24 @@ fn main() -> Result<()> {
 
 fn geo_target_content(target: &str) -> Result<String> {
     crate::paths::read_user_file(target, &["md", "mdx", "markdown", "html", "htm", "txt"])
+}
+
+/// Run a Jev eval gated by policy. Returns None on low confidence or API
+/// failure, after telling the user the output is local-only. Never silent.
+fn gated_eval(command: &str, state: serde_json::Value) -> Option<(engine::AnalysisResult, policy::Verdict)> {
+    let client = engine::JevClient::new()?;
+    match client.fanout_eval(state) {
+        Ok(eval) => {
+            let v = policy::gate(command, eval.confidence());
+            if v == policy::Verdict::Drop {
+                eprintln!("{}", "Note: Jev unsure (low confidence), showing local-only output.".yellow());
+                return None;
+            }
+            Some((eval, v))
+        }
+        Err(e) => {
+            eprintln!("{}", format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow());
+            None
+        }
+    }
 }

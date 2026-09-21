@@ -49,11 +49,16 @@ pub fn generate_brief(topic: &str, limit: usize) -> Result<ContentBrief> {
             "top_competitors": competitor_benchmarks.iter().take(5).collect::<Vec<_>>()
         });
 
-        if let Ok(eval) = client.fanout_eval(state) {
-            search_intent = eval.intent;
-            if eval.content_gap != "none" {
-                winning_angle = format!("Address competitor gap: {}", eval.content_gap);
+        match client.fanout_eval(state) {
+            Ok(eval) => {
+                if crate::policy::gate("brief", eval.confidence()) != crate::policy::Verdict::Drop {
+                    search_intent = eval.intent;
+                    if eval.content_gap != "none" {
+                        winning_angle = format!("Address competitor gap: {}", eval.content_gap);
+                    }
+                }
             }
+            Err(e) => eprintln!("Warning: Jev brief scoring failed ({e:#}), using defaults."),
         }
     }
 
