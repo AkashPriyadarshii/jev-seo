@@ -129,9 +129,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <h2 class="h2">Ten commands, no dashboard</h2>
     <p class="lede">Every tool proofs something measurable. Terminal in, verdict out.</p>
     <div class="radar-grid">
-      <div class="cmd"><code>jev-seo query "offline expense tracker android"</code><span class="cmd-cap">live SERP competitor radar + gap analysis</span></div>
-      <div class="cmd"><code>jev-seo audit docs/</code><span class="cmd-cap">105 files · title collisions, thin pages, AI slop, orphan links</span></div>
-      <div class="cmd"><code>jev-seo geo README.md --query "agentic skills"</code><span class="cmd-cap">GEO citation probability 1-10 vs Perplexity, SearchGPT, Gemini Overviews</span></div>
+      <div class="cmd"><code>jev-seo query "offline expense tracker android"</code><span class="cmd-cap">live SERP competitor radar + Jev relevance rerank + gap analysis</span></div>
+      <div class="cmd"><code>jev-seo audit docs/ --min-pass 40</code><span class="cmd-cap">105 files · title collisions, thin pages, AI slop, orphan links · fails CI below the floor</span></div>
+      <div class="cmd"><code>jev-seo geo README.md --query "agentic skills"</code><span class="cmd-cap">GEO citation probability 1-10 + 5-dimension composite vs Perplexity, SearchGPT, Gemini Overviews</span></div>
       <div class="cmd"><code>jev-seo schema index.html</code><span class="cmd-cap">JSON-LD validator: SoftwareApplication, Article, Organization, Product + deprecation flags</span></div>
       <div class="cmd"><code>jev-seo robots example.com</code><span class="cmd-cap">GPTBot · ClaudeBot · PerplexityBot · Google-Extended · Bytespider</span></div>
       <div class="cmd"><code>jev-seo brief "fast local sqlite tui" --markdown</code><span class="cmd-cap">competitor SERP synthesis → H2 outline + 150-word GEO direct answer</span></div>
