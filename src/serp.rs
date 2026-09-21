@@ -45,6 +45,10 @@ pub fn scrape_serp(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
         .context("Failed to request DuckDuckGo HTML SERP")?;
 
     let html = resp.into_string()?;
+    let lower = html.to_lowercase();
+    if lower.contains("anomaly") || lower.contains("captcha") || lower.contains("challenge-form") {
+        anyhow::bail!("search blocked (bot challenge page) — no rank recorded");
+    }
     let mut items = Vec::new();
 
     let result_re = Regex::new(r#"(?s)<div[^>]*class="[^"]*result\b[^"]*"[^>]*>(.*?)</div>\s*</div>"#)?;
@@ -87,6 +91,9 @@ pub fn scrape_serp(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
         }
     }
 
+    if items.is_empty() {
+        anyhow::bail!("no results parsed — search may have been blocked; no rank recorded");
+    }
     Ok(items)
 }
 

@@ -51,6 +51,22 @@ pub fn run_stdio_server() -> Result<()> {
 
 pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
     match req.method.as_str() {
+        "initialize" => RpcResponse {
+            jsonrpc: "2.0".into(),
+            id: req.id.clone(),
+            result: Some(json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": { "tools": {} },
+                "serverInfo": { "name": "jev-seo", "version": env!("CARGO_PKG_VERSION") }
+            })),
+            error: None,
+        },
+        "notifications/initialized" | "notifications/cancelled" => RpcResponse {
+            jsonrpc: "2.0".into(),
+            id: req.id.clone(),
+            result: Some(json!({})),
+            error: None,
+        },
         "tools/list" => RpcResponse {
             jsonrpc: "2.0".into(),
             id: req.id.clone(),
@@ -180,6 +196,45 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
     }
 }
 
+fn read_geo_target(target: &str) -> anyhow::Result<String> {
+    const ALLOWED: &[&str] = &["md", "mdx", "markdown", "html", "htm", "txt"];
+    let trimmed = target.trim();
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        anyhow::bail!("geo does not fetch URLs — pass a local content file path or an inline snippet");
+    }
+    let path = std::path::Path::new(trimmed);
+    let looks_like_path = path.exists()
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+        || (trimmed.starts_with('.') && trimmed.len() > 1);
+    if !looks_like_path {
+        return Ok(trimmed.to_string());
+    }
+    if !path.exists() {
+        anyhow::bail!("file not found: {}", trimmed);
+    }
+    if !path.is_file() {
+        anyhow::bail!("not a file: {}", trimmed);
+    }
+    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+        if name.starts_with('.') {
+            anyhow::bail!("refusing dot-file: {}", trimmed);
+        }
+    }
+    let ext_ok = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| ALLOWED.contains(&e.to_ascii_lowercase().as_str()))
+        .unwrap_or(false);
+    if !ext_ok {
+        anyhow::bail!(
+            "refusing non-content file (allowed: .md .mdx .markdown .html .htm .txt): {}",
+            trimmed
+        );
+    }
+    Ok(std::fs::read_to_string(path)?)
+}
+
 fn execute_tool(name: &str, args: &serde_json::Value) -> String {
     match name {
         "seo_keywords" => {
@@ -207,7 +262,10 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         "seo_geo" => {
             let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
             let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-            let content = std::fs::read_to_string(target).unwrap_or_else(|_| target.to_string());
+            let content = match read_geo_target(target) {
+                Ok(c) => c,
+                Err(e) => return format!("Error: {}", e),
+            };
             if let Some(client) = crate::engine::JevClient::new() {
                 let state = json!({ "query": query, "content": content });
                 match client.fanout_eval(state) {
