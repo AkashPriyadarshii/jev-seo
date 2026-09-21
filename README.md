@@ -42,6 +42,8 @@ Keywords: seo, geo, generative engine optimization, typesafe ai, jev, foss, rust
   </p>
 </div>
 
+[![stars](https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars)](https://github.com/AkashPriyadarshii/jev-seo/stargazers) [![crates.io](https://img.shields.io/crates/v/jev-seo?style=flat-square)](https://crates.io/crates/jev-seo) [![downloads](https://img.shields.io/crates/d/jev-seo?style=flat-square)](https://crates.io/crates/jev-seo) [![release](https://img.shields.io/github/v/release/AkashPriyadarshii/jev-seo?style=flat-square&label=release)](https://github.com/AkashPriyadarshii/jev-seo/releases)
+
 ---
 
 ## Why jev-seo?
