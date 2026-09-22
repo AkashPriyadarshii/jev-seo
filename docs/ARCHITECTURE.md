@@ -76,7 +76,7 @@
 
 ### `mcp.rs` (Stdio Model Context Protocol)
 - JSON-RPC 2.0 loop over stdin/stdout.
-- Tools:
+- Tools (11):
   - `seo_keywords`: Autocomplete variants and search intent classification.
   - `seo_serp_inspect`: Live SERP competitors and winning angles.
   - `seo_audit`: Local file or directory on-page SEO scan with orphan detection.
@@ -85,3 +85,32 @@
   - `seo_robots`: Live robots.txt and AI crawler permission checker.
   - `seo_brief`: SERP-driven heading outline and content brief generator.
   - `seo_sitemap`: XML sitemap, URL limits, HTTPS, and hreflang validator.
+  - `seo_crawl`: Live-site crawl with health score and findings.
+  - `seo_llms`: llms.txt and AI crawler readiness check.
+  - `seo_extract`: Paid URL-to-markdown extraction (key-gated).
+
+### `crawl.rs` (Live-Site Crawler)
+- Level-batched parallel fetch over 8 std threads, no async runtime.
+- Seeds from `/sitemap.xml`, honors robots.txt, SSRF-guarded redirects with same-host pins and hop chains.
+- Canonical dedup (tracking params, `/index.html`, slash policy), per-page timing, 2MB body cap.
+- Weak bodies upgrade to Jina or Firecrawl backends under a shared credit budget.
+
+### `fetch.rs` (Fetch Backends)
+- Direct (free), Jina reader (keyless base tier), Firecrawl scrape (paid, key-gated).
+- Quality math picks the best body; budgets cap paid spend with refunds only when no call happened.
+
+### `rules.rs` (Fifty-Rule Engine)
+- Stable R01-R50 registry across nine areas with severity weights and reach factors.
+- One scoring truth for crawl and audit output: area scores, weighted overall, impact-ranked actions.
+
+### `actions.rs` (Ranked Actions)
+- Shared P1-P3 priorities, effort bands, 0-100 impact, quick-win flags, A-F grades.
+
+### `llms.rs` (Answer-Engine Readiness)
+- Scores llms.txt presence plus explicit AI crawler allows with ranked readiness actions.
+
+### `gsc.rs` (Search Console)
+- Free first-party query data via OAuth device flow; refresh tokens stored with owner-only permissions.
+
+### `policy.rs` (Confidence Gates)
+- Per-command Jev thresholds plus needs-review surfacing for low-confidence answers.

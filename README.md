@@ -74,6 +74,7 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 - **SERP Content Briefs**: Synthesizes competitor SERP snippets into an actionable content blueprint with H2 outlines and optimal 134-167 word GEO blocks.
 - **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 11 SEO tools into Claude Code, Gemini CLI, and Antigravity.
 - **Live-site crawler**: Parallel BFS crawl with canonical dedup, per-page timing, health scores, and ranked fix actions.
+- **Fifty-rule engine**: R01-R50 checks with severity weights and reach scoring across nine areas, one truth for crawl and audit output.
 - **Answer-engine readiness**: `llms.txt` plus AI crawler permission scoring with readiness actions.
 - **Local & private**: All rank tracking and audit histories persist in a single local SQLite database (`.jev-seo.db`).
 - **Low RAM footprint**: Fast native Rust binary that runs in under 30MB RAM on resource-constrained machines.
@@ -184,23 +185,23 @@ jev-seo geo README.md --query "agentic skills framework for coding agents"
 ```
 Calculates citation probability for Perplexity, SearchGPT, and Gemini Overviews using Jev `Score` (1-10) and `Noul`. Prints a five-dimension composite (structure, density, directness, statistics, freshness) with code-owned weights, plus the score delta since your last check. Low-confidence answers are withheld instead of printed.
 
-### 8. Confidence-Gated Scoring
+### 6. Confidence-Gated Scoring
 Every Jev verdict carries calibrated confidence. Confident scores print as facts, shaky ones are marked `[verify]`, and unsure ones are withheld with a note. Thresholds live in one place (`src/policy.rs`) and scale with the stakes of each command.
 
-### 9. SEO Gate for CI
+### 7. SEO Gate for CI
 ```bash
 jev-seo audit docs/ --min-pass 40
 ```
 Exits nonzero when the pass rate falls below the floor. A ready-made workflow (`.github/workflows/seo-gate.yml`) runs tests plus the gate on every push and pull request.
 
-### 6. XML Sitemap & International Hreflang Auditor
+### 8. XML Sitemap & International Hreflang Auditor
 ```bash
 jev-seo sitemap sitemap.xml
 jev-seo sitemap https://example.com/sitemap.xml
 ```
 Validates sitemaps against Google webmaster standards: enforces canonical HTTPS protocols, flags parameter pollution, verifies the 50,000 URL limit, and audits international `hreflang` codes (flagging malformed codes like `en-UK` vs `en-GB` and enforcing `x-default`).
 
-### 7. Google Helpful Content & AI Slop Radar
+### 9. Google Helpful Content & AI Slop Radar
 Integrated into `jev-seo audit`:
 * **Em-dash density scanner**: Flags excessive em-dash saturation (>2 per 500 words).
 * **AI Vocabulary Detector**: Flags 17 pervasive AI boilerplate crutches (`delve`, `leverage`, `testament`, `foster`, `seamless`, `crucial`, `robust`, `landscape`, etc.).
@@ -271,7 +272,7 @@ Measured 2026-09-22. Rerun any row; full notes in `docs/EVAL.md`.
 | Local audit, 4 files | ~0.2s | `jev-seo audit docs/ --json` |
 | Live crawl, 6-10 pages | 3-11s wall, server-bound | `jev-seo crawl <url> --max-pages 10` |
 | Score repeatability, 3 runs | 99 stable, findings ±2 from server timing | `jev-seo crawl <url> --json` ×3 |
-| Test suite | 42 green, zero clippy warnings | `cargo test` |
+| Test suite | 46 green, zero clippy warnings | `cargo test` |
 
 ---
 
@@ -288,6 +289,8 @@ Measured 2026-09-22. Rerun any row; full notes in `docs/EVAL.md`.
 **Which pages does it check?** Up to 50 per crawl by default, seeded from sitemap.xml, robots.txt honored. Raise `--max-pages` deliberately.
 
 **Can CI fail on it?** Yes. `audit --min-pass` exits nonzero below your floor, and crawl `--diff` reports drift between runs.
+
+**Do I need paid APIs?** No. Paid backends are opt-in per flag and stay parked at zero spend by default. Free paths never call them.
 
 ---
 

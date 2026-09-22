@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `audit --pdf` and `audit --md` report writers: pure-Rust multi-page PDF and Markdown tables from the same audit data.
+- `gsc` command: free Search Console query data via OAuth device flow with owner-only token storage.
 - Optional paid search backend: `query --provider tavily` (or auto when `TAVILY_API_KEY` is set) with free DuckDuckGo fallback, hardened browser headers, and clean `--json` stdout. Thanks to @jerryrat for the API path and header research in PR #2.
 - Paid `/extract` endpoint as `seo_extract` MCP tool, search depth/topic flags on `query`, Tavily-compatible URL override.
 - Multi-backend page fetch: direct first, Jina and Firecrawl upgrade weak bodies only, quality math picks, per-page source labels, shared credit budget with `--max-credits`.

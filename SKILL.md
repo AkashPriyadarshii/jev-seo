@@ -10,6 +10,7 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 ## Fast paths
 
 - Full site picture: `jev-seo crawl <url> --max-pages 50` then `jev-seo llms <domain>`.
+- Own-site truth: `jev-seo gsc auth`, then `jev-seo gsc query --site <url>` for free Search Console clicks and positions.
 - Docs folder gate: `jev-seo audit docs/ --min-pass 60 --html report.html --pdf report.pdf --md report.md`.
 - One question, one answer: `jev-seo geo <file> --query "<query>"`, `jev-seo robots <domain>`, `jev-seo schema <file>`, `jev-seo sitemap <url>`.
 - Environment check first on a new machine: `jev-seo doctor`.
@@ -27,5 +28,6 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 1. Crawl before judging. Never score pages the crawl has not fetched.
 2. Quote the completeness line alongside any score.
 3. Gate deploys with `audit --min-pass` or crawl health deltas via `--diff`, not vibes.
+4. Export findings with `--csv` for spreadsheets; rebuild past runs with `--rescore`, no spend.
 4. Jev needs `TYPESAFE_API_KEY`. Without it the tool still runs; semantic sections report local-only output.
 5. Keep crawls polite: default 50 pages, 8 workers, robots.txt honored. Raise `--max-pages` deliberately.
