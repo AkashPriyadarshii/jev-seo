@@ -67,11 +67,11 @@ pub fn generate_brief(topic: &str, limit: usize) -> Result<ContentBrief> {
 
     let recommended_h2_outline = vec![
         format!("1. What is {} (Direct 150-Word Definition)", clean_topic),
-        format!("2. Why Existing Solutions Fail (Pain Points & Trade-offs)"),
-        format!("3. Empirical Performance Benchmarks & Architecture"),
-        format!("4. Step-by-Step Implementation & Working Code"),
-        format!("5. Edge Cases, Failure Modes & Production Checklist"),
-        format!("6. Comparison Matrix vs Key Alternatives"),
+        "2. Why Existing Solutions Fail (Pain Points & Trade-offs)".to_string(),
+        "3. Empirical Performance Benchmarks & Architecture".to_string(),
+        "4. Step-by-Step Implementation & Working Code".to_string(),
+        "5. Edge Cases, Failure Modes & Production Checklist".to_string(),
+        "6. Comparison Matrix vs Key Alternatives".to_string(),
     ];
 
     let geo_opening_prescription = format!(

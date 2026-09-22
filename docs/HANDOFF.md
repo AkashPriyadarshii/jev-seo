@@ -2,7 +2,7 @@
 
 ## 1. Quick Setup
 ```bash
-cd C:/Users/saves/Desktop/jev-seo
+cd jev-seo
 cargo check
 ```
 

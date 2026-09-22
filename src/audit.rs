@@ -713,3 +713,262 @@ fn collect_audit_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Resul
     }
     Ok(())
 }
+
+fn esc(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// ASCII-fold a line for PDF standard fonts (WinAnsi only).
+fn pdf_text(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '—' | '–' => '-',
+            '“' | '”' => '"',
+            '‘' | '’' => '\'',
+            '…' => '.',
+            '▲' => '^',
+            '▼' => 'v',
+            '✖' | '⚠' => '!',
+            c if c.is_ascii() => c,
+            _ => '?',
+        })
+        .collect::<String>()
+        .replace('\\', "\\\\")
+        .replace('(', "\\(")
+        .replace(')', "\\)")
+}
+
+/// Minimal multi-page PDF 1.4 writer, std only. Helvetica, A4, 11pt.
+fn pdf_lines(title: &str, lines: &[String]) -> Vec<u8> {
+    const PER_PAGE: usize = 48;
+    let mut pages: Vec<&[String]> = Vec::new();
+    let mut i = 0;
+    while i < lines.len().max(1) {
+        pages.push(&lines[i..(i + PER_PAGE).min(lines.len())]);
+        i += PER_PAGE;
+        if lines.is_empty() {
+            break;
+        }
+    }
+    // Objects: 1 catalog, 2 pages, 3 font, then per page (page, content).
+    let mut objs: Vec<Vec<u8>> = Vec::new();
+    objs.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
+    let kids: Vec<String> = (0..pages.len()).map(|p| format!("{} 0 R", 4 + p * 2)).collect();
+    objs.push(format!("<< /Type /Pages /Kids [{}] /Count {} >>", kids.join(" "), pages.len()).as_bytes().to_vec());
+    objs.push(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec());
+    for (pi, chunk) in pages.iter().enumerate() {
+        let content_obj = 5 + pi * 2;
+        objs.push(
+            format!(
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R >>",
+                content_obj
+            )
+            .as_bytes()
+            .to_vec(),
+        );
+        let mut stream = String::from("BT /F1 11 Tf 50 790 Td 14 TL ");
+        if pi == 0 {
+            stream.push_str(&format!("({}) Tj T* ", pdf_text(title)));
+        }
+        for line in chunk.iter() {
+            stream.push_str(&format!("({}) Tj T* ", pdf_text(line)));
+        }
+        stream.push_str("ET");
+        let bytes = stream.as_bytes();
+        let mut obj = format!("<< /Length {} >>\nstream\n", bytes.len()).as_bytes().to_vec();
+        obj.extend_from_slice(bytes);
+        obj.extend_from_slice(b"\nendstream");
+        objs.push(obj);
+    }
+    let mut out = b"%PDF-1.4\n".to_vec();
+    let mut offsets = Vec::new();
+    for (n, body) in objs.iter().enumerate() {
+        offsets.push(out.len());
+        out.extend_from_slice(format!("{} 0 obj\n", n + 1).as_bytes());
+        out.extend_from_slice(body);
+        out.extend_from_slice(b"\nendobj\n");
+    }
+    let xref_at = out.len();
+    out.extend_from_slice(format!("xref\n0 {}\n", objs.len() + 1).as_bytes());
+    out.extend_from_slice(b"0000000000 65535 f \n");
+    for off in &offsets {
+        out.extend_from_slice(format!("{:010} 00000 n \n", off).as_bytes());
+    }
+    out.extend_from_slice(
+        format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF", objs.len() + 1, xref_at).as_bytes(),
+    );
+    out
+}
+
+/// Markdown twin of to_html: scorecard, pages, findings, method.
+pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
+    let score = rep.pass_rate.round().clamp(0.0, 100.0) as u32;
+    let mut m = String::new();
+    m.push_str(&format!(
+        "# SEO audit: {}\n\nScore **{}/100 ({})** across {} files and {} words, pass rate {:.1}%.\n",
+        rep.dir_path, score, crate::actions::grade(score), rep.total_files, rep.total_words, rep.pass_rate
+    ));
+    m.push_str("\n## Pages\n\n| Page | Words | Title | Checks |\n|---|---|---|---|\n");
+    for r in &rep.reports {
+        let passed = r.checks.iter().filter(|c| c.passed).count();
+        m.push_str(&format!(
+            "| {} | {} | {} | {}/{} |\n",
+            r.file_path,
+            r.word_count,
+            r.title.as_deref().unwrap_or(""),
+            passed,
+            r.checks.len()
+        ));
+    }
+    if !rep.duplicate_titles.is_empty() {
+        m.push_str(&format!("\n## Duplicate titles ({})\n\n", rep.duplicate_titles.len()));
+        let mut titles: Vec<&String> = rep.duplicate_titles.keys().collect();
+        titles.sort();
+        for t in titles {
+            m.push_str(&format!("- {} ({} files)\n", t, rep.duplicate_titles[t].len()));
+        }
+    }
+    if !rep.orphan_pages.is_empty() {
+        m.push_str(&format!("\n## Orphan pages ({})\n\n", rep.orphan_pages.len()));
+        for f in &rep.orphan_pages {
+            m.push_str(&format!("- {}\n", f));
+        }
+    }
+    if !rep.thin_pages.is_empty() {
+        m.push_str(&format!("\n## Thin pages ({})\n\n", rep.thin_pages.len()));
+        for (f, wc) in &rep.thin_pages {
+            m.push_str(&format!("- {} ({} words)\n", f, wc));
+        }
+    }
+    if !rep.keyword_cannibalization.is_empty() {
+        m.push_str(&format!("\n## Keyword cannibalization ({})\n\n", rep.keyword_cannibalization.len()));
+        for item in &rep.keyword_cannibalization {
+            m.push_str(&format!("- {} ({} pages)\n", item.keyword_stem, item.colliding_files.len()));
+        }
+    }
+    m.push_str("\n## Method\n\nOn-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar. Scores rank work; they never predict rankings or traffic.\n");
+    m
+}
+
+/// PDF twin of to_html: scorecard, pages, findings, method.
+pub fn to_pdf(rep: &DirectoryAuditReport) -> Vec<u8> {
+    let score = rep.pass_rate.round().clamp(0.0, 100.0) as u32;
+    let mut lines = vec![
+        format!("SEO audit: {}  |  score {}/100 ({})", rep.dir_path, score, crate::actions::grade(score)),
+        format!("Files: {}  Words: {}  Pass rate: {:.1}%", rep.total_files, rep.total_words, rep.pass_rate),
+        String::new(),
+        "Pages (path | words | title | checks):".to_string(),
+    ];
+    for r in &rep.reports {
+        let passed = r.checks.iter().filter(|c| c.passed).count();
+        lines.push(format!(
+            "- {} | {}w | {} | {}/{}",
+            r.file_path,
+            r.word_count,
+            r.title.as_deref().unwrap_or(""),
+            passed,
+            r.checks.len()
+        ));
+    }
+    if !rep.duplicate_titles.is_empty() {
+        lines.push(String::new());
+        lines.push(format!("Duplicate titles ({}):", rep.duplicate_titles.len()));
+        let mut titles: Vec<&String> = rep.duplicate_titles.keys().collect();
+        titles.sort();
+        for t in titles.iter().take(10) {
+            lines.push(format!("- {} ({} files)", t, rep.duplicate_titles[*t].len()));
+        }
+    }
+    if !rep.orphan_pages.is_empty() {
+        lines.push(String::new());
+        lines.push(format!("Orphan pages ({}):", rep.orphan_pages.len()));
+        for f in rep.orphan_pages.iter().take(10) {
+            lines.push(format!("- {}", f));
+        }
+    }
+    if !rep.thin_pages.is_empty() {
+        lines.push(String::new());
+        lines.push(format!("Thin pages ({}):", rep.thin_pages.len()));
+        for (f, wc) in rep.thin_pages.iter().take(10) {
+            lines.push(format!("- {} ({} words)", f, wc));
+        }
+    }
+    lines.push(String::new());
+    lines.push("Method: on-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar.".to_string());
+    lines.push("Scores rank work; they never predict rankings or traffic.".to_string());
+    pdf_lines(&format!("jev-seo audit report: {}", rep.dir_path), &lines)
+}
+
+/// Single-file HTML report for humans. Same numbers as the JSON output.
+pub fn to_html(rep: &DirectoryAuditReport) -> String {
+    let score = rep.pass_rate.round().clamp(0.0, 100.0) as u32;
+    let grade = crate::actions::grade(score);
+    let mut h = String::new();
+    h.push_str("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">");
+    h.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+    h.push_str("<title>jev-seo audit report</title>");
+    h.push_str("<style>:root{--pink:#f386a1;--ink:#111;--mut:#666;--line:#e2e2e2}body{font-family:system-ui,-apple-system,sans-serif;color:var(--ink);max-width:960px;margin:0 auto;padding:2rem 1rem;line-height:1.55}.hero{background:#111;color:#fff;border-radius:10px;padding:2rem;display:flex;gap:2rem;align-items:center;flex-wrap:wrap}.grade{font-size:4rem;font-weight:800;background:var(--pink);color:#111;border-radius:10px;min-width:6rem;text-align:center}.meta{font-size:.9rem;color:#bbb}table{border-collapse:collapse;width:100%;margin-top:1rem}th,td{border:1px solid var(--line);padding:.45rem .65rem;text-align:left;font-size:.9rem}th{background:#f6f6f6}h2{margin-top:2.2rem;font-size:1.15rem;border-bottom:2px solid var(--pink);display:inline-block}ul{padding-left:1.2rem}.foot{margin-top:2.5rem;font-size:.8rem;color:var(--mut);border-top:1px solid var(--line);padding-top:1rem}code{background:#f1f1f1;padding:.1rem .35rem;border-radius:4px;font-size:.85em}</style>");
+    h.push_str("</head><body>");
+    h.push_str(&format!(
+        "<div class=\"hero\"><div class=\"grade\">{}</div><div><h1 style=\"margin:0;font-size:1.5rem\">SEO audit: {}</h1><p class=\"meta\">{} files | {} words | pass rate {:.1}% | score {}/100</p></div></div>",
+        grade,
+        esc(&rep.dir_path),
+        rep.total_files,
+        rep.total_words,
+        rep.pass_rate,
+        score
+    ));
+    h.push_str("<h2>Pages</h2><table><tr><th>Page</th><th>Words</th><th>Title</th><th>Checks passed</th></tr>");
+    for r in &rep.reports {
+        let passed = r.checks.iter().filter(|c| c.passed).count();
+        h.push_str(&format!(
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}/{}</td></tr>",
+            esc(&r.file_path),
+            r.word_count,
+            esc(r.title.as_deref().unwrap_or("")),
+            passed,
+            r.checks.len()
+        ));
+    }
+    h.push_str("</table>");
+    if !rep.duplicate_titles.is_empty() {
+        h.push_str("<h2>Duplicate titles</h2><ul>");
+        let mut titles: Vec<&String> = rep.duplicate_titles.keys().collect();
+        titles.sort();
+        for t in titles {
+            h.push_str(&format!("<li>{} ({} files)</li>", esc(t), rep.duplicate_titles[t].len()));
+        }
+        h.push_str("</ul>");
+    }
+    if !rep.orphan_pages.is_empty() {
+        h.push_str(&format!("<h2>Orphan pages ({})</h2><ul>", rep.orphan_pages.len()));
+        for f in &rep.orphan_pages {
+            h.push_str(&format!("<li>{}</li>", esc(f)));
+        }
+        h.push_str("</ul>");
+    }
+    if !rep.thin_pages.is_empty() {
+        h.push_str(&format!("<h2>Thin pages ({})</h2><ul>", rep.thin_pages.len()));
+        for (f, wc) in &rep.thin_pages {
+            h.push_str(&format!("<li>{} ({} words)</li>", esc(f), wc));
+        }
+        h.push_str("</ul>");
+    }
+    if !rep.keyword_cannibalization.is_empty() {
+        h.push_str("<h2>Keyword cannibalization</h2><ul>");
+        for item in &rep.keyword_cannibalization {
+            h.push_str(&format!(
+                "<li>{} ({} pages)</li>",
+                esc(&item.keyword_stem),
+                item.colliding_files.len()
+            ));
+        }
+        h.push_str("</ul>");
+    }
+    h.push_str("<div class=\"foot\">Generated locally by <code>jev-seo audit --html</code>. Scores rank work; they never predict rankings or traffic. Method: on-page checks per file, duplicate titles, orphan detection via internal link graph, thin-page and cannibalization radar.</div>");
+    h.push_str("</body></html>");
+    h
+}

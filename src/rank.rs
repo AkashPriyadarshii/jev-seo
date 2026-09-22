@@ -22,12 +22,16 @@ impl DbStore {
                 .map(|h| format!("{}/.jev-seo/jev-seo.db", h))
                 .unwrap_or_else(|_| ".jev-seo.db".to_string())
         });
-        if let Some(parent) = std::path::Path::new(&path).parent() {
+        Self::open_at(&path)
+    }
+
+    pub fn open_at(path: &str) -> Result<Self> {
+        if let Some(parent) = std::path::Path::new(path).parent() {
             if !parent.as_os_str().is_empty() {
                 std::fs::create_dir_all(parent)?;
             }
         }
-        let conn = Connection::open(&path)?;
+        let conn = Connection::open(path)?;
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              CREATE TABLE IF NOT EXISTS keywords (
@@ -44,13 +48,23 @@ impl DbStore {
                   serp_url TEXT,
                   checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
               );
-              CREATE TABLE IF NOT EXISTS geo_history (
-                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  target TEXT NOT NULL,
-                  term TEXT NOT NULL,
-                  score INTEGER NOT NULL,
-                  checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
-              );",
+               CREATE TABLE IF NOT EXISTS geo_history (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   target TEXT NOT NULL,
+                   term TEXT NOT NULL,
+                   score INTEGER NOT NULL,
+                   checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+               );
+               CREATE TABLE IF NOT EXISTS crawl_snapshots (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   start_url TEXT NOT NULL,
+                   pages INTEGER NOT NULL,
+                   broken INTEGER NOT NULL,
+                   checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+               );
+               CREATE INDEX IF NOT EXISTS idx_rank_history_keyword ON rank_history(keyword_id);
+               CREATE INDEX IF NOT EXISTS idx_geo_history_target ON geo_history(target, term);
+               CREATE INDEX IF NOT EXISTS idx_crawl_snapshots_url ON crawl_snapshots(start_url);",
         )?;
         Ok(Self { conn })
     }
@@ -62,19 +76,19 @@ impl DbStore {
         curr_rank: Option<usize>,
         serp_url: Option<&str>,
     ) -> Result<RankDelta> {
-        self.conn.execute(
+        let tx = self.conn.transaction()?;
+        tx.execute(
             "INSERT OR IGNORE INTO keywords (domain, term) VALUES (?1, ?2)",
             params![domain, term],
         )?;
 
-        let keyword_id: i64 = self.conn.query_row(
+        let keyword_id: i64 = tx.query_row(
             "SELECT id FROM keywords WHERE domain = ?1 AND term = ?2",
             params![domain, term],
             |row| row.get(0),
         )?;
 
-        let prev_rank: Option<usize> = self
-            .conn
+        let prev_rank: Option<usize> = tx
             .query_row(
                 "SELECT position FROM rank_history WHERE keyword_id = ?1 ORDER BY id DESC LIMIT 1",
                 params![keyword_id],
@@ -86,10 +100,11 @@ impl DbStore {
             .unwrap_or(None);
 
         let curr_pos_i64 = curr_rank.map(|p| p as i64);
-        self.conn.execute(
+        tx.execute(
             "INSERT INTO rank_history (keyword_id, position, serp_url) VALUES (?1, ?2, ?3)",
             params![keyword_id, curr_pos_i64, serp_url],
         )?;
+        tx.commit()?;
 
         Ok(RankDelta {
             domain: domain.to_string(),
@@ -113,6 +128,32 @@ impl DbStore {
         self.conn.execute(
             "INSERT INTO geo_history (target, term, score) VALUES (?1, ?2, ?3)",
             params![target, term, score as i64],
+        )?;
+        Ok(prev)
+    }
+
+    /// Store a crawl snapshot, returning the previous (pages, broken) pair for --diff.
+    pub fn record_crawl_snapshot(
+        &self,
+        start_url: &str,
+        pages: i64,
+        broken: i64,
+    ) -> Result<Option<(i64, i64)>> {
+        let prev: Option<(i64, i64)> = self
+            .conn
+            .query_row(
+                "SELECT pages, broken FROM crawl_snapshots WHERE start_url = ?1 ORDER BY id DESC LIMIT 1",
+                params![start_url],
+                |row| {
+                    let pages: i64 = row.get(0)?;
+                    let broken: i64 = row.get(1)?;
+                    Ok((pages, broken))
+                },
+            )
+            .ok();
+        self.conn.execute(
+            "INSERT INTO crawl_snapshots (start_url, pages, broken) VALUES (?1, ?2, ?3)",
+            params![start_url, pages, broken],
         )?;
         Ok(prev)
     }

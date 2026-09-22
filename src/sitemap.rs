@@ -26,7 +26,7 @@ pub fn audit_sitemap(target: &str) -> Result<SitemapReport> {
         crate::paths::reject_private_url(target)?;
         let resp = ureq::get(target)
             .timeout(Duration::from_secs(10))
-            .set("User-Agent", "jev-seo/0.1.0 (TypeSafe Jev XML Sitemap Inspector)")
+            .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev XML Sitemap Inspector)"))
             .call()
             .with_context(|| format!("Failed to fetch remote sitemap: {}", target))?;
         crate::paths::reject_redirect_target(resp.get_url())?;

@@ -4,8 +4,11 @@ use colored::*;
 use serde_json::json;
 
 mod audit;
+mod actions;
 mod brief;
+mod crawl;
 mod engine;
+mod llms;
 mod mcp;
 mod paths;
 mod policy;
@@ -21,7 +24,7 @@ mod tests;
 #[derive(Parser)]
 #[command(name = "jev-seo")]
 #[command(author = "Akash Priyadarshi")]
-#[command(version = "0.1.0")]
+#[command(version)]
 #[command(about = "FOSS zero-cost, agent-first SEO & GEO search radar powered by TypeSafe Jev", long_about = None)]
 struct Cli {
     #[command(subcommand)]
@@ -57,6 +60,15 @@ enum Commands {
         /// Exit nonzero when pass rate falls below this percent (CI gate)
         #[arg(long)]
         min_pass: Option<f64>,
+        /// Write a single-file HTML report to this path
+        #[arg(long, value_name = "PATH")]
+        html: Option<String>,
+        /// Write a PDF report to this path
+        #[arg(long, value_name = "PATH")]
+        pdf: Option<String>,
+        /// Write a Markdown report to this path
+        #[arg(long, value_name = "PATH")]
+        md: Option<String>,
     },
     /// Generative Engine Optimization (GEO) citation scoring via Jev
     Geo {
@@ -103,6 +115,35 @@ enum Commands {
     Sitemap {
         /// URL or local file path to sitemap.xml
         target: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Crawl a live site for broken links, redirect chains, and orphan pages
+    Crawl {
+        /// Start URL (seeds from /sitemap.xml when present)
+        #[arg(value_name = "URL")]
+        url: Option<String>,
+        /// Maximum pages to fetch from this host
+        #[arg(long, default_value_t = crate::crawl::DEFAULT_MAX_PAGES)]
+        max_pages: usize,
+        #[arg(long)]
+        json: bool,
+        /// Compare against the last stored snapshot in SQLite
+        #[arg(long)]
+        diff: bool,
+        /// Rebuild score and actions from a saved crawl JSON, no network
+        #[arg(long, value_name = "PATH")]
+        rescore: Option<String>,
+    },
+    /// Check llms.txt presence and AI crawler permissions for answer-engine readiness
+    Llms {
+        /// Domain or URL to inspect
+        domain: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Check environment: version, API key presence, database, platform
+    Doctor {
         #[arg(long)]
         json: bool,
     },
@@ -218,8 +259,21 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json, min_pass } => {
+        Commands::Audit { path, target_query, json, min_pass, html, pdf, md } => {
             let dir_report = audit::audit_path(&path)?;
+
+            if let Some(out) = &html {
+                std::fs::write(out, audit::to_html(&dir_report))?;
+                println!("HTML report written to {}", out.dimmed());
+            }
+            if let Some(out) = &pdf {
+                std::fs::write(out, audit::to_pdf(&dir_report))?;
+                println!("PDF report written to {}", out.dimmed());
+            }
+            if let Some(out) = &md {
+                std::fs::write(out, audit::to_markdown(&dir_report))?;
+                println!("Markdown report written to {}", out.dimmed());
+            }
 
             if let Some(floor) = min_pass {
                 if dir_report.pass_rate < floor {
@@ -293,6 +347,62 @@ fn main() -> Result<()> {
                     println!("  Missing Canonicals:  {} files", dir_report.missing_canonicals.len().to_string().yellow());
                 }
                 println!("\n{}", "Summary Status: Audit complete across directory.".green());
+
+                let mut actions = Vec::new();
+                if !dir_report.duplicate_titles.is_empty() {
+                    actions.push(crate::actions::Action::new(
+                        "AUDIT-001",
+                        2,
+                        1,
+                        &format!("Dedup {} colliding titles", dir_report.duplicate_titles.len()),
+                        dir_report.duplicate_titles.keys().take(3).cloned().collect::<Vec<_>>().join(", "),
+                    ));
+                }
+                if !dir_report.orphan_pages.is_empty() {
+                    actions.push(crate::actions::Action::new(
+                        "AUDIT-002",
+                        2,
+                        2,
+                        &format!("Link {} orphan pages inward", dir_report.orphan_pages.len()),
+                        dir_report.orphan_pages.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
+                    ));
+                }
+                if !dir_report.thin_pages.is_empty() {
+                    actions.push(crate::actions::Action::new(
+                        "AUDIT-003",
+                        3,
+                        2,
+                        &format!("Thicken {} thin pages", dir_report.thin_pages.len()),
+                        dir_report.thin_pages.iter().take(3).map(|(f, _)| f.clone()).collect::<Vec<_>>().join(", "),
+                    ));
+                }
+                if !dir_report.missing_canonicals.is_empty() {
+                    actions.push(crate::actions::Action::new(
+                        "AUDIT-004",
+                        2,
+                        1,
+                        &format!("Add canonicals to {} files", dir_report.missing_canonicals.len()),
+                        dir_report.missing_canonicals.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
+                    ));
+                }
+                if !dir_report.keyword_cannibalization.is_empty() {
+                    actions.push(crate::actions::Action::new(
+                        "AUDIT-005",
+                        2,
+                        2,
+                        &format!("Split {} cannibalized stems", dir_report.keyword_cannibalization.len()),
+                        dir_report.keyword_cannibalization.iter().take(3).map(|i| i.keyword_stem.clone()).collect::<Vec<_>>().join(", "),
+                    ));
+                }
+                let actions = crate::actions::rank(actions);
+                if actions.is_empty() {
+                    println!("  Actions:       {}", "none, directory is clean".green());
+                } else {
+                    println!("\n{}", "Top Actions:".cyan().bold());
+                    for a in crate::actions::top(&actions, 5) {
+                        println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                    }
+                }
             } else if let Some(report) = dir_report.reports.first() {
                 println!("\n{} {}", "On-Page SEO Audit:".cyan().bold(), report.file_path);
                 println!("  Title:       {}", report.title.as_deref().unwrap_or("N/A"));
@@ -311,6 +421,26 @@ fn main() -> Result<()> {
                 for check in &report.checks {
                     let badge = if check.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
                     println!("  [{}] {:<20} - {}", badge, check.name, check.message);
+                }
+                let failed: Vec<crate::actions::Action> = report
+                    .checks
+                    .iter()
+                    .filter(|c| !c.passed)
+                    .enumerate()
+                    .map(|(i, c)| crate::actions::Action::new(
+                        &format!("AUDIT-{:03}", 101 + i),
+                        2,
+                        2,
+                        &c.name,
+                        c.message.clone(),
+                    ))
+                    .collect();
+                let failed = crate::actions::rank(failed);
+                if !failed.is_empty() {
+                    println!("\n{}", "Top Actions:".cyan().bold());
+                    for a in crate::actions::top(&failed, 5) {
+                        println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                    }
                 }
 
                 if let Some(query) = target_query {
@@ -358,6 +488,10 @@ fn main() -> Result<()> {
                             println!("  GEO Score:       {}/10{}", eval.geo_score, m);
                             if let Some((composite, cconf)) = policy::composite_geo(&eval.extra) {
                                 println!("  Composite:       {}/10 (confidence: {:.2})", composite, cconf);
+                            }
+                            let review = policy::needs_review(&eval.extra, "geo");
+                            if !review.is_empty() {
+                                println!("  Needs review:    {} [{}]", review.len().to_string().yellow(), review.join(", ").dimmed());
                             }
                             println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
                             println!("  Primary Gap:     {}", eval.content_gap.yellow());
@@ -561,6 +695,182 @@ fn main() -> Result<()> {
                     println!("  ⚠ {}", w);
                 }
             }
+        }
+        Commands::Crawl { url, max_pages, json, diff, rescore } => {
+            if let Some(path) = rescore {
+                let raw = std::fs::read_to_string(&path)?;
+                let saved: crawl::CrawlReport = serde_json::from_str(&raw)?;
+                let report = crawl::finish_report(crawl::ReportParts {
+                    start_url: saved.start_url,
+                    pages: saved.pages,
+                    redirects: saved.redirects,
+                    inbound: saved.inbound,
+                    errors: saved.errors,
+                    seeded_from_sitemap: saved.seeded_from_sitemap,
+                    capped: saved.capped,
+                    robots_honored: saved.robots_honored,
+                });
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                } else {
+                    println!("  Rescored:      {}/100 ({})", report.score, crate::actions::grade(report.score));
+                }
+                return Ok(());
+            }
+            let url = url.unwrap_or_else(|| {
+                eprintln!("{}", "Error: provide a start URL or --rescore PATH.".red());
+                std::process::exit(2);
+            });
+            eprintln!("{}", format!("Crawling {} (max {} pages)...", url, max_pages).dimmed());
+            let report = crawl::crawl_site(&url, max_pages)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                return Ok(());
+            }
+
+            println!("\n{} {}", "Live Site Crawl:".cyan().bold(), report.start_url);
+            println!("  Pages crawled: {}", report.pages_crawled);
+            println!("  Health:        {}/100 ({})", report.score, crate::actions::grade(report.score).green().bold());
+            println!(
+                "  Areas:         {}",
+                report
+                    .areas
+                    .iter()
+                    .map(|a| format!("{} {}", a.name, a.score))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+                    .dimmed()
+            );
+            if report.broken.is_empty() {
+                println!("  Broken links:  {}", "0 (Clean)".green());
+            } else {
+                println!("  Broken links:  {}", report.broken.len().to_string().red().bold());
+                for p in report.broken.iter().take(5) {
+                    println!("    ✖ [{}] {}", p.status, p.url.dimmed());
+                }
+                if report.broken.len() > 5 {
+                    println!("      ... and {} more", report.broken.len() - 5);
+                }
+            }
+            let slow: Vec<&crawl::PageRecord> = report
+                .pages
+                .iter()
+                .filter(|p| p.status == 200 && p.elapsed_ms > crawl::SLOW_PAGE_MS)
+                .collect();
+            if slow.is_empty() {
+                println!("  Slow pages:    {}", "0".green());
+            } else {
+                println!("  Slow pages:    {}", format!("{} over {}ms", slow.len(), crawl::SLOW_PAGE_MS).yellow());
+                for p in slow.iter().take(5) {
+                    println!("      {}ms {}", p.elapsed_ms, p.url.dimmed());
+                }
+            }
+            if report.redirects.is_empty() {
+                println!("  Redirects:     {}", "0".green());
+            } else {
+                println!("  Redirects:     {}", report.redirects.len().to_string().yellow());
+                for (from, to) in report.redirects.iter().take(3) {
+                    println!("      {} -> {}", from.dimmed(), to.dimmed());
+                }
+            }
+            if report.orphans.is_empty() {
+                println!("  Orphans:       {}", "0".green());
+            } else {
+                println!("  Orphans:       {}", report.orphans.len().to_string().yellow());
+                for f in report.orphans.iter().take(5) {
+                    println!("      {}", f.yellow());
+                }
+            }
+            if !report.errors.is_empty() {
+                println!("  Fetch errors:  {}", report.errors.len().to_string().yellow());
+                for e in report.errors.iter().take(3) {
+                    println!("      {}", e.dimmed());
+                }
+            }
+            if report.actions.is_empty() {
+                println!("  Actions:       {}", "none, site is clean".green());
+            } else {
+                println!("\n{}", "Top Actions:".cyan().bold());
+                for a in crate::actions::top(&report.actions, 5) {
+                    println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                }
+            }
+            println!(
+                "  Completeness:  {} seeded, robots {}, {}{}",
+                if report.seeded_from_sitemap { "sitemap" } else { "start-URL" },
+                if report.robots_honored { "honored" } else { "missing" },
+                report.pages_crawled,
+                if report.capped { " (capped, raise --max-pages)" } else { " (full)" }
+            );
+            if diff {
+                match rank::DbStore::open()?.record_crawl_snapshot(
+                    &report.start_url,
+                    report.pages_crawled as i64,
+                    report.broken.len() as i64,
+                )? {
+                    Some((prev_pages, prev_broken)) => {
+                        println!(
+                            "  Since last:    {} pages (was {}), {} broken (was {})",
+                            report.pages_crawled, prev_pages, report.broken.len(), prev_broken
+                        );
+                    }
+                    None => println!("  Since last:    first recorded snapshot"),
+                }
+            }
+        }
+        Commands::Llms { domain, json } => {
+            let report = llms::check_llms(&domain)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                return Ok(());
+            }
+
+            println!("\n{} {}", "Agent Readiness:".cyan().bold(), report.domain);
+            println!("  llms.txt:      {}", if report.info.present { "YES".green() } else { "NO".red() });
+            if report.info.present {
+                println!("  Sections:      {}", report.info.sections.len());
+            }
+            println!("  AI explicit:   {}", if report.ai_allowed.is_empty() { "none".yellow().to_string() } else { report.ai_allowed.join(", ").green().to_string() });
+            println!("  AI default:    {} bots inherit allow (*)", report.ai_default.len());
+            if !report.ai_blocked.is_empty() {
+                println!("  AI blocked:    {}", report.ai_blocked.join(", ").red());
+            }
+            println!("  Score:         {}/100", report.score);
+            if report.actions.is_empty() {
+                println!("  Actions:       {}", "none, ready".green());
+            } else {
+                println!("\n{}", "Top Actions:".cyan().bold());
+                for a in crate::actions::top(&report.actions, 5) {
+                    println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                }
+            }
+            println!("\n{}", "Checks:".bold());
+            for c in &report.checks {
+                let badge = if c.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
+                println!("  [{}] {:<22} - {}", badge, c.name, c.message);
+            }
+        }
+        Commands::Doctor { json } => {
+            let key_set = std::env::var("TYPESAFE_API_KEY").map(|k| !k.trim().is_empty()).unwrap_or(false);
+            let db_ok = rank::DbStore::open().is_ok();
+            let report = serde_json::json!({
+                "version": env!("CARGO_PKG_VERSION"),
+                "os": std::env::consts::OS,
+                "typesafe_key": if key_set { "set" } else { "missing" },
+                "database": if db_ok { "writable" } else { "error" },
+            });
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                return Ok(());
+            }
+            println!("\n{}", "Doctor:".cyan().bold());
+            println!("  Version:       {}", env!("CARGO_PKG_VERSION"));
+            println!("  Platform:      {}", std::env::consts::OS);
+            println!(
+                "  Jev API key:   {}",
+                if key_set { "set (value hidden)".green().to_string() } else { "missing, Jev scores will skip".yellow().to_string() }
+            );
+            println!("  Database:      {}", if db_ok { "writable".green().to_string() } else { "ERROR".red().to_string() });
         }
         Commands::Mcp => {
             mcp::run_stdio_server()?;

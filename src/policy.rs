@@ -83,6 +83,25 @@ pub fn composite_geo(extra: &serde_json::Map<String, serde_json::Value>) -> Opti
     Some((((total * 9.0) + 1.0).round().clamp(1.0, 10.0) as u32, conf_total))
 }
 
+/// Question ids in `extra` whose confidence sits below the act bar.
+/// Code prints these as needs-review instead of silently trusting them.
+/// A missing confidence also surfaces: unknown certainty is review-worthy.
+pub fn needs_review(extra: &serde_json::Map<String, serde_json::Value>, command: &str) -> Vec<String> {
+    let act = thresholds(command).act;
+    let mut ids: Vec<String> = extra
+        .iter()
+        .filter(|(_, a)| {
+            a.get("confidence")
+                .and_then(|c| c.as_f64())
+                .map(|c| c < act)
+                .unwrap_or(true)
+        })
+        .map(|(k, _)| k.clone())
+        .collect();
+    ids.sort();
+    ids
+}
+
 /// Next command hint from intent. Pure routing, no inference.
 pub fn route_for_intent(intent: &str) -> &'static str {
     match intent {

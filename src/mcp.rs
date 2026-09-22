@@ -173,6 +173,29 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
                             },
                             "required": ["target"]
                         }
+                    },
+                    {
+                        "name": "seo_crawl",
+                        "description": "Crawl a live site for broken links, redirect chains, and orphan pages",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": { "type": "string", "description": "Start URL" },
+                                "max_pages": { "type": "integer", "description": "Maximum pages to fetch (default: 50)" }
+                            },
+                            "required": ["url"]
+                        }
+                    },
+                    {
+                        "name": "seo_llms",
+                        "description": "Check llms.txt presence and AI crawler permissions for answer-engine readiness",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "domain": { "type": "string", "description": "Domain or URL to inspect" }
+                            },
+                            "required": ["domain"]
+                        }
                     }
                 ]
             })),
@@ -304,6 +327,21 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
                 return err;
             }
             match crate::sitemap::audit_sitemap(target) {
+                Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_crawl" => {
+            let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            let max_pages = args.get("max_pages").and_then(|v| v.as_u64()).unwrap_or(crate::crawl::DEFAULT_MAX_PAGES as u64) as usize;
+            match crate::crawl::crawl_site(url, max_pages) {
+                Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_llms" => {
+            let domain = args.get("domain").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::llms::check_llms(domain) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }

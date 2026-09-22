@@ -223,7 +223,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(resp.error.is_none());
         let res = resp.result.unwrap();
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
-        assert_eq!(tools.len(), 8, "All 8 agent SEO tools must be exposed");
+        assert_eq!(tools.len(), 10, "All 10 agent SEO tools must be exposed");
 
         let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(|n| n.as_str())).collect();
         assert!(names.contains(&"seo_keywords"));
@@ -234,6 +234,8 @@ Sitemap: https://example.com/sitemap.xml
         assert!(names.contains(&"seo_robots"));
         assert!(names.contains(&"seo_brief"));
         assert!(names.contains(&"seo_sitemap"));
+        assert!(names.contains(&"seo_crawl"));
+        assert!(names.contains(&"seo_llms"));
     }
 
     #[test]
@@ -496,5 +498,148 @@ Sitemap: https://example.com/sitemap.xml
         let resp = handle_request(&call);
         let result = resp.result.unwrap();
         assert_eq!(result.get("isError").and_then(|v| v.as_bool()), Some(true));
+    }
+
+    #[test]
+    fn test_crawl_extract_links_same_host() {
+        use crate::crawl::extract_links;
+        let base = url::Url::parse("https://example.com/docs/a").unwrap();
+        let html = r#"<a href="/docs/b">B</a><a href="https://example.com/c#frag">C</a><a href="https://other.com/x">X</a><a href="mailto:a@b.c">M</a><a href="/docs/b">dup</a>"#;
+        let links = extract_links(html, &base);
+        assert_eq!(links.len(), 2);
+        assert!(links.contains(&"https://example.com/docs/b".to_string()));
+        assert!(links.contains(&"https://example.com/c".to_string()));
+    }
+
+    #[test]
+    fn test_crawl_robots_allows() {
+        use crate::crawl::robots_allows;
+        let body = "User-agent: *\nDisallow: /private/\nDisallow: /tmp\nAllow: /tmp/public\n";
+        assert!(robots_allows(body, "/docs/a"));
+        assert!(!robots_allows(body, "/private/x"));
+        assert!(robots_allows(body, "/tmp/public/x"));
+        assert!(!robots_allows(body, "/tmp/x"));
+        assert!(robots_allows("", "/anything"));
+    }
+
+    #[test]
+    fn test_crawl_sitemap_seeds() {        use crate::crawl::sitemap_seed_urls;
+        let xml = r#"<?xml version="1.0"?><urlset><url><loc>https://example.com/a</loc></url><url><loc>https://example.com/b</loc></url></urlset>"#;
+        let seeds = sitemap_seed_urls(xml);
+        assert_eq!(seeds, vec!["https://example.com/a", "https://example.com/b"]);
+    }
+
+    #[test]
+    fn test_crawl_canonicalize() {        use crate::crawl::canonicalize;
+        assert_eq!(canonicalize("https://Example.COM/a/?utm_source=x#frag"), "https://example.com/a");
+        assert_eq!(canonicalize("https://example.com/index.html"), "https://example.com/");
+        assert_eq!(canonicalize("https://example.com/docs/?fbclid=1&x=2"), "https://example.com/docs?x=2");
+        assert_eq!(canonicalize("https://example.com/a/"), "https://example.com/a");
+        assert_eq!(canonicalize("https://example.com/a"), "https://example.com/a");
+    }
+
+    #[test]
+    fn test_crawl_score_weights() {
+        use crate::crawl::score_crawl;
+        assert_eq!(score_crawl(0, 0, 0, 0), 100);
+        assert_eq!(score_crawl(1, 0, 0, 0), 85);
+        assert_eq!(score_crawl(10, 10, 10, 10), 15);
+        assert_eq!(score_crawl(100, 100, 100, 100), 15);
+    }
+
+    #[test]
+    fn test_actions_rank_priority_then_effort() {
+        use crate::actions::{grade, rank, Action};
+        let mk = |id: &str, p: u8, e: u8| Action::new(id, p, e, id, String::new());
+        let ranked = rank(vec![mk("C", 2, 1), mk("A", 1, 3), mk("B", 1, 1)]);
+        let ids: Vec<&str> = ranked.iter().map(|a| a.id.as_str()).collect();
+        assert_eq!(ids, vec!["B", "A", "C"]);
+        assert_eq!(crate::actions::top(&ranked, 2).len(), 2);
+        assert_eq!(grade(91), "A");
+        assert_eq!(grade(80), "B");
+        assert_eq!(grade(60), "C");
+        assert_eq!(grade(40), "D");
+        assert_eq!(grade(10), "F");
+        let q = Action::new("Q", 2, 1, "q", String::new());
+        assert!(q.quick_win);
+        assert_eq!(q.impact, 60);
+    }
+
+    #[test]
+    fn test_llms_parse() {
+        use crate::llms::parse_llms_txt;
+        let body = "# Title\n\nSome prose.\n\n## Docs\n\n- item\n";
+        let (bytes, sections) = parse_llms_txt(body);
+        assert_eq!(bytes, body.len());
+        assert_eq!(sections, vec!["Title", "Docs"]);
+    }
+
+    #[test]
+    fn test_policy_needs_review() {
+        use crate::policy::needs_review;
+        let extra: serde_json::Map<String, serde_json::Value> = serde_json::from_value(serde_json::json!({
+            "geo_structure": { "score": 3.0, "confidence": 0.9 },
+            "geo_density": { "score": 2.0, "confidence": 0.6 },
+            "geo_freshness": { "score": 1.0 }
+        }))
+        .unwrap();
+        let ids = needs_review(&extra, "geo");
+        assert_eq!(ids, vec!["geo_density", "geo_freshness"]);
+    }
+
+    #[test]
+    fn test_audit_to_html() {        use crate::audit::{audit_path, to_html};
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("p.md"), "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here.\n").unwrap();
+        let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
+        let html = to_html(&rep);
+        assert!(html.contains("<!DOCTYPE html>"));
+        assert!(html.contains("pass rate"));
+        assert!(html.contains("jev-seo audit report"));
+    }
+
+    #[test]
+    fn test_audit_to_pdf_structure() {
+        use crate::audit::{audit_path, to_pdf};
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["a.md", "b.md", "c.md"] {
+            std::fs::write(
+                dir.path().join(name),
+                "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here live happily in this file with enough of them.\n",
+            )
+            .unwrap();
+        }
+        let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
+        let pdf = to_pdf(&rep);
+        assert!(pdf.starts_with(b"%PDF-1.4\n"));
+        assert!(pdf.ends_with(b"%%EOF"));
+        assert!(pdf.windows(9).any(|w| w == b"endstream"));
+        // startxref must point at the xref table.
+        let text = String::from_utf8_lossy(&pdf);
+        let xpos: usize = text.rsplit("startxref\n").next().unwrap().lines().next().unwrap().parse().unwrap();
+        assert!(pdf[xpos..].starts_with(b"xref\n"));
+        assert!(text.contains("SEO audit"));
+    }
+
+    #[test]
+    fn test_audit_to_markdown_tables() {
+        use crate::audit::{audit_path, to_markdown};
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("p.md"), "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here.\n").unwrap();
+        let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
+        let md = to_markdown(&rep);
+        assert!(md.starts_with("# SEO audit:"));
+        assert!(md.contains("| Page | Words | Title | Checks |"));
+        assert!(md.contains("## Method"));
+    }
+
+    #[test]
+    fn test_crawl_snapshot_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("t.db");
+        let store = DbStore::open_at(db_path.to_str().unwrap()).unwrap();
+        assert!(store.record_crawl_snapshot("https://example.com", 10, 1).unwrap().is_none());
+        let prev = store.record_crawl_snapshot("https://example.com", 12, 0).unwrap().unwrap();
+        assert_eq!(prev, (10, 1));
     }
 }

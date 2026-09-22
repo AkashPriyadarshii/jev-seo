@@ -42,7 +42,7 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
 
     let resp = ureq::get(&robots_url)
         .timeout(Duration::from_secs(8))
-        .set("User-Agent", "jev-seo/0.1.0 (TypeSafe Jev Search Radar; +https://github.com/AkashPriyadarshii/jev-seo)")
+        .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Search Radar; +https://github.com/AkashPriyadarshii/jev-seo)"))
         .call();
 
     match resp {

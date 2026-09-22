@@ -42,7 +42,23 @@ Keywords: seo, geo, generative engine optimization, typesafe ai, jev, foss, rust
   </p>
 </div>
 
-[![stars](https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars)](https://github.com/AkashPriyadarshii/jev-seo/stargazers) [![crates.io](https://img.shields.io/crates/v/jev-seo?style=flat-square)](https://crates.io/crates/jev-seo) [![downloads](https://img.shields.io/crates/d/jev-seo?style=flat-square)](https://crates.io/crates/jev-seo) [![release](https://img.shields.io/github/v/release/AkashPriyadarshii/jev-seo?style=flat-square&label=release)](https://github.com/AkashPriyadarshii/jev-seo/releases)
+[![stars](https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars)](https://github.com/AkashPriyadarshii/jev-seo/stargazers) [![crates.io](https://img.shields.io/crates/v/jev-seo?style=flat-square)](https://crates.io/crates/jev-seo) [![downloads](https://img.shields.io/crates/d/jev-seo?style=flat-square)](https://crates.io/crates/jev-seo) [![release](https://img.shields.io/github/v/release/AkashPriyadarshii/jev-seo?style=flat-square&label=release)](https://github.com/AkashPriyadarshii/jev-seo/releases) [![ci](https://github.com/AkashPriyadarshii/jev-seo/actions/workflows/ci.yml/badge.svg)](https://github.com/AkashPriyadarshii/jev-seo/actions/workflows/ci.yml)
+
+---
+
+## See it run
+
+Live crawl with health score, ranked actions, and completeness notes:
+
+![jev-seo live crawl output](docs/assets/terminal.png)
+
+Single-file HTML report from `audit --html`, with grade scorecard:
+
+![jev-seo HTML audit report](docs/assets/report.png)
+
+Grade scorecard close-up from the same report:
+
+![jev-seo scorecard](docs/assets/scorecard.png)
 
 ---
 
@@ -56,7 +72,9 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 - **2026 Schema.org Validator**: Deeply inspects JSON-LD schemas (`SoftwareApplication`, `Article`, `Organization`, `Product`) and flags deprecated schemas.
 - **Robots.txt & AI Crawler Radar**: Evaluates permissions for AI bots (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, `Bytespider`).
 - **SERP Content Briefs**: Synthesizes competitor SERP snippets into an actionable content blueprint with H2 outlines and optimal 134-167 word GEO blocks.
-- **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 8 SEO tools into Claude Code, Gemini CLI, and Antigravity.
+- **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 10 SEO tools into Claude Code, Gemini CLI, and Antigravity.
+- **Live-site crawler**: Parallel BFS crawl with canonical dedup, per-page timing, health scores, and ranked fix actions.
+- **Answer-engine readiness**: `llms.txt` plus AI crawler permission scoring with readiness actions.
 - **Local & private**: All rank tracking and audit histories persist in a single local SQLite database (`.jev-seo.db`).
 - **Low RAM footprint**: Fast native Rust binary that runs in under 30MB RAM on resource-constrained machines.
 
@@ -166,21 +184,24 @@ Integrated into `jev-seo audit`:
 | Command | Description | Flags |
 |---|---|---|
 | `keywords <query>` | Autocomplete discovery and Jev intent classification | `--json` |
-| `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--json` |
-| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit | `--target-query <query>`, `--json`, `--min-pass <pct>` |
+| `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--limit <n>`, `--json` |
+| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>` |
 | `geo <target>` | Generative Engine Optimization citation scoring (1-10), composite dimensions, score trend | `--query <query>`, `--json` |
 | `schema <target>` | Schema.org JSON-LD structural and deprecation validator | `--json` |
 | `robots <domain>` | Robots.txt and AI crawler permission auditor | `--json` |
 | `brief <topic>` | SERP-driven heading outline and 150-word GEO direct-answer | `--limit <n>`, `--markdown`, `--json` |
 | `rank` | SQLite rank drift tracker (~/.jev-seo/jev-seo.db) | `--domain <domain>`, `--query <query>` |
 | `sitemap <target>` | XML sitemap, 50k limit, HTTPS, and hreflang validator | `--json` |
+| `crawl <url>` | Live-site BFS crawl: health score, ranked actions, broken links, redirect chains, orphans, timing | `--max-pages <n>`, `--json`, `--diff`, `--rescore <path>` |
+| `llms <domain>` | llms.txt plus AI crawler scoring with ranked readiness actions | `--json` |
+| `doctor` | Environment check: version, API key presence, database, platform | `--json` |
 | `mcp` | Native Stdio JSON-RPC 2.0 Agent MCP Server | (None) |
 
 ---
 
-## Native MCP Server (8 Tools)
+## Native MCP Server (10 Tools)
 
-When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 8 tools. It answers the `initialize` handshake, stays silent on notifications, reports parse errors, and flags tool failures with `isError`. File tools share a guarded reader (content extensions only, no dot-files, no URLs) plus a Jev safety classifier that blocks secret-looking targets. Remote fetches refuse private hosts, resolved DNS, and redirect landings.
+When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 10 tools. It answers the `initialize` handshake, stays silent on notifications, reports parse errors, and flags tool failures with `isError`. File tools share a guarded reader (content extensions only, no dot-files, no URLs) plus a Jev safety classifier that blocks secret-looking targets. Remote fetches refuse private hosts, resolved DNS, and redirect landings.
 
 | MCP Tool | Arguments | Purpose |
 |---|---|---|
@@ -192,6 +213,8 @@ When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model C
 | `seo_robots` | `domain: string` | Inspect live robots.txt directives for major LLM crawlers |
 | `seo_brief` | `topic: string`, `limit?: int` | Generate structured markdown content briefs with H2 outlines |
 | `seo_sitemap` | `target: string` | Validate XML sitemap protocols, HTTPS links, and hreflang tags |
+| `seo_crawl` | `url: string`, `max_pages?: int` | Crawl a live site for broken links, redirect chains, and orphan pages |
+| `seo_llms` | `domain: string` | Check llms.txt presence and AI crawler permissions |
 
 ---
 
@@ -211,8 +234,10 @@ jev-seo
 │   ├── brief.rs        SERP-driven content brief generator
 │   ├── rank.rs         Local SQLite rank drift tracker (~/.jev-seo/jev-seo.db)
 │   ├── sitemap.rs      XML sitemap & international hreflang auditor
-│   ├── mcp.rs          Native stdio JSON-RPC 2.0 MCP server (8 tools)
-│   └── tests.rs        Unit & integration test harness (27 tests passing)
+│   ├── crawl.rs        Live-site BFS crawler with canonical dedup and timing
+│   ├── llms.rs         llms.txt and AI crawler readiness scorer
+│   ├── mcp.rs          Native stdio JSON-RPC 2.0 MCP server (10 tools)
+│   └── tests.rs        Unit & integration test harness (35 tests passing)
 ├── Cargo.toml
 └── README.md
 ```

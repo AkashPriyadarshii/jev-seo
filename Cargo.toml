@@ -1,6 +1,6 @@
 [package]
 name = "jev-seo"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Akash Priyadarshi <272530059+AkashPriyadarshii@users.noreply.github.com>"]
 license = "MIT"
