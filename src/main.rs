@@ -47,6 +47,9 @@ enum Commands {
         query: String,
         #[arg(short, long, default_value_t = 10)]
         limit: usize,
+        /// Search backend: auto, ddg, or tavily (paid, needs TAVILY_API_KEY)
+        #[arg(long, default_value = "auto")]
+        provider: String,
         #[arg(long)]
         json: bool,
     },
@@ -188,9 +191,14 @@ fn main() -> Result<()> {
                 println!("  Suggested Next: jev-seo {}", policy::route_for_intent(&eval.intent));
             }
         }
-        Commands::Query { query, limit, json } => {
+        Commands::Query { query, limit, provider, json } => {
+            let backend = match provider.as_str() {
+                "ddg" => serp::Provider::Ddg,
+                "tavily" => serp::Provider::Tavily,
+                _ => serp::Provider::Auto,
+            };
             println!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
-            let items = serp::scrape_serp(&query, limit)?;
+            let items = serp::scrape_serp_with(&query, limit, backend)?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&items)?);

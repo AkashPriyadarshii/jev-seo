@@ -653,6 +653,30 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_provider_selection_stays_explicit() {
+        use crate::serp::Provider;
+        assert_eq!(crate::serp::select_provider(Provider::Ddg), Provider::Ddg);
+        assert_eq!(crate::serp::select_provider(Provider::Tavily), Provider::Tavily);
+    }
+
+    #[test]
+    fn test_tavily_without_key_errors_offline() {
+        // tavily_search must fail before any network call when no key is set.
+        let saved_key = std::env::var("TAVILY_API_KEY").ok();
+        let saved_url = std::env::var("TAVILY_API_URL").ok();
+        std::env::remove_var("TAVILY_API_KEY");
+        std::env::remove_var("TAVILY_API_URL");
+        let res = crate::serp::tavily_search("test", 3);
+        if let Some(k) = saved_key {
+            std::env::set_var("TAVILY_API_KEY", k);
+        }
+        if let Some(u) = saved_url {
+            std::env::set_var("TAVILY_API_URL", u);
+        }
+        assert!(res.is_err());
+    }
+
+    #[test]
     fn test_audit_to_html() {        use crate::audit::{audit_path, to_html};
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("p.md"), "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here.\n").unwrap();
