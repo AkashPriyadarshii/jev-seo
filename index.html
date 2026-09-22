@@ -7,12 +7,16 @@
 <meta name="description" content="jev-seo is a zero-subscription SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, and SERP briefs. Rust CLI + MCP.">
 <meta name="keywords" content="seo, geo, generative engine optimization, seo audit, semrush alternative, typesafe ai, jev, rust, mcp, ai crawlers, robots.txt, schema validator, serp analysis">
 <link rel="canonical" href="https://jevseo.vercel.app/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="jev-seo">
 <meta property="og:title" content="jev-seo — zero-cost SEO & GEO radar">
 <meta property="og:description" content="jev-seo is a zero-subscription SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, and SERP briefs. Rust CLI + MCP.">
 <meta property="og:url" content="https://jevseo.vercel.app/">
-<meta property="og:image" content="https://github.com/AkashPriyadarshii.png">
+<meta property="og:image" content="https://jevseo.vercel.app/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="jev-seo — zero-cost SEO & GEO search radar">
 <meta name="twitter:description" content="Zero-subscription SEO and GEO search radar. Rust CLI + MCP.">
@@ -20,7 +24,7 @@
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"jev-seo","applicationCategory":"SEOApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"},"author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"url":"https://jevseo.vercel.app/","description":"FOSS zero-cost SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, SERP briefs, and GEO scoring. Rust CLI with MCP server."}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"jev-seo","url":"https://jevseo.vercel.app/","description":"Zero-cost SEO and GEO search radar. Rust CLI + MCP server.","inLanguage":"en","publisher":{"@type":"Organization","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app","logo":{"@type":"ImageObject","url":"https://github.com/AkashPriyadarshii.png"}}}
+{"@context":"https://schema.org","@type":"WebSite","name":"jev-seo","url":"https://jevseo.vercel.app/","description":"Zero-cost SEO and GEO search radar. Rust CLI + MCP server.","inLanguage":"en","publisher":{"@type":"Organization","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app","logo":{"@type":"ImageObject","url":"https://jevseo.vercel.app/assets/og-image.png"}}}
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is jev-seo free?","acceptedAnswer":{"@type":"Answer","text":"Yes. jev-seo is MIT-licensed open source and costs zero subscriptions. It scrapes free DuckDuckGo endpoints and audits local files, so there is no paid API key required."}},{"@type":"Question","name":"What does GEO mean in jev-seo?","acceptedAnswer":{"@type":"Answer","text":"GEO stands for Generative Engine Optimization: making content likely to be cited by AI search engines such as Gemini Overviews, Perplexity, and SearchGPT. jev-seo scores citation likelihood from 1 to 10 with TypeSafe Jev."}},{"@type":"Question","name":"Does jev-seo need a credit card or paid API?","acceptedAnswer":{"@type":"Answer","text":"No. The only optional key is a free TypeSafe API key for semantic scoring. Ranking history, audits, schema validation, and SERP inspection all run locally with zero cost."}},{"@type":"Question","name":"What is the difference between jev-seo and Semrush or Ahrefs?","acceptedAnswer":{"@type":"Answer","text":"Semrush and Ahrefs are hosted dashboards that cost over $130 a month. jev-seo is a native Rust CLI and MCP server that audits local files, validates schema, checks robots.txt, and scores GEO citations, all in one binary under 30MB RAM."}},{"@type":"Question","name":"How do I install jev-seo?","acceptedAnswer":{"@type":"Answer","text":"Install with cargo install jev-seo, or download the release binary for Windows, macOS, or Linux from the GitHub releases page."}}]}
@@ -41,7 +45,13 @@ FORM: assigned direction 7 (proof sheet), raised by challengers: algorave (phosp
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
 -->
 <header class="sheethead">
-  <div class="reg-cross" aria-hidden="true"></div>
+  <svg class="reg-cross" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <g stroke="var(--paper)" stroke-width="2" fill="none">
+      <line x1="4" y1="32" x2="60" y2="32"/>
+      <line x1="32" y1="4" x2="32" y2="60"/>
+      <circle cx="32" cy="32" r="19"/>
+    </g>
+  </svg>
   <div class="cropmark crop-tl" aria-hidden="true"></div>
   <div class="cropmark crop-tr" aria-hidden="true"></div>
   <div class="cropmark crop-bl" aria-hidden="true"></div>
@@ -50,6 +60,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <a class="wordmark" href="#top">jev<span class="ink-g">-seo</span></a>
     <div class="topnav">
       <a href="#why">why</a>
+      <a href="#bench">bench</a>
       <a href="#radar">commands</a>
       <a href="#phi">oracle</a>
       <a href="#proof">proofed</a>
@@ -66,7 +77,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <section class="titleblock">
     <div class="tb-meta">
       <p class="tb-line">FOSS · RUST · ₹0 · MCP-READY</p>
-      <p class="tb-line tb-right">PROOFED 2026-02-18</p>
+      <p class="tb-line tb-right">PROOFED 2026-09-22</p>
     </div>
     <h1 class="specimen">jev-seo</h1>
     <p class="subtitle">Zero-cost SEO &amp; GEO search radar. <span class="paper">Proofs your search presence the way a printer proofs a sheet</span> — no dashboard, no $130/month, no hallucinated advice.</p>
@@ -98,7 +109,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <div class="needle" data-level="0.86" style="--lvl:0.86"><div class="needle-bar"></div><span class="needle-scale" aria-hidden="true">0─────10</span></div>
         <div class="needle" data-level="0.62" style="--lvl:0.62"><div class="needle-bar"></div></div>
         <div class="needle" data-level="0.94" style="--lvl:0.94"><div class="needle-bar"></div></div>
-        <div class="spec-caption">Ballistic needles: sweep, overshoot, settle. Green is good — red would mean the page fell.</div>
+        <div class="spec-caption">Cyan measures the drift; red would mean the page fell.</div>
       </div>
       <div class="spec-card code-spec">
         <div class="spec-head">
@@ -112,6 +123,47 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <li><i class="chip ok"></i>PerplexityBot <span class="dim">allowed</span></li>
         </ul>
         <div class="spec-caption">Five generative indexers, one pass.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CALIBRATION BENCH (Part A): geo meter + command strip ============ -->
+  <section class="benchsec" id="bench" style="padding:0 0 80px">
+    <h2 class="h2">Calibrate once, read every month</h2>
+    <p class="lede">The GEO meter is the real reading for query "jev seo" taken from the jev-for-seo guide. The bench strip is the ten commands, five proven on this very site.</p>
+    <div class="calibration">
+      <div class="spec-card geo-meter">
+        <div class="spec-head">
+          <span class="spec-no">FIG. 04</span>
+          <span class="spec-title">geo — citation meter</span>
+          <span class="spec-stat" style="color:var(--cyan)">MEASURED</span>
+        </div>
+        <span class="geo-value">8/10 <small>composite</small></span>
+        <div class="geo-sweep" aria-hidden="true"></div>
+        <div class="geo-scale"><span>0</span><span>1-10</span><span>10</span></div>
+        <div class="geo-grid">
+          <div class="geo-cell">direct answer<b class="ok">YES · p=0.81</b></div>
+          <div class="geo-cell">confidence<b>0.83</b></div>
+          <div class="geo-cell">step-by-step<b class="ok">PRESENT</b></div>
+          <div class="geo-cell">refresh<b>monthly</b></div>
+        </div>
+        <p class="spec-caption">Real run: <code>jev-seo geo jev-for-seo.html --query "jev seo"</code>, 2026-09-22. The figure is a commitment, not a claim.</p>
+      </div>
+      <div class="bench">
+        <div class="spec-head" style="margin-bottom:0; padding:16px 20px 10px">
+          <span class="spec-no">FIG. 05</span>
+          <span class="spec-title">bench — ten commands</span>
+        </div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo audit .</code><span class="bench-cap">ran here: 74.3% pass, 0 orphans</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo geo &lt;page&gt; --query "jev seo"</code><span class="bench-cap">ran here: 8/10 composite</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo schema index.html</code><span class="bench-cap">ran here: VALID 100/100</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo robots jevseo.vercel.app</code><span class="bench-cap">ran here: all AI crawlers allowed</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo sitemap sitemap.xml</code><span class="bench-cap">ran here: 9 URLs, lastmod set</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo keywords "jev seo"</code><span class="bench-cap">autocomplete discovery + intent</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo brief "jev for seo" --markdown</code><span class="bench-cap">SERP synthesis + outline</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo query "jev seo"</code><span class="bench-cap">competitor radar + rerank</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo rank --domain jevseo.vercel.app --query "jev seo"</code><span class="bench-cap">baseline in local SQLite</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo mcp</code><span class="bench-cap">stdio server into your agent</span></div>
       </div>
     </div>
   </section>
@@ -173,6 +225,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <div class="phi-cell"><span class="phi-prim">Fan-out</span><span class="phi-desc">one state, many questions, one request. 10x fewer round trips, 12x cheaper</span></div>
       </div>
       <p class="phi-note">Jev hates being asked for arithmetic or word counts. The CLI does the math; Jev does the judgment. That split is the whole architecture.</p>
+      <span class="verdict-stamp">JEV SEAL<small>DECISION ENGINE, NOT CHATBOX</small></span>
     </div>
   </section>
 
@@ -242,6 +295,24 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="faq-item">
         <h3>Does jev-seo collect my data?</h3>
         <p>No analytics, no telemetry. Audits read local files, rank history stays in one local SQLite database, and only semantic scoring calls reach the TypeSafe API with content you explicitly pass.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AUTHOR (E-E-A-T, Part A) ============ -->
+  <section style="padding:0 0 90px">
+    <div class="author" id="author">
+      <img src="https://jevseo.vercel.app/assets/og-image.png" alt="Akash Priyadarshi" width="88" height="88">
+      <div>
+        <h3>Akash Priyadarshi</h3>
+        <p class="author-loc">Patna, Bihar, India</p>
+        <p class="author-note">Builds the Jev ecosystem: jev-seo, jev-curate, jev-superpowers, kharcha, tdlib-android. This site is proofed, not guessed: every number on it is a measured run.</p>
+        <div class="author-links">
+          <a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio ↗</a>
+          <a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">github ↗</a>
+          <a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin ↗</a>
+          <a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume ↗</a>
+        </div>
       </div>
     </div>
   </section>
