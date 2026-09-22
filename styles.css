@@ -134,6 +134,17 @@ main { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
   font-size: 1.25rem; line-height: 1.5; color: var(--paper-dim);
   max-width: 68ch; margin-bottom: 26px;
 }
+.direct-answer {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--paper);
+  background: var(--ink-2);
+  border-left: 3px solid var(--phos);
+  max-width: 76ch;
+  margin: 0 auto 30px;
+  padding: 0.9rem 1.1rem;
+  text-align: left;
+}
 .paper { color: var(--paper); font-weight: 600; }
 
 .foldline {
@@ -355,6 +366,65 @@ section { padding: 90px 0; }
   }
   .term .blink { animation: none; }
 }
+
+/* ---------- subpages (about / contact / privacy) ---------- */
+.page-main {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 56px 24px 72px;
+}
+.page-main h1 {
+  font-family: var(--disp);
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+}
+.page-main h2 {
+  font-family: var(--disp);
+  font-size: 1.3rem;
+  margin: 2.2rem 0 0.6rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.page-main p { max-width: 68ch; margin-bottom: 1rem; }
+.page-main a { color: var(--phos); text-decoration: underline; text-underline-offset: 3px; }
+.page-main a:hover { color: var(--amber); }
+.page-lede {
+  font-size: 1.15rem;
+  color: var(--paper-dim);
+  max-width: 60ch;
+  border-left: 3px solid var(--phos);
+  padding-left: 1rem;
+}
+.page-list { margin: 0 0 1.5rem 1.4rem; }
+.page-list li { margin-bottom: 0.35rem; }
+.page-cta {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line-strong);
+  font-family: var(--mono);
+  font-size: 0.875rem;
+}
+
+/* ---------- FAQ section (index) ---------- */
+.faq { max-width: var(--max); margin: 0 auto; padding: 72px 24px; }
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.faq-item { background: var(--ink); padding: 1.25rem 1.5rem 1.5rem; }
+.faq-item h3 {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--amber);
+  margin-bottom: 0.5rem;
+}
+.faq-item p { color: var(--paper-dim); font-size: 0.95rem; }
+.faq-item code { color: var(--phos); }
+
 
 @media (prefers-reduced-transparency: reduce) {
   /* world is flat print ink; nothing to degrade */

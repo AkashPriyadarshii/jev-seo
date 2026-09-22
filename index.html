@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>jev-seo — zero-cost SEO &amp; GEO radar</title>
+<title>jev-seo — zero-cost SEO &amp; GEO search radar (Semrush alternative)</title>
 <meta name="description" content="jev-seo is a zero-subscription SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, and SERP briefs. Rust CLI + MCP.">
 <meta name="keywords" content="seo, geo, generative engine optimization, seo audit, semrush alternative, typesafe ai, jev, rust, mcp, ai crawlers, robots.txt, schema validator, serp analysis">
 <link rel="canonical" href="https://jevseo.vercel.app/">
@@ -14,10 +14,16 @@
 <meta property="og:url" content="https://jevseo.vercel.app/">
 <meta property="og:image" content="https://github.com/AkashPriyadarshii.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="jev-seo — zero-cost SEO & GEO radar">
+<meta name="twitter:title" content="jev-seo — zero-cost SEO & GEO search radar">
 <meta name="twitter:description" content="Zero-subscription SEO and GEO search radar. Rust CLI + MCP.">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"jev-seo","applicationCategory":"SEOApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"},"author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"url":"https://jevseo.vercel.app/","description":"FOSS zero-cost SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, SERP briefs, and GEO scoring. Rust CLI with MCP server."}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"jev-seo","url":"https://jevseo.vercel.app/","description":"Zero-cost SEO and GEO search radar. Rust CLI + MCP server.","inLanguage":"en","publisher":{"@type":"Organization","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app","logo":{"@type":"ImageObject","url":"https://github.com/AkashPriyadarshii.png"}}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is jev-seo free?","acceptedAnswer":{"@type":"Answer","text":"Yes. jev-seo is MIT-licensed open source and costs zero subscriptions. It scrapes free DuckDuckGo endpoints and audits local files, so there is no paid API key required."}},{"@type":"Question","name":"What does GEO mean in jev-seo?","acceptedAnswer":{"@type":"Answer","text":"GEO stands for Generative Engine Optimization: making content likely to be cited by AI search engines such as Gemini Overviews, Perplexity, and SearchGPT. jev-seo scores citation likelihood from 1 to 10 with TypeSafe Jev."}},{"@type":"Question","name":"Does jev-seo need a credit card or paid API?","acceptedAnswer":{"@type":"Answer","text":"No. The only optional key is a free TypeSafe API key for semantic scoring. Ranking history, audits, schema validation, and SERP inspection all run locally with zero cost."}},{"@type":"Question","name":"What is the difference between jev-seo and Semrush or Ahrefs?","acceptedAnswer":{"@type":"Answer","text":"Semrush and Ahrefs are hosted dashboards that cost over $130 a month. jev-seo is a native Rust CLI and MCP server that audits local files, validates schema, checks robots.txt, and scores GEO citations, all in one binary under 30MB RAM."}},{"@type":"Question","name":"How do I install jev-seo?","acceptedAnswer":{"@type":"Answer","text":"Install with cargo install jev-seo, or download the release binary for Windows, macOS, or Linux from the GitHub releases page."}}]}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,6 +70,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
     <h1 class="specimen">jev-seo</h1>
     <p class="subtitle">Zero-cost SEO &amp; GEO search radar. <span class="paper">Proofs your search presence the way a printer proofs a sheet</span> — no dashboard, no $130/month, no hallucinated advice.</p>
+    <p class="direct-answer">jev-seo is a free, MIT-licensed, open source alternative to Semrush and Ahrefs ($130+/month) that audits local files, validates schema, checks robots.txt, and scores AI citation likelihood. One Rust binary under 30MB RAM, hundreds of files audited in under a second, ten commands, zero subscriptions, zero paid data APIs.</p>
     <div class="foldline" aria-hidden="true"><span>FOLD</span></div>
     <div class="titleblock-cta">
       <code class="install-cmd"><span class="ink-g">$</span> cargo install jev-seo</code>
@@ -207,6 +214,38 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
   </section>
 
+  <!-- ============ FAQ (GEO direct answers) ============ -->
+  <section class="faq" id="faq">
+    <h2 class="h2">Direct answers, no hedge</h2>
+    <p class="lede">The same plain declarative copy AI search engines quote. Short question, shorter answer.</p>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <h3>Is jev-seo free?</h3>
+        <p>Yes. jev-seo is MIT-licensed open source and costs zero subscriptions. It scrapes free DuckDuckGo endpoints and audits local files, so there is no paid API key required.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What does GEO mean in jev-seo?</h3>
+        <p>GEO stands for Generative Engine Optimization: making content likely to be cited by AI search engines such as Gemini Overviews, Perplexity, and SearchGPT. jev-seo scores citation likelihood from 1 to 10 with TypeSafe Jev.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Does jev-seo need a credit card or paid API?</h3>
+        <p>No. The only optional key is a free TypeSafe API key for semantic scoring. Ranking history, audits, schema validation, and SERP inspection all run locally with zero cost.</p>
+      </div>
+      <div class="faq-item">
+        <h3>jev-seo vs Semrush or Ahrefs?</h3>
+        <p>Semrush and Ahrefs are hosted dashboards that cost over $130 a month. jev-seo is a native Rust CLI and MCP server that audits local files, validates schema, checks robots.txt, and scores GEO citations — one binary, under 30MB RAM.</p>
+      </div>
+      <div class="faq-item">
+        <h3>How do I install jev-seo?</h3>
+        <p><code>cargo install jev-seo</code>, or download the release binary for Windows, macOS, or Linux from GitHub Releases.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Does jev-seo collect my data?</h3>
+        <p>No analytics, no telemetry. Audits read local files, rank history stays in one local SQLite database, and only semantic scoring calls reach the TypeSafe API with content you explicitly pass.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ INSTALL ============ -->
   <section class="install" id="install">
     <h2 class="h2">Set up in two lines</h2>
@@ -224,6 +263,16 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 <footer class="sheetfoot">
   <div class="rule"></div>
+  <div class="foot-row">
+    <h3 class="foot-h">Site</h3>
+    <ul>
+      <li><a href="/">home</a></li>
+      <li><a href="/about.html">about</a></li>
+      <li><a href="/contact.html">contact</a></li>
+      <li><a href="/privacy.html">privacy</a></li>
+    <li><a href="/PRODUCT.md" rel="noopener">product doc</a></li>
+    </ul>
+  </div>
   <div class="foot-row">
     <h3 class="foot-h">Ecosystem</h3>
     <ul>

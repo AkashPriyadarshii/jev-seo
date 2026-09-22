@@ -2,12 +2,88 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Privacy — jev-seo</title>
-<meta name="description" content="jev-seo privacy policy: no tracking, no cookies, no data collection on this site.">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy policy — jev-seo</title>
+<meta name="description" content="jev-seo privacy policy: this site collects nothing. No tracking, no cookies, no analytics. The CLI runs locally; only optional semantic scoring calls reach the TypeSafe API.">
+<meta name="keywords" content="jev-seo privacy, no tracking, no cookies, open source privacy policy">
 <link rel="canonical" href="https://jevseo.vercel.app/privacy.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="jev-seo">
+<meta property="og:title" content="Privacy policy — jev-seo">
+<meta property="og:description" content="This site collects nothing. The CLI runs locally; only optional semantic scoring reaches an API.">
+<meta property="og:url" content="https://jevseo.vercel.app/privacy.html">
+<meta property="og:image" content="https://github.com/AkashPriyadarshii.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Privacy policy — jev-seo">
+<meta name="twitter:description" content="No tracking, no cookies, no analytics. Local-first CLI.">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://jevseo.vercel.app/"},{"@type":"ListItem","position":2,"name":"Privacy","item":"https://jevseo.vercel.app/privacy.html"}]}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="page">
+<header class="sheethead"><div class="reg-cross" aria-hidden="true"></div>
+  <nav class="topline">
+    <a class="wordmark" href="/">jev<span class="ink-g">-seo</span></a>
+    <div class="topnav"><a href="/#why">why</a><a href="/#radar">commands</a><a href="/#phi">oracle</a><a href="/#proof">proofed</a><a href="/#install">install</a></div>
+    <a class="toplink" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">github ↗</a>
+  </nav>
+  <div class="rule"></div>
+</header>
+
+<main class="page-main">
 <h1>Privacy policy</h1>
-<p>This website collects nothing. No analytics, no cookies, no tracking pixels, no accounts, no forms. Pages are static files served over HTTPS. The jev-seo CLI tool runs entirely on your machine: audits read your local files, rank history stays in a local SQLite database, and only the semantic scoring calls reach the TypeSafe API with the page content you explicitly pass. Nothing is sold, shared, or retained by this site because nothing is collected. Questions: https://github.com/AkashPriyadarshii/jev-seo/issues.</p>
+<p class="page-lede">Short version: this website collects nothing, and the jev-seo CLI is local-first. There is no account system, no analytics, and nothing to opt out of.</p>
+
+<h2>This website</h2>
+<p>jevseo.vercel.app is a static site served over HTTPS. It runs no analytics, sets no cookies, uses no tracking pixels, and hosts no forms. Static hosting providers log standard request metadata (IP address, user agent, requested URL) for ordinary operation; this site does not read, retain, or sell it. No third-party scripts load on any page.</p>
+
+<h2>The jev-seo CLI</h2>
+<p>The tool runs entirely on your machine. Audits read local files and never leave your disk. Rank history stays in a local SQLite database (a single <code>.jev-seo.db</code> file). SERP and keyword commands fetch public search pages over the network, exactly like opening them in a browser.</p>
+
+<h2>TypeSafe API calls</h2>
+<p>The only optional network dependency is semantic scoring via the TypeSafe API, used by the <code>geo</code>, <code>query</code>, and related commands. It sends the page content or snippet you explicitly pass plus the question being scored, to the API endpoint you configure through <code>TYPESAFE_API_KEY</code>. Nothing is sent automatically, and without a key every command stays fully local.</p>
+
+<h2>Retention and sharing</h2>
+<p>Nothing is collected, so nothing is retained, sold, or shared. There are no ads, no affiliate links, and no data brokers. If you open a GitHub issue, GitHub's own terms apply to that interaction; it is the only third-party service this project operates on.</p>
+
+<h2>Changes and questions</h2>
+<p>If this policy changes, the change will land in this file with a new last-modified date. Questions or concerns: <a href="https://github.com/AkashPriyadarshii/jev-seo/issues" target="_blank" rel="noopener">open a GitHub issue</a>.</p>
+
+<p class="page-cta"><a href="/">Back to the proof sheet</a>.</p>
+</main>
+
+<footer class="sheetfoot">
+  <div class="rule"></div>
+  <div class="foot-row"><h3 class="foot-h">Site</h3><ul>
+    <li><a href="/">home</a></li>
+    <li><a href="/about.html">about</a></li>
+    <li><a href="/contact.html">contact</a></li>
+    <li><a href="/privacy.html">privacy</a></li>
+    <li><a href="/PRODUCT.md" rel="noopener">product doc</a></li>
+  </ul></div>
+  <div class="foot-row"><h3 class="foot-h">Ecosystem</h3><ul>
+    <li><a href="https://github.com/AkashPriyadarshii/jev-superpowers" target="_blank" rel="noopener">jev-superpowers</a></li>
+    <li><a href="https://github.com/AkashPriyadarshii/jev-curate" target="_blank" rel="noopener">jev-curate</a></li>
+    <li><a href="https://github.com/AkashPriyadarshii/tdlib-android" target="_blank" rel="noopener">tdlib-android</a></li>
+    <li><a href="https://github.com/AkashPriyadarshii/kharcha" target="_blank" rel="noopener">kharcha</a></li>
+  </ul></div>
+  <div class="foot-row"><h3 class="foot-h">Author</h3><ul>
+    <li><a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">Akash Priyadarshi — Patna, Bihar, India</a></li>
+    <li><a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio</a></li>
+    <li><a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin</a></li>
+    <li><a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume</a></li>
+  </ul></div>
+  <div class="foot-row"><h3 class="foot-h">Social</h3><ul>
+    <li><a href="https://x.com/Akash__ydv001" target="_blank" rel="noopener">X / Twitter</a></li>
+    <li><a href="https://www.threads.net/@akash.priyadarshii" target="_blank" rel="noopener">Threads</a></li>
+    <li><a href="https://www.instagram.com/akash.priyadarshii/" target="_blank" rel="noopener">Instagram</a></li>
+    <li><a href="https://reddit.com/user/DragonfruitWeak2801" target="_blank" rel="noopener">Reddit</a></li>
+  </ul></div>
+  <p class="foot-note">jev-seo — proof the sheet, then ship it. <span class="ink-g">zero-cost SEO/GEO radar for developers and agents.</span></p>
+</footer>
 </body>
 </html>
