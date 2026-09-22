@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Fifty-rule audit engine (`src/rules.rs`): stable R01-R50 registry across 9 areas with severity weights, reach factors, area scores, and a weighted overall blend.
+- `crawl` scoring unified on the rules engine: findings, areas, and impact-ranked actions from one truth, stored in JSON for agents.
+- `audit` findings from the same engine, CSV findings export for crawl and audit, and `audit --rescore` for offline rebuilds with backward-compatible JSON.
+- Staged stderr progress with elapsed timers on audit and llms; stdout stays machine-clean.
+- `SKILL.md` agent contract and `docs/EVAL.md` with measured repeatability, verification, timing, and cost figures.
 - Project repository skeleton, PRD, architecture, design specifications, and agent contracts.
 - XML sitemap inspection command `sitemap` validating `<loc>`, `<lastmod>`, canonical HTTPS links, parameter pollution, and 50,000 URL limits.
 - International hreflang tag validation verifying language and country pairs and enforcing `x-default` fallbacks.

@@ -501,6 +501,8 @@ pub struct DirectoryAuditReport {
     pub missing_descriptions: Vec<String>,
     pub orphan_pages: Vec<String>,
     pub keyword_cannibalization: Vec<CannibalizationItem>,
+    #[serde(default)]
+    pub findings: Vec<crate::rules::Finding>,
 }
 
 pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
@@ -531,7 +533,7 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
             100.0
         };
 
-        return Ok(DirectoryAuditReport {
+        return Ok(with_findings(DirectoryAuditReport {
             dir_path: path_str.to_string(),
             total_files: 1,
             total_words,
@@ -544,7 +546,8 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
             missing_descriptions,
             orphan_pages: Vec::new(),
             keyword_cannibalization: Vec::new(),
-        });
+            findings: Vec::new(),
+        }))
     }
 
     let mut files = Vec::new();
@@ -690,7 +693,14 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
         missing_descriptions,
         orphan_pages,
         keyword_cannibalization,
+        findings: Vec::new(),
     })
+}
+
+/// Fill rule findings after construction. Shared by live audits and --rescore.
+pub fn with_findings(mut rep: DirectoryAuditReport) -> DirectoryAuditReport {
+    rep.findings = crate::rules::check_audit(&rep);
+    rep
 }
 
 fn collect_audit_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> {

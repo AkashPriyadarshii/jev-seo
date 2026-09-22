@@ -14,6 +14,7 @@ mod paths;
 mod policy;
 mod rank;
 mod robots;
+mod rules;
 mod schema;
 mod serp;
 mod sitemap;
@@ -69,6 +70,12 @@ enum Commands {
         /// Write a Markdown report to this path
         #[arg(long, value_name = "PATH")]
         md: Option<String>,
+        /// Write a CSV findings export to this path
+        #[arg(long, value_name = "PATH")]
+        csv: Option<String>,
+        /// Rebuild findings and actions from a saved audit JSON, no work
+        #[arg(long, value_name = "PATH")]
+        rescore: Option<String>,
     },
     /// Generative Engine Optimization (GEO) citation scoring via Jev
     Geo {
@@ -131,6 +138,9 @@ enum Commands {
         /// Compare against the last stored snapshot in SQLite
         #[arg(long)]
         diff: bool,
+        /// Write a CSV findings export to this path
+        #[arg(long, value_name = "PATH")]
+        csv: Option<String>,
         /// Rebuild score and actions from a saved crawl JSON, no network
         #[arg(long, value_name = "PATH")]
         rescore: Option<String>,
@@ -259,8 +269,23 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json, min_pass, html, pdf, md } => {
-            let dir_report = audit::audit_path(&path)?;
+        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, rescore } => {
+            let t0 = std::time::Instant::now();
+            let dir_report = match rescore {
+                Some(path) => {
+                    let raw = std::fs::read_to_string(&path)?;
+                    let saved: audit::DirectoryAuditReport = serde_json::from_str(&raw)?;
+                    audit::with_findings(saved)
+                }
+                None => audit::with_findings(audit::audit_path(&path)?),
+            };
+            eprintln!(
+                "[jev-seo {:>02}:{:>02}] audited {} files in {:.1}s",
+                t0.elapsed().as_secs() / 60,
+                t0.elapsed().as_secs() % 60,
+                dir_report.total_files,
+                t0.elapsed().as_secs_f64()
+            );
 
             if let Some(out) = &html {
                 std::fs::write(out, audit::to_html(&dir_report))?;
@@ -273,6 +298,10 @@ fn main() -> Result<()> {
             if let Some(out) = &md {
                 std::fs::write(out, audit::to_markdown(&dir_report))?;
                 println!("Markdown report written to {}", out.dimmed());
+            }
+            if let Some(out) = &csv {
+                std::fs::write(out, crate::rules::to_csv(&dir_report.findings))?;
+                println!("CSV findings written to {}", out.dimmed());
             }
 
             if let Some(floor) = min_pass {
@@ -348,53 +377,8 @@ fn main() -> Result<()> {
                 }
                 println!("\n{}", "Summary Status: Audit complete across directory.".green());
 
-                let mut actions = Vec::new();
-                if !dir_report.duplicate_titles.is_empty() {
-                    actions.push(crate::actions::Action::new(
-                        "AUDIT-001",
-                        2,
-                        1,
-                        &format!("Dedup {} colliding titles", dir_report.duplicate_titles.len()),
-                        dir_report.duplicate_titles.keys().take(3).cloned().collect::<Vec<_>>().join(", "),
-                    ));
-                }
-                if !dir_report.orphan_pages.is_empty() {
-                    actions.push(crate::actions::Action::new(
-                        "AUDIT-002",
-                        2,
-                        2,
-                        &format!("Link {} orphan pages inward", dir_report.orphan_pages.len()),
-                        dir_report.orphan_pages.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
-                    ));
-                }
-                if !dir_report.thin_pages.is_empty() {
-                    actions.push(crate::actions::Action::new(
-                        "AUDIT-003",
-                        3,
-                        2,
-                        &format!("Thicken {} thin pages", dir_report.thin_pages.len()),
-                        dir_report.thin_pages.iter().take(3).map(|(f, _)| f.clone()).collect::<Vec<_>>().join(", "),
-                    ));
-                }
-                if !dir_report.missing_canonicals.is_empty() {
-                    actions.push(crate::actions::Action::new(
-                        "AUDIT-004",
-                        2,
-                        1,
-                        &format!("Add canonicals to {} files", dir_report.missing_canonicals.len()),
-                        dir_report.missing_canonicals.iter().take(3).cloned().collect::<Vec<_>>().join(", "),
-                    ));
-                }
-                if !dir_report.keyword_cannibalization.is_empty() {
-                    actions.push(crate::actions::Action::new(
-                        "AUDIT-005",
-                        2,
-                        2,
-                        &format!("Split {} cannibalized stems", dir_report.keyword_cannibalization.len()),
-                        dir_report.keyword_cannibalization.iter().take(3).map(|i| i.keyword_stem.clone()).collect::<Vec<_>>().join(", "),
-                    ));
-                }
-                let actions = crate::actions::rank(actions);
+                let actions = crate::rules::actions_for(&dir_report.findings);
+                println!("  Rule findings: {}", dir_report.findings.len());
                 if actions.is_empty() {
                     println!("  Actions:       {}", "none, directory is clean".green());
                 } else {
@@ -422,20 +406,13 @@ fn main() -> Result<()> {
                     let badge = if check.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
                     println!("  [{}] {:<20} - {}", badge, check.name, check.message);
                 }
-                let failed: Vec<crate::actions::Action> = report
-                    .checks
+                let file_findings: Vec<crate::rules::Finding> = dir_report
+                    .findings
                     .iter()
-                    .filter(|c| !c.passed)
-                    .enumerate()
-                    .map(|(i, c)| crate::actions::Action::new(
-                        &format!("AUDIT-{:03}", 101 + i),
-                        2,
-                        2,
-                        &c.name,
-                        c.message.clone(),
-                    ))
+                    .filter(|f| f.scope == report.file_path)
+                    .cloned()
                     .collect();
-                let failed = crate::actions::rank(failed);
+                let failed = crate::rules::actions_for(&file_findings);
                 if !failed.is_empty() {
                     println!("\n{}", "Top Actions:".cyan().bold());
                     for a in crate::actions::top(&failed, 5) {
@@ -696,7 +673,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Crawl { url, max_pages, json, diff, rescore } => {
+        Commands::Crawl { url, max_pages, json, diff, csv, rescore } => {
             if let Some(path) = rescore {
                 let raw = std::fs::read_to_string(&path)?;
                 let saved: crawl::CrawlReport = serde_json::from_str(&raw)?;
@@ -736,7 +713,7 @@ fn main() -> Result<()> {
                 report
                     .areas
                     .iter()
-                    .map(|a| format!("{} {}", a.name, a.score))
+                    .map(|a| format!("{} {}", crate::rules::label(&a.area), a.score))
                     .collect::<Vec<_>>()
                     .join(", ")
                     .dimmed()
@@ -817,9 +794,20 @@ fn main() -> Result<()> {
                     None => println!("  Since last:    first recorded snapshot"),
                 }
             }
+            if let Some(out) = &csv {
+                std::fs::write(out, crate::rules::to_csv(&report.findings))?;
+                println!("CSV findings written to {}", out.dimmed());
+            }
         }
         Commands::Llms { domain, json } => {
+            let t0 = std::time::Instant::now();
             let report = llms::check_llms(&domain)?;
+            eprintln!(
+                "[jev-seo {:>02}:{:>02}] readiness checked in {:.1}s",
+                t0.elapsed().as_secs() / 60,
+                t0.elapsed().as_secs() % 60,
+                t0.elapsed().as_secs_f64()
+            );
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 return Ok(());

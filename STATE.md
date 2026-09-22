@@ -47,3 +47,11 @@
 - [ ] Thin `src/main.rs`: extract printing to `src/view.rs`
 - [ ] One central fetch helper with body caps and redirect revalidation
 - [ ] Abstract HTTP and Jev behind traits for hermetic tests
+
+## Phase 5: Fifty Rules & Proof (Unreleased)
+- [x] Fifty-rule engine with severity weights, reach, and weighted overall
+- [x] Crawl scoring unified on the rules engine with stored findings
+- [x] Audit findings, CSV export, audit rescore, backward-compatible JSON
+- [x] Staged progress on audit and llms
+- [x] SKILL.md agent contract and docs/EVAL.md with measured figures
+- [ ] Release as v0.1.2 on 22 October with the Unreleased backlog

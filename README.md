@@ -48,7 +48,7 @@ Keywords: seo, geo, generative engine optimization, typesafe ai, jev, foss, rust
 
 ## See it run
 
-Live crawl with health score, ranked actions, and completeness notes:
+Live crawl of a real production site with health score, ranked actions, and completeness notes:
 
 ![jev-seo live crawl output](docs/assets/terminal.png)
 
@@ -185,7 +185,7 @@ Integrated into `jev-seo audit`:
 |---|---|---|
 | `keywords <query>` | Autocomplete discovery and Jev intent classification | `--json` |
 | `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--limit <n>`, `--json` |
-| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>` |
+| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit, 50-rule findings | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--rescore <path>` |
 | `geo <target>` | Generative Engine Optimization citation scoring (1-10), composite dimensions, score trend | `--query <query>`, `--json` |
 | `schema <target>` | Schema.org JSON-LD structural and deprecation validator | `--json` |
 | `robots <domain>` | Robots.txt and AI crawler permission auditor | `--json` |

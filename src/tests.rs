@@ -539,12 +539,77 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
-    fn test_crawl_score_weights() {
-        use crate::crawl::score_crawl;
-        assert_eq!(score_crawl(0, 0, 0, 0), 100);
-        assert_eq!(score_crawl(1, 0, 0, 0), 85);
-        assert_eq!(score_crawl(10, 10, 10, 10), 15);
-        assert_eq!(score_crawl(100, 100, 100, 100), 15);
+    fn test_rules_registry_and_scoring() {        use crate::rules::{overall, score_areas, Area, Finding, Severity, RULES};
+        assert_eq!(RULES.len(), 50);
+        assert!(RULES.iter().all(|r| crate::rules::rule(r.id).is_some()));
+        let findings = vec![
+            Finding { rule_id: "R01".into(), area: Area::Crawl, severity: Severity::High, scope: "https://x.test/a".into(), evidence: "HTTP 404".into(), fix: "Restore the target.".into() },
+            Finding { rule_id: "R42".into(), area: Area::Performance, severity: Severity::Medium, scope: "https://x.test/a".into(), evidence: "900ms".into(), fix: "Cut server time.".into() },
+        ];
+        let mut totals = std::collections::HashMap::new();
+        totals.insert(Area::Crawl, 10);
+        totals.insert(Area::Performance, 10);
+        let areas = score_areas(&findings, &totals);
+        let crawl = areas.iter().find(|a| a.area == Area::Crawl).unwrap();
+        assert!(crawl.score < 100 && crawl.score > 80);
+        let perf = areas.iter().find(|a| a.area == Area::Performance).unwrap();
+        assert!(perf.score < 100 && perf.score > 90);
+        assert!(overall(&[]) == 100);
+        let ranked = crate::rules::actions_for(&findings);
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked[0].id, "RULE-R01");
+    }
+
+    #[test]
+    fn test_rules_check_crawl_live_shapes() {
+        use crate::crawl::{finish_report, PageRecord, ReportParts};
+        use std::collections::HashMap;
+        let pages = vec![
+            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()) },
+            PageRecord { url: "https://x.test/dead".into(), status: 404, final_url: "https://x.test/dead".into(), outlinks: 0, elapsed_ms: 50, bytes: 0, hops: vec![], encoding: None },
+        ];
+        let rep = finish_report(ReportParts {
+            start_url: "https://x.test/".into(),
+            pages,
+            redirects: vec![],
+            inbound: HashMap::new(),
+            errors: vec![],
+            seeded_from_sitemap: false,
+            capped: false,
+            robots_honored: false,
+        });
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R01"));
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R05"));
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R06"));
+        assert!(!rep.actions.is_empty());
+        assert!(rep.score < 100);
+    }
+
+    #[test]
+    fn test_rules_check_audit_shapes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("p.md"), "# T\n\nshort\n").unwrap();
+        let rep = crate::audit::with_findings(crate::audit::audit_path(dir.path().to_str().unwrap()).unwrap());
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R18"));
+        let csv = crate::rules::to_csv(&rep.findings);
+        assert!(csv.starts_with("rule,area,severity,scope,evidence\n"));
+    }
+
+    #[test]
+    fn test_rescore_reads_v011_json() {
+        let old = r#"{"start_url":"https://x.test/","pages_crawled":1,"score":90,"grade":"A","areas":[],"actions":[],"broken":[],"redirects":[],"orphans":[],"errors":[],"pages":[{"url":"https://x.test/","status":200,"final_url":"https://x.test/","outlinks":0,"elapsed_ms":10,"bytes":100,"hops":[]}],"seeded_from_sitemap":true,"capped":false,"robots_honored":true}"#;
+        let saved: crate::crawl::CrawlReport = serde_json::from_str(old).unwrap();
+        let rep = crate::crawl::finish_report(crate::crawl::ReportParts {
+            start_url: saved.start_url,
+            pages: saved.pages,
+            redirects: saved.redirects,
+            inbound: saved.inbound,
+            errors: saved.errors,
+            seeded_from_sitemap: saved.seeded_from_sitemap,
+            capped: saved.capped,
+            robots_honored: saved.robots_honored,
+        });
+        assert!(rep.score <= 100);
     }
 
     #[test]

@@ -30,12 +30,7 @@ pub struct PageRecord {
     pub elapsed_ms: u128,
     pub bytes: usize,
     pub hops: Vec<(u16, String)>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AreaScore {
-    pub name: String,
-    pub score: u32,
+    pub encoding: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,31 +39,20 @@ pub struct CrawlReport {
     pub pages_crawled: usize,
     pub score: u32,
     pub grade: String,
-    pub areas: Vec<AreaScore>,
+    pub areas: Vec<crate::rules::AreaScore>,
     pub actions: Vec<crate::actions::Action>,
+    #[serde(default)]
+    pub findings: Vec<crate::rules::Finding>,
     pub broken: Vec<PageRecord>,
     pub redirects: Vec<(String, String)>,
     pub orphans: Vec<String>,
     pub errors: Vec<String>,
     pub pages: Vec<PageRecord>,
+    #[serde(default)]
     pub inbound: HashMap<String, usize>,
     pub seeded_from_sitemap: bool,
     pub capped: bool,
     pub robots_honored: bool,
-}
-
-fn act(id: &str, priority: u8, effort: u8, title: &str, evidence: String) -> crate::actions::Action {
-    crate::actions::Action::new(id, priority, effort, title, evidence)
-}
-
-/// Health score from crawl facts. Deterministic weights, documented here.
-pub fn score_crawl(broken: usize, redirects: usize, orphans: usize, slow: usize) -> u32 {
-    let mut score = 100i64;
-    score -= (15 * broken as i64).min(45);
-    score -= (5 * redirects as i64).min(15);
-    score -= (3 * orphans as i64).min(15);
-    score -= (2 * slow as i64).min(10);
-    score.max(0) as u32
 }
 
 /// Same-host anchor hrefs resolved to absolute canonical URLs.
@@ -219,7 +203,17 @@ pub fn sitemap_seed_urls(xml: &str) -> Vec<String> {
         .collect()
 }
 
-fn fetch_page(url: &str) -> (u16, String, String, u128, usize, Vec<(u16, String)>) {
+struct Fetch {
+    status: u16,
+    final_url: String,
+    body: String,
+    elapsed_ms: u128,
+    bytes: usize,
+    hops: Vec<(u16, String)>,
+    encoding: Option<String>,
+}
+
+fn fetch_page(url: &str) -> Fetch {
     let agent: ureq::Agent = ureq::AgentBuilder::new().redirects(0).build();
     let base_host = Url::parse(url)
         .ok()
@@ -228,8 +222,8 @@ fn fetch_page(url: &str) -> (u16, String, String, u128, usize, Vec<(u16, String)
     let mut current = url.to_string();
     let mut hops = Vec::new();
     let start = Instant::now();
-    let done = |status: u16, final_url: String, body: String, bytes: usize, hops: Vec<(u16, String)>| {
-        (status, final_url, body, start.elapsed().as_millis(), bytes, hops)
+    let done = |status: u16, final_url: String, body: String, bytes: usize, hops: Vec<(u16, String)>, encoding: Option<String>| {
+        Fetch { status, final_url, body, elapsed_ms: start.elapsed().as_millis(), bytes, hops, encoding }
     };
     for _ in 0..6 {
         let resp = agent
@@ -244,12 +238,14 @@ fn fetch_page(url: &str) -> (u16, String, String, u128, usize, Vec<(u16, String)
                     .header("content-type")
                     .map(|c| c.contains("html"))
                     .unwrap_or(true);
+                let encoding = r.header("content-encoding").map(str::to_string);
+                let declared: Option<usize> = r.header("content-length").and_then(|v| v.parse().ok());
                 let mut body = if is_html { r.into_string().unwrap_or_default() } else { String::new() };
                 if body.len() > MAX_BODY_BYTES {
                     body.truncate(MAX_BODY_BYTES);
                 }
-                let bytes = body.len();
-                return done(200, final_url, body, bytes, hops);
+                let bytes = declared.unwrap_or(body.len());
+                return done(200, final_url, body, bytes, hops, encoding);
             }
             Err(ureq::Error::Status(code, r)) if (300..400).contains(&code) => {
                 let loc = r.header("location").unwrap_or("").to_string();
@@ -262,17 +258,17 @@ fn fetch_page(url: &str) -> (u16, String, String, u128, usize, Vec<(u16, String)
                     {
                         current = n.to_string()
                     }
-                    _ => return done(code, current, String::new(), 0, hops),
+                    _ => return done(code, current, String::new(), 0, hops, None),
                 }
             }
             Err(ureq::Error::Status(code, r)) => {
                 let final_url = r.get_url().to_string();
-                return done(code, final_url, String::new(), 0, hops);
+                return done(code, final_url, String::new(), 0, hops, None);
             }
-            Err(_) => return done(0, current, String::new(), 0, hops),
+            Err(_) => return done(0, current, String::new(), 0, hops, None),
         }
     }
-    done(0, current, String::new(), 0, hops)
+    done(0, current, String::new(), 0, hops, None)
 }
 
 pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
@@ -323,12 +319,7 @@ pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
 
     struct Done {
         url: String,
-        status: u16,
-        final_url: String,
-        body: String,
-        elapsed_ms: u128,
-        bytes: usize,
-        hops: Vec<(u16, String)>,
+        fetch: Fetch,
     }
 
     // Level-by-level parallel fetch: 8 workers per batch, cheap parse and
@@ -369,25 +360,26 @@ pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
             for url in &batch {
                 let tx = tx.clone();
                 s.spawn(move || {
-                    let (status, final_url, body, elapsed_ms, bytes, hops) = fetch_page(url);
-                    let _ = tx.send(Done { url: url.clone(), status, final_url, body, elapsed_ms, bytes, hops });
+                    let fetch = fetch_page(url);
+                    let _ = tx.send(Done { url: url.clone(), fetch });
                 });
             }
         });
         drop(tx);
         for d in rx {
-            if d.status == 0 {
+            let f = d.fetch;
+            if f.status == 0 {
                 errors.push(format!("{}: fetch failed", d.url));
             }
             // Raw compare modulo trailing slash: canonical-only rewrites
             // (tracking params, index.html) must not count as redirects.
-            if d.final_url.trim_end_matches('/') != d.url.trim_end_matches('/') && d.status != 0 {
-                redirects.push((d.url.clone(), d.final_url.clone()));
+            if f.final_url.trim_end_matches('/') != d.url.trim_end_matches('/') && f.status != 0 {
+                redirects.push((d.url.clone(), f.final_url.clone()));
             }
-            let outlinks = if d.status == 200 && !d.body.is_empty() {
-                match Url::parse(&d.final_url) {
+            let outlinks = if f.status == 200 && !f.body.is_empty() {
+                match Url::parse(&f.final_url) {
                     Ok(base) => {
-                        let links = extract_links(&d.body, &base);
+                        let links = extract_links(&f.body, &base);
                         for l in &links {
                             *inbound.entry(l.clone()).or_insert(0) += 1;
                             if !visited.contains(l) {
@@ -403,12 +395,13 @@ pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
             };
             pages.push(PageRecord {
                 url: d.url,
-                status: d.status,
-                final_url: d.final_url,
+                status: f.status,
+                final_url: f.final_url,
                 outlinks,
-                elapsed_ms: d.elapsed_ms,
-                bytes: d.bytes,
-                hops: d.hops,
+                elapsed_ms: f.elapsed_ms,
+                bytes: f.bytes,
+                hops: f.hops,
+                encoding: f.encoding,
             });
         }
         eprintln!("{} crawled {} pages", stamp(), pages.len());
@@ -458,57 +451,14 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
         .filter(|p| p.status == 200 && p.url != start_url && inbound.get(&p.url).copied().unwrap_or(0) == 0)
         .map(|p| p.url.clone())
         .collect();
-    let slow: Vec<&PageRecord> = pages
-        .iter()
-        .filter(|p| p.status == 200 && p.elapsed_ms > SLOW_PAGE_MS)
-        .collect();
-
-    let mut actions = Vec::new();
-    if !broken.is_empty() {
-        let sample: Vec<String> = broken.iter().take(3).map(|p| format!("{} [{}]", p.url, p.status)).collect();
-        actions.push(act("CRAWL-001", 1, 1, &format!("Fix {} broken links", broken.len()), sample.join(", ")));
-    }
-    if !redirects.is_empty() {
-        let sample: Vec<String> = redirects.iter().take(3).map(|(f, t)| format!("{} -> {}", f, t)).collect();
-        actions.push(act("CRAWL-002", 2, 2, &format!("Straighten {} redirect chains", redirects.len()), sample.join(", ")));
-    }
-    if !orphans.is_empty() {
-        let sample: Vec<String> = orphans.iter().take(3).cloned().collect();
-        actions.push(act("CRAWL-003", 2, 2, &format!("Link {} orphan pages inward", orphans.len()), sample.join(", ")));
-    }
-    if !slow.is_empty() {
-        let slowest = slow.iter().map(|p| p.elapsed_ms).max().unwrap_or(0);
-        actions.push(act(
-            "CRAWL-004",
-            3,
-            2,
-            &format!("Speed up {} slow pages (over {}ms)", slow.len(), SLOW_PAGE_MS),
-            format!("slowest {}ms", slowest),
-        ));
-    }
-    let actions = crate::actions::rank(actions);
-    let score = score_crawl(broken.len(), redirects.len(), orphans.len(), slow.len());
-
-    CrawlReport {
+    let mut rep = CrawlReport {
         start_url,
         pages_crawled: pages.len(),
-        score,
-        grade: crate::actions::grade(score).to_string(),
-        areas: vec![
-            AreaScore {
-                name: "links".into(),
-                score: (100 - ((15 * broken.len() as i64).min(45) + (3 * orphans.len() as i64).min(15))).max(0) as u32,
-            },
-            AreaScore {
-                name: "redirects".into(),
-                score: (100 - (10 * redirects.len() as i64).min(30)).max(0) as u32,
-            },
-            AreaScore {
-                name: "performance".into(),
-                score: (100 - (5 * slow.len() as i64).min(40)).max(0) as u32,
-            },
-        ],
-        actions,
+        score: 0,
+        grade: String::new(),
+        areas: Vec::new(),
+        actions: Vec::new(),
+        findings: Vec::new(),
         broken,
         redirects,
         orphans,
@@ -518,5 +468,24 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
         seeded_from_sitemap,
         capped,
         robots_honored,
+    };
+    // One scoring truth: the fifty-rule engine. Totals scope reach per area.
+    let findings = crate::rules::check_crawl(&rep);
+    let mut totals = HashMap::new();
+    for area in [
+        crate::rules::Area::Crawl,
+        crate::rules::Area::Performance,
+        crate::rules::Area::Security,
+        crate::rules::Area::Canonical,
+    ] {
+        totals.insert(area, rep.pages_crawled);
     }
+    let areas = crate::rules::score_areas(&findings, &totals);
+    let score = crate::rules::overall(&areas);
+    rep.score = score;
+    rep.grade = crate::actions::grade(score).to_string();
+    rep.areas = areas;
+    rep.actions = crate::rules::actions_for(&findings);
+    rep.findings = findings;
+    rep
 }
