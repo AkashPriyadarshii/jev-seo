@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What is Jev? TypeSafe AI System One decision model explained | jev-seo</title>
+<meta name="description" content="Jev is TypeSafe AI's System One decision model: fast, typed, probabilistic answers to structured questions. Choice, Score, and Noul primitives, used for SEO judgment at scale.">
+<meta name="keywords" content="what is jev, jev ai, typesafe ai jev, system one model, jev choice score noul, jev vs chatgpt, probabilistic decision model">
+<link rel="canonical" href="https://jevseo.vercel.app/what-is-jev.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="jev-seo">
+<meta property="og:title" content="What is Jev? System One decision model explained">
+<meta property="og:description" content="Jev is TypeSafe AI's System One model: typed, probabilistic answers to structured questions at $0.0004 per decision. Choice, Score, and Noul explained.">
+<meta property="og:url" content="https://jevseo.vercel.app/what-is-jev.html">
+<meta property="og:image" content="https://github.com/AkashPriyadarshii.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="What is Jev? System One decision model explained">
+<meta name="twitter:description" content="Choice, Score, Noul: TypeSafe Jev primitives for cheap, typed SEO judgment.">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"What is Jev? TypeSafe AI System One explained","description":"Plain-language explanation of TypeSafe Jev: what it is, how Choice, Score, and Noul work, and where it fits in SEO workflows.","author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"datePublished":"2026-09-22","publisher":{"@type":"Organization","name":"Akash Priyadarshi","logo":{"@type":"ImageObject","url":"https://github.com/AkashPriyadarshii.png"}},"mainEntityOfPage":"https://jevseo.vercel.app/what-is-jev.html"}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is Jev AI?","acceptedAnswer":{"@type":"Answer","text":"Jev is a System One decision model from TypeSafe AI. Given a blob of state and a question with fixed answer choices, it returns a typed, probabilistic answer in 70 to 500 milliseconds, at roughly $0.0004 per decision."}},{"@type":"Question","name":"What does JEV stand for?","acceptedAnswer":{"@type":"Answer","text":"JEV is the product name TypeSafe AI uses for its System One decision model. The three primitives are Choice, Score, and Noul: a fixed selection, a numeric rating, and a calibrated yes/no probability."}},{"@type":"Question","name":"How is Jev different from ChatGPT?","acceptedAnswer":{"@type":"Answer","text":"Jev answers fixed-choice questions with typed output and no generated prose. ChatGPT generates free-form text. Jev is for high-volume structured judgment; an LLM is for writing and open-ended reasoning."}},{"@type":"Question","name":"Can Jev generate content?","acceptedAnswer":{"@type":"Answer","text":"No. Jev does not write articles or descriptions. It returns selections, scores, and probabilities. Use it to classify, sort, filter, and judge; use a generative model for the writing."}},{"@type":"Question","name":"Is Jev good for SEO?","acceptedAnswer":{"@type":"Answer","text":"Yes, for structured judgment: keyword intent classification, freshness scoring, internal link mapping, cannibalization flags, and page element audits. See the jev for SEO guide for a step-by-step workflow."}}]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://jevseo.vercel.app/"},{"@type":"ListItem","position":2,"name":"What is Jev","item":"https://jevseo.vercel.app/what-is-jev.html"}]}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="sheethead">
+  <div class="reg-cross" aria-hidden="true"></div>
+  <div class="cropmark crop-tl" aria-hidden="true"></div>
+  <div class="cropmark crop-tr" aria-hidden="true"></div>
+  <div class="cropmark crop-bl" aria-hidden="true"></div>
+  <div class="cropmark crop-br" aria-hidden="true"></div>
+  <nav class="topline">
+    <a class="wordmark" href="/">jev<span class="ink-g">-seo</span></a>
+    <div class="topnav">
+      <a href="/">home</a>
+      <a href="/jev-for-seo.html">jev for seo</a>
+      <a href="/benchmarks.html">benchmarks</a>
+    </div>
+    <a class="toplink" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">github ↗</a>
+  </nav>
+  <div class="rule"></div>
+  <p class="jobno">JOB SE-006 / WHAT IS JEV / GLOSSARY</p>
+</header>
+
+<main class="guide" id="top">
+  <p class="tb-line">GLOSSARY · 2026-09-22 · READ TIME 3 MIN</p>
+  <h1>What is Jev?</h1>
+  <p class="guide-lede">Jev is a System One decision model from TypeSafe AI. Give it a blob of state and a question with fixed answer choices, and it returns a typed, probabilistic answer in 70 to 500 milliseconds, at roughly $0.0004 per decision, up to 250k tokens per second. It decides instead of writing.</p>
+
+  <h2>The three primitives</h2>
+  <table class="guide-table">
+    <tr><th>Primitive</th><th>What it returns</th><th>Use for</th></tr>
+    <tr><td>Choice</td><td>One option from a fixed list, plus confidence</td><td>Intent classification, funnel stage, keep-or-change verdicts</td></tr>
+    <tr><td>Score</td><td>A numeric rating, plus confidence</td><td>Freshness scoring, competitor answer depth, GEO citation likelihood</td></tr>
+    <tr><td>Noul</td><td>A calibrated yes/no probability</td><td>Should this page get a link, is this title duplicate, is this safe to run</td></tr>
+  </table>
+  <p>Every answer carries a confidence value. The convention in the ecosystem: for destructive or critical operations, require confidence of at least 0.80 before acting.</p>
+
+  <h2>Jev versus a generative LLM</h2>
+  <table class="guide-table">
+    <tr><th>Axis</th><th>Jev</th><th>ChatGPT / Claude</th></tr>
+    <tr><td>Output</td><td>Typed, structured, probabilistic</td><td>Free-form text</td></tr>
+    <tr><td>Cost per decision</td><td>About $0.0004</td><td>Tens to hundreds of tokens billed</td></tr>
+    <tr><td>Speed</td><td>70 to 500ms per question</td><td>
+
+Seconds per generation
+</td></tr>
+    <tr><td>Job</td><td>Sort, classify, score, judge</td><td>Write, explain, reason open-ended</td></tr>
+    <tr><td>Strengths</td><td>High-volume repeatable judgment</td><td>Novel creative output</td></tr>
+  </table>
+
+  <h2>What Jev does not do</h2>
+  <ul>
+    <li>It does not generate prose: no articles, no meta descriptions from scratch, no paragraph explanations.</li>
+    <li>It does not crawl the web or fetch URLs. A crawler or a client like <a href="/">jev-seo</a> collects state and feeds it in.</li>
+    <li>It is not a calculator. Arithmetic, counting, and date math stay in host code; Jev handles semantic judgment only.</li>
+    <li>It is not a chat model. You batch independent questions against one state snapshot, one request, and read the answers.</li>
+  </ul>
+
+  <h2>Where Jev fits in SEO</h2>
+  <p>The full workflow is on the <a href="/jev-for-seo.html">jev for SEO guide</a>. In one line: a client collects state (SERP results, Search Console rows, local page files) and batches Jev questions against it, turning a $250 per-client audit into a fraction of a cent of judgment calls, with a typed transcript instead of a prose report.</p>
+
+  <section class="guide-faq">
+    <h2>Frequently asked questions</h2>
+    <p><strong>Is Jev open source?</strong> Jev is a hosted decision API by TypeSafe AI. The client ecosystem around it, including jev-seo, is MIT-licensed open source.</p>
+    <p><strong>How much does Jev cost?</strong> Roughly $0.0004 per decision at list price, about $0.042 per million input tokens, with output tokens free. Hard limits per request: 32k tokens for state plus the longest question, 64k total context.</p>
+    <p><strong>Can Jev replace an LLM in my stack?</strong> No. It replaces the expensive repetitive judgment calls. Keep a generative model for writing and pair them: Jev sorts and scores, the LLM writes.</p>
+  </section>
+
+  <p class="guide-next">NEXT: <a href="/jev-for-seo.html">jev for SEO guide &rarr;</a> · <a href="/">home</a></p>
+</main>
+
+<footer class="sheetfoot">
+  <div class="rule"></div>
+  <div class="foot-row">
+    <h3 class="foot-h">Site</h3>
+    <ul>
+      <li><a href="/">home</a></li>
+      <li><a href="/jev-for-seo.html">jev for seo guide</a></li>
+      <li><a href="/comparisons.html">comparisons</a></li>
+      <li><a href="/use-cases.html">use cases</a></li>
+      <li><a href="/benchmarks.html">benchmarks</a></li>
+      <li><a href="/what-is-jev.html">what is jev</a></li>
+      <li><a href="/about.html">about</a></li>
+      <li><a href="/contact.html">contact</a></li>
+      <li><a href="/privacy.html">privacy</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Ecosystem</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-superpowers" target="_blank" rel="noopener">jev-superpowers</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-curate" target="_blank" rel="noopener">jev-curate</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/tdlib-android" target="_blank" rel="noopener">tdlib-android</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/kharcha" target="_blank" rel="noopener">kharcha</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Author</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">Akash Priyadarshi, Patna, Bihar, India</a></li>
+      <li><a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio</a></li>
+      <li><a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin</a></li>
+      <li><a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Social</h3>
+    <ul>
+      <li><a href="https://x.com/Akash__ydv001" target="_blank" rel="noopener">X / Twitter</a></li>
+      <li><a href="https://www.threads.net/@akash.priyadarshii" target="_blank" rel="noopener">Threads</a></li>
+      <li><a href="https://www.instagram.com/akash.priyadarshii/" target="_blank" rel="noopener">Instagram</a></li>
+      <li><a href="https://reddit.com/user/DragonfruitWeak2801" target="_blank" rel="noopener">Reddit</a></li>
+    </ul>
+  </div>
+  <p class="foot-note">jev-seo — proof the sheet, then ship it. <span class="ink-g">zero-cost SEO/GEO radar for developers and agents.</span></p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Use cases: jev-seo for audits, GEO, robots, rank tracking | jev-seo</title>
+<meta name="description" content="Ten jev-seo use cases with real command output: site audits, GEO citation scoring, schema validation, AI crawler radar, keyword intent, SERP briefs, rank tracking, MCP agent wiring.">
+<meta name="keywords" content="jev seo use cases, seo audit cli, geo scoring, robots.txt checker, schema validator cli, serp analysis, rank tracker, mcp server seo, typesafe jev">
+<link rel="canonical" href="https://jevseo.vercel.app/use-cases.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="jev-seo">
+<meta property="og:title" content="Use cases: ten ways to run jev-seo">
+<meta property="og:description" content="Ten jev-seo use cases with real output: audit, GEO, schema, robots radar, keywords, briefs, rank tracking, MCP.">
+<meta property="og:url" content="https://jevseo.vercel.app/use-cases.html">
+<meta property="og:image" content="https://github.com/AkashPriyadarshii.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Use cases: ten ways to run jev-seo">
+<meta name="twitter:description" content="Ten jev-seo use cases with real command output.">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"Use cases: ten ways to run jev-seo","description":"The ten jev-seo commands and the SEO or GEO job each one handles, with output from real runs.","author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"datePublished":"2026-09-22","publisher":{"@type":"Organization","name":"Akash Priyadarshi","logo":{"@type":"ImageObject","url":"https://github.com/AkashPriyadarshii.png"}},"mainEntityOfPage":"https://jevseo.vercel.app/use-cases.html"}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What can jev-seo do?","acceptedAnswer":{"@type":"Answer","text":"jev-seo runs ten commands: audit, schema, robots, sitemap, geo, keywords, brief, query, rank, and update. They cover local SEO audits, schema validation, AI crawler radar, GEO citation scoring, keyword intent, SERP briefs, and rank tracking, free and offline-capable."}},{"@type":"Question","name":"Is jev-seo an MCP server?","acceptedAnswer":{"@type":"Answer","text":"Yes. The jev-seo mcp command starts a Model Context Protocol server, so agents like Claude Code and Cursor call every other command as native tools."}},{"@type":"Question","name":"What is GEO scoring in jev-seo?","acceptedAnswer":{"@type":"Answer","text":"The geo command scores how likely a generative engine is to cite a page for a given query, from 1 to 10, with confidence and direct-answer detection. It is the competitive edge no hosted SEO dashboard offers."}},{"@type":"Question","name":"Does jev-seo track rankings?","acceptedAnswer":{"@type":"Answer","text":"Yes. The rank command stores weekly position history for your domain and queries in a local SQLite file, so you can watch drift without opening a dashboard."}}]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://jevseo.vercel.app/"},{"@type":"ListItem","position":2,"name":"Use cases","item":"https://jevseo.vercel.app/use-cases.html"}]}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="sheethead">
+  <div class="reg-cross" aria-hidden="true"></div>
+  <div class="cropmark crop-tl" aria-hidden="true"></div>
+  <div class="cropmark crop-tr" aria-hidden="true"></div>
+  <div class="cropmark crop-bl" aria-hidden="true"></div>
+  <div class="cropmark crop-br" aria-hidden="true"></div>
+  <nav class="topline">
+    <a class="wordmark" href="/">jev<span class="ink-g">-seo</span></a>
+    <div class="topnav">
+      <a href="/">home</a>
+      <a href="/jev-for-seo.html">jev for seo</a>
+      <a href="/benchmarks.html">benchmarks</a>
+    </div>
+    <a class="toplink" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">github ↗</a>
+  </nav>
+  <div class="rule"></div>
+  <p class="jobno">JOB SE-004 / USE CASES / TEN COMMANDS</p>
+</header>
+
+<main class="guide" id="top">
+  <p class="tb-line">CATALOG · 2026-09-22 · READ TIME 5 MIN</p>
+  <h1>Use cases: ten commands, ten jobs</h1>
+  <p class="guide-lede">jev-seo is one Rust binary with ten commands. Each command maps to one SEO or GEO job that a freelancer, an agency, or an agent would otherwise pay a dashboard for. Every use case below ran on this site.</p>
+
+  <h2>1. <code>audit</code> — page-level site health</h2>
+  <pre>jev-seo audit .</pre>
+  <p>Walks local HTML and reports pass or fail per file on titles, meta descriptions, canonicals, headings, schema, orphans, thin pages, and internal links. On this site it found four orphan pages and four thin pages in the first pass, and 72 percent overall pass after fixes. Every rule names the exact file, so fixes are mechanical.</p>
+
+  <h2>2. <code>schema</code> — structured data validation</h2>
+  <pre>jev-seo schema index.html</pre>
+  <p>Parses JSON-LD blocks and validates them against Schema.org. Current homepage reports VALID 100/100 across SoftwareApplication, WebSite, and FAQPage. Catches malformed offers and missing required fields before Google's parser does, in local milliseconds.</p>
+
+  <h2>3. <code>robots</code> — AI crawler radar</h2>
+  <pre>jev-seo robots https://jevseo.vercel.app</pre>
+  <p>Fetches your live robots.txt and reports which AI crawlers (GPTBot, ClaudeBot, PerplexityBot) are allowed, blocked, or unrestricted, plus the declared sitemap. The single most underchecked GEO lever: many sites silently block the crawlers that feed AI answers.</p>
+
+  <h2>4. <code>sitemap</code> — crawl path validation</h2>
+  <pre>jev-seo sitemap https://jevseo.vercel.app</pre>
+  <p>Validates sitemap.xml: URL count, HTTPS, lastmod presence, and status codes. Caught this site listing one URL while four real pages existed, which meant the subpages were invisible to crawlers. Fixed to nine URLs.</p>
+
+  <h2>5. <code>geo</code> — generative engine optimization scoring</h2>
+  <pre>jev-seo geo --query "jev seo" --target index.html</pre>
+  <p>Scores citation likelihood for generative engines, 1 to 10, with confidence and direct-answer detection. The homepage scores direct answer with 0.90 confidence after the copy rewrite. No hosted dashboard offers this signal at all.</p>
+
+  <h2>6. <code>keywords</code> — intent and funnel classification</h2>
+  <pre>jev-seo keywords "jev seo"</pre>
+  <p>Classifies a query's search intent: informational, transactional, or navigational, with funnel stage, grounded in the live SERP. Instant keyword triage before you write anything.</p>
+
+  <h2>7. <code>brief</code> — content brief from the live SERP</h2>
+  <pre>jev-seo brief "jev for seo"</pre>
+  <p>Reads the current SERP and emits a blueprint: suggested title, target word count, intent, audience, and the gap to beat. Its brief for "jev for seo" surfaced the missing step-by-step section that this guide now ships.</p>
+
+  <h2>8. <code>query</code> — SERP competitor snapshot</h2>
+  <pre>jev-seo query "jev seo"</pre>
+  <p>Scrapes DuckDuckGo with no API key and lists the top competitors with URLs. Free SERP inspection for anyone who refuses to pay for rank checkers.</p>
+
+  <h2>9. <code>rank</code> — domain rank history</h2>
+  <pre>jev-seo rank --domain jevseo.vercel.app --query "jev seo"</pre>
+  <p>Records your position for a query in a local SQLite file, and reports drift over weeks. Sets the baseline before content changes and measures whether they moved the needle.</p>
+
+  <h2>10. <code>mcp</code> and <code>update</code> — agents and maintenance</h2>
+  <pre>jev-seo mcp
+jev-seo update</pre>
+  <p><code>mcp</code> starts the Model Context Protocol server so Claude Code, Cursor, and other agents call audit, geo, and robots as native tools. <code>update</code> pulls the latest release binary from GitHub automatically.</p>
+
+  <h2>What the ten commands replace</h2>
+  <table class="guide-table">
+    <tr><th>Dashboard feature</th><th>jev-seo command</th><th>Monthly cost replaced</th></tr>
+    <tr><td>Site audit</td><td>audit, schema</td><td>$80+ tier</td></tr>
+    <tr><td>Keyword research</td><td>keywords, brief, query</td><td>$100+ tier</td></tr>
+    <tr><td>Rank tracking</td><td>rank</td><td>$40+ tier</td></tr>
+    <tr><td>GEO oversight</td><td>geo, robots, sitemap</td><td>Not offered</td></tr>
+    <tr><td>Agent tooling</td><td>mcp</td><td>Enterprise API</td></tr>
+  </table>
+
+  <section class="guide-faq">
+    <h2>Frequently asked questions</h2>
+    <p><strong>Which command should I run first?</strong> <code>jev-seo audit .</code> on your local site files. It is the fastest full-health read and needs no network.</p>
+    <p><strong>Do I need a TypeSafe API key?</strong> Only for the geo command's semantic scoring. Audits, schema, robots, sitemap, keywords, query, and rank run with no key at all.</p>
+    <p><strong>Can my CI run these?</strong> Yes. The binary is 6.7MB, idle memory is under 30MB, and every command exits with a status code, which makes audit and schema natural pre-push gates.</p>
+  </section>
+
+  <p class="guide-next">NEXT: <a href="/benchmarks.html">benchmarks &rarr;</a> · <a href="/comparisons.html">comparisons &rarr;</a> · <a href="/">home</a></p>
+</main>
+
+<footer class="sheetfoot">
+  <div class="rule"></div>
+  <div class="foot-row">
+    <h3 class="foot-h">Site</h3>
+    <ul>
+      <li><a href="/">home</a></li>
+      <li><a href="/jev-for-seo.html">jev for seo guide</a></li>
+      <li><a href="/comparisons.html">comparisons</a></li>
+      <li><a href="/use-cases.html">use cases</a></li>
+      <li><a href="/benchmarks.html">benchmarks</a></li>
+      <li><a href="/what-is-jev.html">what is jev</a></li>
+      <li><a href="/about.html">about</a></li>
+      <li><a href="/contact.html">contact</a></li>
+      <li><a href="/privacy.html">privacy</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Ecosystem</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-superpowers" target="_blank" rel="noopener">jev-superpowers</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-curate" target="_blank" rel="noopener">jev-curate</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/tdlib-android" target="_blank" rel="noopener">tdlib-android</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/kharcha" target="_blank" rel="noopener">kharcha</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Author</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">Akash Priyadarshi, Patna, Bihar, India</a></li>
+      <li><a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio</a></li>
+      <li><a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin</a></li>
+      <li><a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Social</h3>
+    <ul>
+      <li><a href="https://x.com/Akash__ydv001" target="_blank" rel="noopener">X / Twitter</a></li>
+      <li><a href="https://www.threads.net/@akash.priyadarshii" target="_blank" rel="noopener">Threads</a></li>
+      <li><a href="https://www.instagram.com/akash.priyadarshii/" target="_blank" rel="noopener">Instagram</a></li>
+      <li><a href="https://reddit.com/user/DragonfruitWeak2801" target="_blank" rel="noopener">Reddit</a></li>
+    </ul>
+  </div>
+  <p class="foot-note">jev-seo — proof the sheet, then ship it. <span class="ink-g">zero-cost SEO/GEO radar for developers and agents.</span></p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

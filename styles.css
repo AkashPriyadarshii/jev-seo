@@ -425,6 +425,77 @@ section { padding: 90px 0; }
 .faq-item p { color: var(--paper-dim); font-size: 0.95rem; }
 .faq-item code { color: var(--phos); }
 
+/* ---------- guide pages (jev-for-seo, benchmarks, use-cases, comparisons, what-is-jev) ---------- */
+.guide {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 56px 24px 72px;
+}
+.guide h1 {
+  font-family: var(--disp);
+  font-size: clamp(2rem, 5vw, 3rem);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+}
+.guide h2 {
+  font-family: var(--disp);
+  font-size: 1.35rem;
+  margin: 2.4rem 0 0.75rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+}
+.guide h3 {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--amber);
+  margin: 1.5rem 0 0.4rem;
+}
+.guide p { max-width: 76ch; margin-bottom: 1rem; }
+.guide ul, .guide ol { max-width: 76ch; margin: 0 0 1.2rem 1.4rem; }
+.guide li { margin-bottom: 0.4rem; }
+.guide a { color: var(--phos); text-decoration: underline; text-underline-offset: 3px; }
+.guide a:hover { color: var(--amber); }
+.guide code { font-family: var(--mono); color: var(--phos); font-size: 0.85rem; background: var(--ink-2); padding: 0.1rem 0.35rem; }
+.guide pre {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  background: var(--ink-2);
+  border-left: 3px solid var(--phos);
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  margin: 0 0 1.2rem;
+  max-width: 82ch;
+}
+.guide pre .c { color: var(--paper-dim); }
+.guide-lede {
+  font-size: 1.15rem;
+  color: var(--paper-dim);
+  max-width: 62ch;
+  border-left: 3px solid var(--phos);
+  padding-left: 1rem;
+  margin-bottom: 1.5rem;
+}
+.guide-table { width: 100%; max-width: 82ch; border-collapse: collapse; margin: 0 0 1.4rem; font-size: 0.9rem; }
+.guide-table th, .guide-table td {
+  text-align: left;
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.75rem;
+  vertical-align: top;
+}
+.guide-table th { font-family: var(--mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--amber); background: var(--ink-2); }
+.guide-table td:first-child { font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
+.guide-next {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line-strong);
+  font-family: var(--mono);
+  font-size: 0.875rem;
+}
+.guide-faq { margin-top: 2rem; }
+.guide-faq h2 { border-top: 1px solid var(--line-strong); }
+.guide-faq p { color: var(--paper-dim); }
+
 
 @media (prefers-reduced-transparency: reduce) {
   /* world is flat print ink; nothing to degrade */

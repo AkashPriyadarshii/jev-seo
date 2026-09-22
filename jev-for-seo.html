@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jev for SEO: Engineering Guide &amp; Benchmarks (2026) | jev-seo</title>
+<meta name="description" content="Jev for SEO, step by step. What Jev is, why it beats hosted SEO dashboards, real benchmarks, and the exact commands to audit and score your site for generative engine optimization.">
+<meta name="keywords" content="jev for seo, jev seo, typesafe ai jev, seo audit, generative engine optimization, geo scoring, semrush alternative, ahrefs alternative, seo cli, mcp seo">
+<link rel="canonical" href="https://jevseo.vercel.app/jev-for-seo.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="jev-seo">
+<meta property="og:title" content="Jev for SEO: Engineering Guide &amp; Benchmarks">
+<meta property="og:description" content="What Jev is, why it beats hosted SEO dashboards, real benchmarks, and the exact commands to audit and GEO-score your site. Free and MIT licensed.">
+<meta property="og:url" content="https://jevseo.vercel.app/jev-for-seo.html">
+<meta property="og:image" content="https://github.com/AkashPriyadarshii.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Jev for SEO: Engineering Guide &amp; Benchmarks">
+<meta name="twitter:description" content="Step-by-step Jev SEO workflow. Rust CLI, zero subscription, GEO scoring built in.">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"Jev for SEO: Engineering Guide & Benchmarks","description":"Step-by-step guide to Jev for SEO and GEO: what it is, real benchmarks, and working commands.","author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"datePublished":"2026-09-22","publisher":{"@type":"Organization","name":"Akash Priyadarshi","logo":{"@type":"ImageObject","url":"https://github.com/AkashPriyadarshii.png"}},"mainEntityOfPage":"https://jevseo.vercel.app/jev-for-seo.html"}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is Jev for SEO?","acceptedAnswer":{"@type":"Answer","text":"Jev for SEO is the practice of using TypeSafe AI's Jev, a System One decision model, to run structured SEO judgments: classifying search intent, scoring competitor freshness, mapping internal links, and flagging keyword cannibalization, at roughly $0.0004 per decision."}},{"@type":"Question","name":"Does Jev work without a crawler?","acceptedAnswer":{"@type":"Answer","text":"Jev cannot crawl the web on its own. You feed it structured state. jev-seo solves this by scraping free DuckDuckGo endpoints and reading local files, then batching Jev questions against that state in a single request."}},{"@type":"Question","name":"Is jev-seo free?","acceptedAnswer":{"@type":"Answer","text":"Yes. jev-seo is MIT licensed, costs zero subscriptions, and needs no paid API. The only optional key is a free TypeSafe Jev key for semantic scoring."}},{"@type":"Question","name":"How fast is a jev-seo audit?","acceptedAnswer":{"@type":"Answer","text":"A jev-seo audit reads local files and validates structure, schema, and headings in one pass under 30MB RAM. The binary is about 6.7MB, and each audit run on a small to medium site completes in seconds."}},{"@type":"Question","name":"Can agents use jev-seo?","acceptedAnswer":{"@type":"Answer","text":"Yes. jev-seo ships an MCP server, so Claude Code, Cursor, and other agents can run audits, GEO scoring, and SERP briefs as native tools."}}]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://jevseo.vercel.app/"},{"@type":"ListItem","position":2,"name":"Jev for SEO guide","item":"https://jevseo.vercel.app/jev-for-seo.html"}]}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="sheethead">
+  <div class="reg-cross" aria-hidden="true"></div>
+  <div class="cropmark crop-tl" aria-hidden="true"></div>
+  <div class="cropmark crop-tr" aria-hidden="true"></div>
+  <div class="cropmark crop-bl" aria-hidden="true"></div>
+  <div class="cropmark crop-br" aria-hidden="true"></div>
+  <nav class="topline">
+    <a class="wordmark" href="/">jev<span class="ink-g">-seo</span></a>
+    <div class="topnav">
+      <a href="/">home</a>
+      <a href="/benchmarks.html">benchmarks</a>
+      <a href="/use-cases.html">use cases</a>
+    </div>
+    <a class="toplink" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">github ↗</a>
+  </nav>
+  <div class="rule"></div>
+  <p class="jobno">JOB SE-002 / JEV FOR SEO / ENGINEERING GUIDE</p>
+</header>
+
+<main class="guide" id="top">
+  <p class="tb-line">GUIDE · 2026-09-22 · READ TIME 7 MIN</p>
+  <h1>Jev for SEO: engineering guide and benchmarks</h1>
+  <p class="guide-lede">Jev for SEO is the practice of using TypeSafe AI's Jev, a System One decision model, to run structured SEO judgments: intent classification, freshness scoring, internal link mapping, and cannibalization checks, at roughly $0.0004 per decision. jev-seo is the free, MIT-licensed Rust client that makes Jev for SEO practical: it scrapes DuckDuckGo for free and reads your local files, then batches Jev questions against that state. No hosted dashboard, no subscription.</p>
+
+  <h2>What Jev is, and why it matters for SEO</h2>
+  <p>Jev is a decision model, not a writer. Given a blob of state and a question with fixed answer choices, it returns a typed answer: a <code>Choice</code>, a <code>Score</code>, or a <code>Noul</code> probability. That design changes what SEO tools can cost. Traditional LLMs generate tokens, which is expensive at scale. Jev answers questions, which is cheap at scale: about $0.0004 per decision at list price, with output tokens free, at up to 250k tokens per second.</p>
+  <p>That combination makes workflows practical that a dashboard would bill you hundreds of dollars for: classify every keyword on your Search Console export by intent and funnel stage, score a competitor page for answer depth and freshness, judge whether each page deserves an internal link, and flag duplicate titles that cannibalize each other.</p>
+
+  <h2>Why hosted dashboards are the wrong tool for this</h2>
+  <p>Semrush and Ahrefs charge over $130 a month and gate their best data behind higher tiers. For a single site, a freelancer, or an agent workflow, that is a license fee for what is mostly batch judgment. Jev-based tooling inverts the economics: the judgment engine costs fractions of a cent per call, and the data layer can be free when you scrape DuckDuckGo and audit local files.</p>
+  <table class="guide-table">
+    <tr><th>Capability</th><th>jev-seo</th><th>Semrush / Ahrefs</th></tr>
+    <tr><td>Price</td><td>₹0 / $0</td><td>$130+ per month</td></tr>
+    <tr><td>Runs where</td><td>Local, offline-capable</td><td>Hosted dashboard</td></tr>
+    <tr><td>RAM footprint</td><td>Under 30MB</td><td>Browser + dashboard</td></tr>
+    <tr><td>GEO citation scoring</td><td>Built in, 1 to 10</td><td>Not offered</td></tr>
+    <tr><td>Agent integration</td><td>MCP server</td><td>REST API, paid tiers</td></tr>
+    <tr><td>Schema validation</td><td>Built in</td><td>Mostly not offered</td></tr>
+  </table>
+
+  <h2>Real benchmarks</h2>
+  <p>Numbers from the current release, v0.1.0, measured on a Windows 11 machine with 8GB RAM and a 2-core i3-1115G4:</p>
+  <ul>
+    <li>Release binary: 6.7MB executable, 3.2MB zipped download.</li>
+    <li>Idle memory: under 30MB RAM, safe for CI runners and low-RAM laptops.</li>
+    <li>Audit pass on a 6-file site: reads structure, schema, headings, and copy in one pass, in seconds.</li>
+    <li>GEO scoring: direct-answer confidence 0.90 reported on a well-formed landing page; composite score 7/10 after content fixes.</li>
+    <li>Search radar: live DuckDuckGo SERP scraping with no API key; ranked the project #1 for its own head term in one shot.</li>
+    <li>Jev inference speed at the API: 70 to 500ms per decision, up to 1200 requests per minute.</li>
+  </ul>
+  <p>Full runnable details on the <a href="/benchmarks.html">benchmarks page</a>.</p>
+
+  <h2>Step by step: run a Jev for SEO audit today</h2>
+  <h3>1. Install</h3>
+  <pre><span class="c"># cargo route</span>
+cargo install jev-seo
+
+<span class="c"># or grab the release binary for Windows, macOS, or Linux:</span>
+<span class="c"># https://github.com/AkashPriyadarshii/jev-seo/releases</span></pre>
+  <h3>2. Audit your site</h3>
+  <pre>jev-seo audit .</pre>
+  <p>The audit walks local HTML files and reports pass/fail on titles, meta descriptions, canonical links, headings, schema, orphan pages, thin pages, and internal links. On a clean page set you should see pass rates in the 70 to 90 percent range, with each failure pointing at the exact file and rule.</p>
+  <h3>3. Validate schema</h3>
+  <pre>jev-seo schema index.html</pre>
+  <p>Parses JSON-LD and reports validity against Schema.org, catching malformed fields before Google does.</p>
+  <h3>4. Score GEO citation likelihood</h3>
+  <pre>jev-seo geo --query "jev seo" --target index.html</pre>
+  <p>Scores how likely a generative engine (Gemini Overviews, Perplexity, SearchGPT) is to cite the page for that query, with a confidence value and direct-answer detection. If the score sits below 7/10, the tool tells you which signals are missing, usually direct answers, statistics, or step-by-step structure.</p>
+  <h3>5. Generate a content brief</h3>
+  <pre>jev-seo brief "jev for seo"</pre>
+  <p>Reads the live SERP and produces a brief blueprint: suggested title, target word count, search intent, audience, and the differentiator to beat the incumbent, for example a missing step-by-step section.</p>
+  <h3>6. Run the search radar</h3>
+  <pre>jev-seo keywords "jev seo"
+jev-seo query "jev seo"
+jev-seo rank --domain jevseo.vercel.app --query "jev seo"</pre>
+  <p>Keyword intents, live SERP competitors, and weekly rank drift for your own domain, all from DuckDuckGo with no API key.</p>
+  <h3>7. Check robots and sitemap against AI crawlers</h3>
+  <pre>jev-seo robots https://jevseo.vercel.app
+jev-seo sitemap https://jevseo.vercel.app</pre>
+  <p>Reads your live robots.txt and sitemap.xml, reports which AI crawlers (GPTBot, ClaudeBot, PerplexityBot) are allowed or blocked, and validates sitemap URLs and HTTPS.</p>
+  <h3>8. Wire it into an agent</h3>
+  <pre>jev-seo mcp</pre>
+  <p>Starts an MCP server so Claude Code, Cursor, and other agents call every command above as native tools.</p>
+  <h3>9. Keep the tool fresh</h3>
+  <pre>jev-seo update</pre>
+  <p>Automatically lifts the latest release binary from GitHub.</p>
+
+  <h2>When Jev for SEO is the wrong call</h2>
+  <p>Jev does not write articles, generate meta descriptions from scratch, or explain its recommendations in prose. It also cannot crawl on its own; someone has to collect state. If your workflow needs generative copy or a full site crawl with rendered JavaScript, pair Jev with an LLM for writing and a real crawler for fetching, and keep Jev on the judgment layer where it is cheap and typed.</p>
+
+  <h2>What to do next</h2>
+  <p>Install jev-seo, run <code>jev-seo audit .</code> on your own repo, then <code>jev-seo geo</code> on your money page. Compare prices against your current dashboard for one month. If the numbers hold, cancel the subscription and keep the binary. Full command catalog on the <a href="/use-cases.html">use cases page</a>, and per-command depth on the <a href="/benchmarks.html">benchmarks page</a>.</p>
+
+  <section class="guide-faq">
+    <h2>Frequently asked questions</h2>
+    <p><strong>What is the difference between Jev and ChatGPT?</strong> Jev answers fixed-choice questions with typed, probabilistic output at $0.0004 per decision. ChatGPT generates free-form text. Jev handles sorting, classification, and scoring; a generative model handles writing.</p>
+    <p><strong>Is TypeSafe Jev free?</strong> Jev has a free tier, and the confidence threshold for destructive actions is 0.80 by convention. jev-seo itself is MIT licensed and does not require a paid key for audits, schema, robots, or SERP work.</p>
+    <p><strong>Where does the "System One" name come from?</strong> From the two-system model of cognition: fast, automatic, low-cost judgment versus slow, deliberate reasoning. Jev is designed for the fast lane: millions of small decisions, not long answers.</p>
+    <p><strong>Can jev-seo replace Semrush entirely?</strong> For audits, schema, GEO scoring, keyword intent, and rank tracking, yes. For proprietary backlink indexes and historical traffic graphs, no hosted tool can be replaced locally; run those checks separately if you need them.</p>
+  </section>
+
+  <p class="guide-next">NEXT: <a href="/benchmarks.html">benchmarks &rarr;</a> · <a href="/use-cases.html">use cases &rarr;</a> · <a href="/">home</a></p>
+</main>
+
+<footer class="sheetfoot">
+  <div class="rule"></div>
+  <div class="foot-row">
+    <h3 class="foot-h">Site</h3>
+    <ul>
+      <li><a href="/">home</a></li>
+      <li><a href="/jev-for-seo.html">jev for seo guide</a></li>
+      <li><a href="/comparisons.html">comparisons</a></li>
+      <li><a href="/use-cases.html">use cases</a></li>
+      <li><a href="/benchmarks.html">benchmarks</a></li>
+      <li><a href="/what-is-jev.html">what is jev</a></li>
+      <li><a href="/about.html">about</a></li>
+      <li><a href="/contact.html">contact</a></li>
+      <li><a href="/privacy.html">privacy</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Ecosystem</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-superpowers" target="_blank" rel="noopener">jev-superpowers</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-curate" target="_blank" rel="noopener">jev-curate</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/tdlib-android" target="_blank" rel="noopener">tdlib-android</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/kharcha" target="_blank" rel="noopener">kharcha</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Author</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">Akash Priyadarshi, Patna, Bihar, India</a></li>
+      <li><a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio</a></li>
+      <li><a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin</a></li>
+      <li><a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Social</h3>
+    <ul>
+      <li><a href="https://x.com/Akash__ydv001" target="_blank" rel="noopener">X / Twitter</a></li>
+      <li><a href="https://www.threads.net/@akash.priyadarshii" target="_blank" rel="noopener">Threads</a></li>
+      <li><a href="https://www.instagram.com/akash.priyadarshii/" target="_blank" rel="noopener">Instagram</a></li>
+      <li><a href="https://reddit.com/user/DragonfruitWeak2801" target="_blank" rel="noopener">Reddit</a></li>
+    </ul>
+  </div>
+  <p class="foot-note">jev-seo — proof the sheet, then ship it. <span class="ink-g">zero-cost SEO/GEO radar for developers and agents.</span></p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
