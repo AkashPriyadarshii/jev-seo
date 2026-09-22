@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Optional paid search backend: `query --provider tavily` (or auto when `TAVILY_API_KEY` is set) with free DuckDuckGo fallback, hardened browser headers, and clean `--json` stdout. Thanks to @jerryrat for the API path and header research in PR #2.
 - Fifty-rule audit engine (`src/rules.rs`): stable R01-R50 registry across 9 areas with severity weights, reach factors, area scores, and a weighted overall blend.
 - `crawl` scoring unified on the rules engine: findings, areas, and impact-ranked actions from one truth, stored in JSON for agents.
 - `audit` findings from the same engine, CSV findings export for crawl and audit, and `audit --rescore` for offline rebuilds with backward-compatible JSON.

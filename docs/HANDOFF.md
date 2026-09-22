@@ -8,6 +8,8 @@ cargo check
 
 ## 2. Environment Variables
 - `TYPESAFE_API_KEY`: Required for semantic Jev evaluations (`keywords`, `query`, `geo`, `audit --semantic`).
+- `TAVILY_API_KEY`: Optional paid search backend for `query --provider tavily` (or auto when set). Without it everything runs free.
+- `TAVILY_API_URL`: Optional override pointing at any Tavily-compatible endpoint or self-hosted proxy.
 - When missing, `jev-seo` gracefully falls back to local AST checks and raw SERP tables without semantic Jev ratings.
 
 ## 3. Pre-Commit Check

@@ -197,7 +197,7 @@ fn main() -> Result<()> {
                 "tavily" => serp::Provider::Tavily,
                 _ => serp::Provider::Auto,
             };
-            println!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
+            eprintln!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
             let items = serp::scrape_serp_with(&query, limit, backend)?;
 
             if json {

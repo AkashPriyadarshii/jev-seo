@@ -215,7 +215,7 @@ Integrated into `jev-seo audit`:
 | Command | Description | Flags |
 |---|---|---|
 | `keywords <query>` | Autocomplete discovery and Jev intent classification | `--json` |
-| `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--limit <n>`, `--json` |
+| `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--limit <n>`, `--provider auto\|ddg\|tavily`, `--json` |
 | `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit, 50-rule findings | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--rescore <path>` |
 | `geo <target>` | Generative Engine Optimization citation scoring (1-10), composite dimensions, score trend | `--query <query>`, `--json` |
 | `schema <target>` | Schema.org JSON-LD structural and deprecation validator | `--json` |
