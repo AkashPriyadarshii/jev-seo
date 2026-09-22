@@ -1,0 +1,64 @@
+{
+  "domain": "jevseo.vercel.app",
+  "llms_url": "https://jevseo.vercel.app/llms.txt",
+  "info": {
+    "present": true,
+    "status": 200,
+    "bytes": 1461,
+    "sections": [
+      "jev-seo",
+      "When to use this",
+      "Call it"
+    ]
+  },
+  "ai_allowed": [],
+  "ai_default": [
+    "GPTBot",
+    "ChatGPT-User",
+    "ClaudeBot",
+    "anthropic-ai",
+    "PerplexityBot",
+    "Google-Extended",
+    "Bytespider",
+    "CCBot"
+  ],
+  "ai_blocked": [],
+  "robots_sitemaps": [
+    "https://jevseo.vercel.app/sitemap.xml"
+  ],
+  "robots_present": true,
+  "score": 70,
+  "checks": [
+    {
+      "name": "llms.txt present",
+      "passed": true,
+      "message": "1461 bytes, 3 sections"
+    },
+    {
+      "name": "AI crawlers allowed",
+      "passed": false,
+      "message": "0 of 8 tracked bots explicitly allowed"
+    },
+    {
+      "name": "Sitemap advertised",
+      "passed": true,
+      "message": "1 sitemap(s) in robots.txt"
+    },
+    {
+      "name": "robots.txt present",
+      "passed": true,
+      "message": "Crawler rules discoverable"
+    }
+  ],
+  "actions": [
+    {
+      "id": "LLMS-001",
+      "priority": 2,
+      "effort": 1,
+      "impact": 60,
+      "quick_win": true,
+      "title": "Name AI crawlers in robots.txt",
+      "evidence": "all bots on default policy"
+    }
+  ]
+}

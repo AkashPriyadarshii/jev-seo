@@ -1,0 +1,289 @@
+{
+  "start_url": "https://jevseo.vercel.app/",
+  "pages_crawled": 8,
+  "score": 99,
+  "grade": "A",
+  "areas": [
+    {
+      "area": "Crawl",
+      "score": 99,
+      "findings": 1
+    },
+    {
+      "area": "OnPage",
+      "score": 100,
+      "findings": 0
+    },
+    {
+      "area": "Content",
+      "score": 100,
+      "findings": 0
+    },
+    {
+      "area": "Links",
+      "score": 100,
+      "findings": 0
+    },
+    {
+      "area": "Structured",
+      "score": 100,
+      "findings": 0
+    },
+    {
+      "area": "AiAccess",
+      "score": 100,
+      "findings": 0
+    },
+    {
+      "area": "Performance",
+      "score": 94,
+      "findings": 12
+    },
+    {
+      "area": "Security",
+      "score": 100,
+      "findings": 0
+    },
+    {
+      "area": "Canonical",
+      "score": 100,
+      "findings": 0
+    }
+  ],
+  "actions": [
+    {
+      "id": "RULE-R42",
+      "priority": 2,
+      "effort": 2,
+      "impact": 55,
+      "quick_win": false,
+      "title": "Slow page over 800ms (4 hits)",
+      "evidence": "https://jevseo.vercel.app/contact.html, https://jevseo.vercel.app/use-cases.html, https://jevseo.vercel.app/, +1 more"
+    },
+    {
+      "id": "RULE-R07",
+      "priority": 3,
+      "effort": 1,
+      "impact": 30,
+      "quick_win": false,
+      "title": "Crawl capped (1 hits)",
+      "evidence": "https://jevseo.vercel.app/"
+    },
+    {
+      "id": "RULE-R44",
+      "priority": 3,
+      "effort": 1,
+      "impact": 30,
+      "quick_win": false,
+      "title": "No compression signal (8 hits)",
+      "evidence": "https://jevseo.vercel.app/about.html, https://jevseo.vercel.app/benchmarks.html, https://jevseo.vercel.app/what-is-jev.html, +5 more"
+    }
+  ],
+  "findings": [
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/about.html",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/benchmarks.html",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/what-is-jev.html",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/jev-for-seo.html",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R42",
+      "area": "Performance",
+      "severity": "Medium",
+      "scope": "https://jevseo.vercel.app/contact.html",
+      "evidence": "2729ms",
+      "fix": "Cut server time and payload below the budget."
+    },
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/contact.html",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R42",
+      "area": "Performance",
+      "severity": "Medium",
+      "scope": "https://jevseo.vercel.app/use-cases.html",
+      "evidence": "2742ms",
+      "fix": "Cut server time and payload below the budget."
+    },
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/use-cases.html",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R42",
+      "area": "Performance",
+      "severity": "Medium",
+      "scope": "https://jevseo.vercel.app/",
+      "evidence": "2750ms",
+      "fix": "Cut server time and payload below the budget."
+    },
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R42",
+      "area": "Performance",
+      "severity": "Medium",
+      "scope": "https://jevseo.vercel.app/comparisons.html",
+      "evidence": "2762ms",
+      "fix": "Cut server time and payload below the budget."
+    },
+    {
+      "rule_id": "R44",
+      "area": "Performance",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/comparisons.html",
+      "evidence": "no content-encoding",
+      "fix": "Serve gzip or brotli with a content-encoding header."
+    },
+    {
+      "rule_id": "R07",
+      "area": "Crawl",
+      "severity": "Low",
+      "scope": "https://jevseo.vercel.app/",
+      "evidence": "capped at 8 pages",
+      "fix": "Raise --max-pages for full coverage."
+    }
+  ],
+  "broken": [],
+  "redirects": [],
+  "orphans": [],
+  "errors": [],
+  "pages": [
+    {
+      "url": "https://jevseo.vercel.app/about.html",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/about.html",
+      "outlinks": 10,
+      "elapsed_ms": 208,
+      "bytes": 7600,
+      "hops": [],
+      "encoding": null
+    },
+    {
+      "url": "https://jevseo.vercel.app/benchmarks.html",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/benchmarks.html",
+      "outlinks": 9,
+      "elapsed_ms": 213,
+      "bytes": 11143,
+      "hops": [],
+      "encoding": null
+    },
+    {
+      "url": "https://jevseo.vercel.app/what-is-jev.html",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/what-is-jev.html",
+      "outlinks": 9,
+      "elapsed_ms": 215,
+      "bytes": 11344,
+      "hops": [],
+      "encoding": null
+    },
+    {
+      "url": "https://jevseo.vercel.app/jev-for-seo.html",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/jev-for-seo.html",
+      "outlinks": 9,
+      "elapsed_ms": 227,
+      "bytes": 15886,
+      "hops": [],
+      "encoding": null
+    },
+    {
+      "url": "https://jevseo.vercel.app/contact.html",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/contact.html",
+      "outlinks": 10,
+      "elapsed_ms": 2729,
+      "bytes": 7629,
+      "hops": [],
+      "encoding": null
+    },
+    {
+      "url": "https://jevseo.vercel.app/use-cases.html",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/use-cases.html",
+      "outlinks": 9,
+      "elapsed_ms": 2742,
+      "bytes": 12483,
+      "hops": [],
+      "encoding": null
+    },
+    {
+      "url": "https://jevseo.vercel.app/",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/",
+      "outlinks": 10,
+      "elapsed_ms": 2750,
+      "bytes": 28629,
+      "hops": [],
+      "encoding": null
+    },
+    {
+      "url": "https://jevseo.vercel.app/comparisons.html",
+      "status": 200,
+      "final_url": "https://jevseo.vercel.app/comparisons.html",
+      "outlinks": 9,
+      "elapsed_ms": 2762,
+      "bytes": 12164,
+      "hops": [],
+      "encoding": null
+    }
+  ],
+  "inbound": {
+    "https://jevseo.vercel.app/contact.html": 8,
+    "https://jevseo.vercel.app/privacy.html": 8,
+    "https://jevseo.vercel.app/": 8,
+    "https://jevseo.vercel.app/comparisons.html": 8,
+    "https://jevseo.vercel.app/jev-for-seo.html": 8,
+    "https://jevseo.vercel.app/what-is-jev.html": 8,
+    "https://jevseo.vercel.app/benchmarks.html": 8,
+    "https://jevseo.vercel.app/use-cases.html": 8,
+    "https://jevseo.vercel.app/PRODUCT.md": 3,
+    "https://jevseo.vercel.app/about.html": 8
+  },
+  "seeded_from_sitemap": true,
+  "capped": true,
+  "robots_honored": true
+}

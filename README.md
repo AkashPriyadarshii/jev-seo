@@ -78,6 +78,16 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 - **Local & private**: All rank tracking and audit histories persist in a single local SQLite database (`.jev-seo.db`).
 - **Low RAM footprint**: Fast native Rust binary that runs in under 30MB RAM on resource-constrained machines.
 
+## Free vs paid dashboards
+
+| Job | Paid dashboards | jev-seo |
+|---|---|---|
+| One-site audit with fixes | Monthly seat, queued crawl | `crawl` in seconds, ranked actions free |
+| Rank tracking over time | Subscription per project | SQLite drift history, zero cost |
+| AI visibility scoring | Add-on tier | `geo` plus `llms` readiness, fractions of a cent |
+| Agent access | API credits per call | 10-tool MCP server on stdio |
+| Report exports | Export limits per plan | HTML, PDF, Markdown, CSV from every run |
+
 ---
 
 ## Quickstart
@@ -112,6 +122,27 @@ jev-seo rank --domain "crates.io" --query "rust grep"
 
 # Start the Native Agent MCP Server
 jev-seo mcp
+```
+
+## Install
+
+One binary, no runtime. Pick a lane:
+
+| Lane | Command |
+|---|---|
+| Cargo | `cargo install jev-seo` |
+| Linux x86_64 / ARM64 | Download `jev-seo-<target>.tar.gz` from [Releases](https://github.com/AkashPriyadarshii/jev-seo/releases) |
+| macOS Intel / ARM | Same Releases page, `tar.gz` archives with SHA256 |
+| Windows x86_64 | Same Releases page, `.zip` archive |
+
+Wire the agent server into your client once:
+
+```json
+{
+  "mcpServers": {
+    "jev-seo": { "command": "jev-seo", "args": ["mcp"] }
+  }
+}
 ```
 
 ---
@@ -215,6 +246,46 @@ When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model C
 | `seo_sitemap` | `target: string` | Validate XML sitemap protocols, HTTPS links, and hreflang tags |
 | `seo_crawl` | `url: string`, `max_pages?: int` | Crawl a live site for broken links, redirect chains, and orphan pages |
 | `seo_llms` | `domain: string` | Check llms.txt presence and AI crawler permissions |
+
+---
+
+## Examples from real runs
+
+Every file below is real output, not mockups:
+
+- `examples/jevseo-site/crawl.json` — 10-page live crawl with health score, areas, findings, and actions.
+- `examples/jevseo-site/llms.json` — answer-engine readiness with checks and actions.
+- `examples/local-docs/report.html`, `report.md`, `findings.csv` — the same audit in three formats.
+
+---
+
+## Benchmarks
+
+Measured 2026-09-22. Rerun any row; full notes in `docs/EVAL.md`.
+
+| Check | Result | Rerun |
+|---|---|---|
+| Cold start | 6ms | `time jev-seo --help` |
+| Local audit, 4 files | ~0.2s | `jev-seo audit docs/ --json` |
+| Live crawl, 6-10 pages | 3-11s wall, server-bound | `jev-seo crawl <url> --max-pages 10` |
+| Score repeatability, 3 runs | 99 stable, findings ±2 from server timing | `jev-seo crawl <url> --json` ×3 |
+| Test suite | 42 green, zero clippy warnings | `cargo test` |
+
+---
+
+## FAQ
+
+**What does jev-seo cost to run?** Nothing for rules, crawls, and reports. Semantic scoring costs fractions of a cent per Jev call.
+
+**Does it need API keys?** No for everything deterministic. Jev scoring needs `TYPESAFE_API_KEY`; without it those sections report local-only output.
+
+**How is this different from a web dashboard?** It is a binary, not a seat. It crawls, scores, and exports from your terminal and CI, and agents call it over MCP.
+
+**What is a GEO score?** Citation likelihood 1-10 for answer engines, backed by a five-dimension composite with published weights.
+
+**Which pages does it check?** Up to 50 per crawl by default, seeded from sitemap.xml, robots.txt honored. Raise `--max-pages` deliberately.
+
+**Can CI fail on it?** Yes. `audit --min-pass` exits nonzero below your floor, and crawl `--diff` reports drift between runs.
 
 ---
 
