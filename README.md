@@ -72,7 +72,7 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 - **2026 Schema.org Validator**: Deeply inspects JSON-LD schemas (`SoftwareApplication`, `Article`, `Organization`, `Product`) and flags deprecated schemas.
 - **Robots.txt & AI Crawler Radar**: Evaluates permissions for AI bots (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, `Bytespider`).
 - **SERP Content Briefs**: Synthesizes competitor SERP snippets into an actionable content blueprint with H2 outlines and optimal 134-167 word GEO blocks.
-- **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 10 SEO tools into Claude Code, Gemini CLI, and Antigravity.
+- **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 11 SEO tools into Claude Code, Gemini CLI, and Antigravity.
 - **Live-site crawler**: Parallel BFS crawl with canonical dedup, per-page timing, health scores, and ranked fix actions.
 - **Answer-engine readiness**: `llms.txt` plus AI crawler permission scoring with readiness actions.
 - **Local & private**: All rank tracking and audit histories persist in a single local SQLite database (`.jev-seo.db`).
@@ -223,16 +223,17 @@ Integrated into `jev-seo audit`:
 | `brief <topic>` | SERP-driven heading outline and 150-word GEO direct-answer | `--limit <n>`, `--markdown`, `--json` |
 | `rank` | SQLite rank drift tracker (~/.jev-seo/jev-seo.db) | `--domain <domain>`, `--query <query>` |
 | `sitemap <target>` | XML sitemap, 50k limit, HTTPS, and hreflang validator | `--json` |
-| `crawl <url>` | Live-site BFS crawl: health score, ranked actions, broken links, redirect chains, orphans, timing | `--max-pages <n>`, `--json`, `--diff`, `--rescore <path>` |
+| `crawl <url>` | Live-site BFS crawl: health score, ranked actions, broken links, redirect chains, orphans, timing | `--max-pages <n>`, `--fetch auto\|direct\|jina\|firecrawl`, `--max-credits <n>`, `--json`, `--diff`, `--csv <path>`, `--rescore <path>` |
 | `llms <domain>` | llms.txt plus AI crawler scoring with ranked readiness actions | `--json` |
 | `doctor` | Environment check: version, API key presence, database, platform | `--json` |
+| `gsc <auth\|sites\|query>` | Google Search Console: free first-party query data for your own sites | `--site <url>`, `--limit <n>`, `--json` |
 | `mcp` | Native Stdio JSON-RPC 2.0 Agent MCP Server | (None) |
 
 ---
 
-## Native MCP Server (10 Tools)
+## Native MCP Server (11 Tools)
 
-When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 10 tools. It answers the `initialize` handshake, stays silent on notifications, reports parse errors, and flags tool failures with `isError`. File tools share a guarded reader (content extensions only, no dot-files, no URLs) plus a Jev safety classifier that blocks secret-looking targets. Remote fetches refuse private hosts, resolved DNS, and redirect landings.
+When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 11 tools. It answers the `initialize` handshake, stays silent on notifications, reports parse errors, and flags tool failures with `isError`. File tools share a guarded reader (content extensions only, no dot-files, no URLs) plus a Jev safety classifier that blocks secret-looking targets. Remote fetches refuse private hosts, resolved DNS, and redirect landings.
 
 | MCP Tool | Arguments | Purpose |
 |---|---|---|
@@ -246,6 +247,7 @@ When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model C
 | `seo_sitemap` | `target: string` | Validate XML sitemap protocols, HTTPS links, and hreflang tags |
 | `seo_crawl` | `url: string`, `max_pages?: int` | Crawl a live site for broken links, redirect chains, and orphan pages |
 | `seo_llms` | `domain: string` | Check llms.txt presence and AI crawler permissions |
+| `seo_extract` | `urls: string[]`, `query: string` | Extract clean markdown via paid API (key-gated) |
 
 ---
 
@@ -359,6 +361,12 @@ Patna, Bihar, India
 * Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)  
 
 **Social:** [X / Twitter](https://x.com/Akash__ydv001) • [Threads](https://www.threads.net/@akash.priyadarshii) • [Instagram](https://www.instagram.com/akash.priyadarshii/) • [Reddit](https://reddit.com/user/DragonfruitWeak2801)
+
+---
+
+## Contributors
+
+* [@jerryrat](https://github.com/jerryrat) — paid search provider path and DuckDuckGo header research (PR #2)
 
 ---
 

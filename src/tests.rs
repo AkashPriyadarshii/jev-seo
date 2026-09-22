@@ -223,7 +223,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(resp.error.is_none());
         let res = resp.result.unwrap();
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
-        assert_eq!(tools.len(), 10, "All 10 agent SEO tools must be exposed");
+        assert_eq!(tools.len(), 11, "All 11 agent SEO tools must be exposed");
 
         let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(|n| n.as_str())).collect();
         assert!(names.contains(&"seo_keywords"));
@@ -236,6 +236,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(names.contains(&"seo_sitemap"));
         assert!(names.contains(&"seo_crawl"));
         assert!(names.contains(&"seo_llms"));
+        assert!(names.contains(&"seo_extract"));
     }
 
     #[test]
@@ -565,8 +566,8 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
         let pages = vec![
-            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()) },
-            PageRecord { url: "https://x.test/dead".into(), status: 404, final_url: "https://x.test/dead".into(), outlinks: 0, elapsed_ms: 50, bytes: 0, hops: vec![], encoding: None },
+            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0 },
+            PageRecord { url: "https://x.test/dead".into(), status: 404, final_url: "https://x.test/dead".into(), outlinks: 0, elapsed_ms: 50, bytes: 0, hops: vec![], encoding: None, source: "direct".into(), fetch_cost: 0 },
         ];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
@@ -661,19 +662,35 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_tavily_without_key_errors_offline() {
-        // tavily_search must fail before any network call when no key is set.
+        // Paid gate must read false before any network call when no key is set.
         let saved_key = std::env::var("TAVILY_API_KEY").ok();
-        let saved_url = std::env::var("TAVILY_API_URL").ok();
         std::env::remove_var("TAVILY_API_KEY");
-        std::env::remove_var("TAVILY_API_URL");
-        let res = crate::serp::tavily_search("test", 3);
+        let enabled = crate::serp::tavily_enabled();
         if let Some(k) = saved_key {
             std::env::set_var("TAVILY_API_KEY", k);
         }
-        if let Some(u) = saved_url {
-            std::env::set_var("TAVILY_API_URL", u);
-        }
-        assert!(res.is_err());
+        assert!(!enabled);
+    }
+    #[test]
+    fn test_fetch_quality_and_budget() {
+        use crate::fetch::{quality, Budget};
+        assert_eq!(quality(""), 0.0);
+        assert_eq!(quality("   "), 0.0);
+        assert!(quality("# Title\n\n- a\n- b\n\nSome words here.") > 0.7);
+        assert!(quality("plain wall of text without any structure at all") < 0.5);
+        let mut b = Budget { max_credits: 1, spent: 0 };
+        assert!(b.allow(1));
+        assert!(!b.allow(1));
+    }
+
+    #[test]
+    fn test_gsc_date_and_encoding_shapes() {
+        let d = crate::gsc::chrono_now_days_ago(28);
+        assert_eq!(d.len(), 10);
+        assert_eq!(&d[4..5], "-");
+        assert_eq!(&d[7..8], "-");
+        assert!(crate::gsc::chrono_now_days_ago(0) >= d);
+        assert_eq!(crate::gsc::urlencoding("https://x.test/a b"), "https%3A%2F%2Fx.test%2Fa%20b");
     }
 
     #[test]

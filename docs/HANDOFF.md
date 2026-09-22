@@ -10,6 +10,10 @@ cargo check
 - `TYPESAFE_API_KEY`: Required for semantic Jev evaluations (`keywords`, `query`, `geo`, `audit --semantic`).
 - `TAVILY_API_KEY`: Optional paid search backend for `query --provider tavily` (or auto when set). Without it everything runs free.
 - `TAVILY_API_URL`: Optional override pointing at any Tavily-compatible endpoint or self-hosted proxy.
+- `JINA_API_KEY`: Optional. Jina reader works keyless at base tier; a key raises limits for fetch upgrades.
+- `FIRECRAWL_API_KEY`: Optional paid JS-rendered fetch for weak pages. Parked at zero spend unless `crawl --max-credits` allows it.
+- `FIRECRAWL_API_URL`: Optional override for self-hosted Firecrawl.
+- `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`: Optional. Desktop OAuth client for `gsc` Search Console data.
 - When missing, `jev-seo` gracefully falls back to local AST checks and raw SERP tables without semantic Jev ratings.
 
 ## 3. Pre-Commit Check

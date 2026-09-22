@@ -54,4 +54,6 @@
 - [x] Audit findings, CSV export, audit rescore, backward-compatible JSON
 - [x] Staged progress on audit and llms
 - [x] SKILL.md agent contract and docs/EVAL.md with measured figures
+- [x] Multi-backend fetch (direct, Jina, Firecrawl) with quality math and budgets
+- [x] Search Console device-flow command with owner-only token storage
 - [ ] Release as v0.1.2 on 22 October with the Unreleased backlog

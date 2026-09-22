@@ -53,7 +53,7 @@ pub enum Provider {
 pub fn select_provider(want: Provider) -> Provider {
     match want {
         Provider::Auto => {
-            if std::env::var("TAVILY_API_KEY").map(|k| !k.trim().is_empty()).unwrap_or(false) {
+            if tavily_enabled() {
                 Provider::Tavily
             } else {
                 Provider::Ddg
@@ -64,8 +64,26 @@ pub fn select_provider(want: Provider) -> Provider {
 }
 
 pub fn scrape_serp_with(query: &str, limit: usize, want: Provider) -> Result<Vec<SerpItem>> {
+    scrape_serp_opts(query, limit, want, &SearchOpts::default())
+}
+
+/// Search knobs for the paid backend. Free path ignores them.
+#[derive(Debug, Clone)]
+pub struct SearchOpts {
+    pub depth: String,
+    pub topic: String,
+    pub answer: bool,
+}
+
+impl Default for SearchOpts {
+    fn default() -> Self {
+        Self { depth: "advanced".into(), topic: "general".into(), answer: false }
+    }
+}
+
+pub fn scrape_serp_opts(query: &str, limit: usize, want: Provider, opts: &SearchOpts) -> Result<Vec<SerpItem>> {
     match select_provider(want) {
-        Provider::Tavily => match tavily_search(query, limit) {
+        Provider::Tavily => match tavily_search_with(query, limit, opts) {
             Ok(items) => Ok(items),
             Err(e) => {
                 eprintln!("[jev-seo] paid search failed ({}); falling back to free scrape", e);
@@ -78,7 +96,21 @@ pub fn scrape_serp_with(query: &str, limit: usize, want: Provider) -> Result<Vec
 
 /// Tavily-compatible search API. Opt-in via env, never the default path:
 /// TAVILY_API_KEY (enables it), TAVILY_API_URL (optional proxy override).
-pub(crate) fn tavily_search(query: &str, limit: usize) -> Result<Vec<SerpItem>> {    let key = std::env::var("TAVILY_API_KEY")
+/// Paid gate: true only with a non-empty key. Decides before any network.
+pub fn tavily_enabled() -> bool {
+    std::env::var("TAVILY_API_KEY").map(|k| !k.trim().is_empty()).unwrap_or(false)
+}
+
+fn tavily_search_with(query: &str, limit: usize, opts: &SearchOpts) -> Result<Vec<SerpItem>> {
+    let depth = match opts.depth.as_str() {
+        "basic" | "fast" | "ultra-fast" | "advanced" => opts.depth.as_str(),
+        _ => "advanced",
+    };
+    let topic = match opts.topic.as_str() {
+        "news" | "finance" => opts.topic.as_str(),
+        _ => "general",
+    };
+    let key = std::env::var("TAVILY_API_KEY")
         .ok()
         .filter(|k| !k.trim().is_empty())
         .context("TAVILY_API_KEY not set")?;
@@ -87,8 +119,9 @@ pub(crate) fn tavily_search(query: &str, limit: usize) -> Result<Vec<SerpItem>> 
     let payload = serde_json::json!({
         "query": query,
         "max_results": limit.clamp(1, 20),
-        "search_depth": "advanced",
-        "include_answer": false,
+        "search_depth": depth,
+        "topic": topic,
+        "include_answer": opts.answer,
     });
     let resp = ureq::post(&endpoint)
         .set("Content-Type", "application/json")
@@ -122,6 +155,53 @@ pub(crate) fn tavily_search(query: &str, limit: usize) -> Result<Vec<SerpItem>> 
         anyhow::bail!("search API returned zero results");
     }
     Ok(items)
+}
+
+/// Tavily /extract: URLs to clean markdown with query rerank.
+/// Returns None without a key so callers fall back silently.
+pub fn tavily_extract(urls: &[String], query: &str) -> Result<String> {    let key = std::env::var("TAVILY_API_KEY")
+        .ok()
+        .filter(|k| !k.trim().is_empty())
+        .context("TAVILY_API_KEY not set")?;
+    let endpoint = std::env::var("TAVILY_API_URL")
+        .map(|base| {
+            let base = base.trim_end_matches('/');
+            if base.ends_with("/extract") {
+                base.to_string()
+            } else {
+                format!("{}/extract", base)
+            }
+        })
+        .unwrap_or_else(|_| "https://api.tavily.com/extract".to_string());
+    let payload = serde_json::json!({
+        "urls": urls,
+        "query": query,
+        "extract_depth": "basic",
+        "format": "markdown",
+    });
+    let resp = ureq::post(&endpoint)
+        .set("Content-Type", "application/json")
+        .set("Authorization", &format!("Bearer {}", key))
+        .timeout(std::time::Duration::from_secs(20))
+        .send_string(&payload.to_string())
+        .context("extract request failed")?;
+    let body: serde_json::Value = resp.into_json()?;
+    let mut out = String::new();
+    if let Some(results) = body.get("results").and_then(|r| r.as_array()) {
+        for r in results {
+            if let Some(url) = r.get("url").and_then(|u| u.as_str()) {
+                out.push_str(&format!("\n## {}\n", url));
+            }
+            if let Some(text) = r.get("raw_content").and_then(|t| t.as_str()) {
+                out.push_str(text);
+                out.push('\n');
+            }
+        }
+    }
+    if out.trim().is_empty() {
+        anyhow::bail!("extract returned no content");
+    }
+    Ok(out)
 }
 
 fn scrape_ddg(query: &str, limit: usize) -> Result<Vec<SerpItem>> {

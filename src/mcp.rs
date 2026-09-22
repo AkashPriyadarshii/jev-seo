@@ -196,6 +196,18 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
                             },
                             "required": ["domain"]
                         }
+                    },
+                    {
+                        "name": "seo_extract",
+                        "description": "Extract clean markdown from URLs via paid API (needs TAVILY_API_KEY), else error",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "urls": { "type": "array", "items": { "type": "string" } },
+                                "query": { "type": "string", "description": "Rerank intent" }
+                            },
+                            "required": ["urls", "query"]
+                        }
                     }
                 ]
             })),
@@ -334,7 +346,8 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         "seo_crawl" => {
             let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
             let max_pages = args.get("max_pages").and_then(|v| v.as_u64()).unwrap_or(crate::crawl::DEFAULT_MAX_PAGES as u64) as usize;
-            match crate::crawl::crawl_site(url, max_pages) {
+            let mut budget = crate::fetch::Budget::default();
+            match crate::crawl::crawl_site(url, max_pages, crate::fetch::FetchMode::Auto, &mut budget) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }
@@ -343,6 +356,18 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             let domain = args.get("domain").and_then(|v| v.as_str()).unwrap_or("");
             match crate::llms::check_llms(domain) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_extract" => {
+            let urls: Vec<String> = args
+                .get("urls")
+                .and_then(|v| v.as_array())
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+                .unwrap_or_default();
+            let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::serp::tavily_extract(&urls, query) {
+                Ok(md) => md,
                 Err(e) => format!("Error: {}", e),
             }
         }

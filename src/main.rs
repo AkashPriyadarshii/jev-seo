@@ -8,6 +8,8 @@ mod actions;
 mod brief;
 mod crawl;
 mod engine;
+mod fetch;
+mod gsc;
 mod llms;
 mod mcp;
 mod paths;
@@ -50,6 +52,12 @@ enum Commands {
         /// Search backend: auto, ddg, or tavily (paid, needs TAVILY_API_KEY)
         #[arg(long, default_value = "auto")]
         provider: String,
+        /// Paid search depth: basic, fast, ultra-fast, advanced
+        #[arg(long, default_value = "advanced")]
+        depth: String,
+        /// Paid search topic: general, news, finance
+        #[arg(long, default_value = "general")]
+        topic: String,
         #[arg(long)]
         json: bool,
     },
@@ -136,6 +144,12 @@ enum Commands {
         /// Maximum pages to fetch from this host
         #[arg(long, default_value_t = crate::crawl::DEFAULT_MAX_PAGES)]
         max_pages: usize,
+        /// Fetch backends: auto, direct, jina, firecrawl (paid, needs key)
+        #[arg(long, default_value = "auto")]
+        fetch: String,
+        /// Max paid fetch credits per run. 0 parks paid backends.
+        #[arg(long, default_value_t = 0)]
+        max_credits: u32,
         #[arg(long)]
         json: bool,
         /// Compare against the last stored snapshot in SQLite
@@ -157,6 +171,21 @@ enum Commands {
     },
     /// Check environment: version, API key presence, database, platform
     Doctor {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Google Search Console: free first-party query data (auth, sites, query)
+    Gsc {
+        /// Action: auth, sites, or query
+        op: String,
+        /// Device code for `auth --code`, site URL for `query`
+        #[arg(long)]
+        site: Option<String>,
+        /// Device code value for auth step 2
+        #[arg(long)]
+        code: Option<String>,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
         #[arg(long)]
         json: bool,
     },
@@ -191,14 +220,15 @@ fn main() -> Result<()> {
                 println!("  Suggested Next: jev-seo {}", policy::route_for_intent(&eval.intent));
             }
         }
-        Commands::Query { query, limit, provider, json } => {
+        Commands::Query { query, limit, provider, depth, topic, json } => {
             let backend = match provider.as_str() {
                 "ddg" => serp::Provider::Ddg,
                 "tavily" => serp::Provider::Tavily,
                 _ => serp::Provider::Auto,
             };
+            let opts = serp::SearchOpts { depth, topic, answer: false };
             eprintln!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
-            let items = serp::scrape_serp_with(&query, limit, backend)?;
+            let items = serp::scrape_serp_opts(&query, limit, backend, &opts)?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&items)?);
@@ -681,7 +711,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Crawl { url, max_pages, json, diff, csv, rescore } => {
+        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore } => {
             if let Some(path) = rescore {
                 let raw = std::fs::read_to_string(&path)?;
                 let saved: crawl::CrawlReport = serde_json::from_str(&raw)?;
@@ -707,7 +737,14 @@ fn main() -> Result<()> {
                 std::process::exit(2);
             });
             eprintln!("{}", format!("Crawling {} (max {} pages)...", url, max_pages).dimmed());
-            let report = crawl::crawl_site(&url, max_pages)?;
+            let mode = match fetch.as_str() {
+                "direct" => crate::fetch::FetchMode::Direct,
+                "jina" => crate::fetch::FetchMode::Jina,
+                "firecrawl" => crate::fetch::FetchMode::Firecrawl,
+                _ => crate::fetch::FetchMode::Auto,
+            };
+            let mut budget = crate::fetch::Budget { max_credits, spent: 0 };
+            let report = crawl::crawl_site(&url, max_pages, mode, &mut budget)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 return Ok(());
@@ -716,6 +753,13 @@ fn main() -> Result<()> {
             println!("\n{} {}", "Live Site Crawl:".cyan().bold(), report.start_url);
             println!("  Pages crawled: {}", report.pages_crawled);
             println!("  Health:        {}/100 ({})", report.score, crate::actions::grade(report.score).green().bold());
+            let upgraded = report.pages.iter().filter(|p| p.source != "direct").count();
+            if upgraded > 0 {
+                println!("  Upgraded:      {} pages via alt backends", upgraded.to_string().yellow());
+            }
+            if budget.spent > 0 {
+                println!("  Paid spend:    {} fetch credits", budget.spent.to_string().yellow());
+            }
             println!(
                 "  Areas:         {}",
                 report
@@ -867,6 +911,52 @@ fn main() -> Result<()> {
                 if key_set { "set (value hidden)".green().to_string() } else { "missing, Jev scores will skip".yellow().to_string() }
             );
             println!("  Database:      {}", if db_ok { "writable".green().to_string() } else { "ERROR".red().to_string() });
+        }
+        Commands::Gsc { op, site, code, limit, json } => {
+            match op.as_str() {
+                "auth" => {
+                    if let Some(device) = code {
+                        gsc::auth_poll(&device)?;
+                    } else {
+                        gsc::auth_start()?;
+                    }
+                }
+                "sites" => {
+                    let sites = gsc::sites()?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&sites)?);
+                    } else {
+                        println!("\n{}", "Verified sites:".cyan().bold());
+                        for s in &sites {
+                            println!("  - {}", s);
+                        }
+                    }
+                }
+                "query" => {
+                    let site = site.unwrap_or_else(|| {
+                        eprintln!("{}", "Error: query needs --site <verified URL>.".red());
+                        std::process::exit(2);
+                    });
+                    let rows = gsc::top_queries(&site, limit)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&rows)?);
+                    } else {
+                        println!("\n{} {}", "Top queries:".cyan().bold(), site.dimmed());
+                        for r in &rows {
+                            println!(
+                                "  {:<40} clicks {:>6.0} pos {:>5.1}",
+                                r.query.chars().take(40).collect::<String>(),
+                                r.clicks,
+                                r.position
+                            );
+                        }
+                    }
+                }
+                other => {
+                    eprintln!("{}", format!("Error: unknown gsc action '{}', use auth, sites, or query.", other).red());
+                    std::process::exit(2);
+                }
+            }
         }
         Commands::Mcp => {
             mcp::run_stdio_server()?;

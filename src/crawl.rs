@@ -31,6 +31,14 @@ pub struct PageRecord {
     pub bytes: usize,
     pub hops: Vec<(u16, String)>,
     pub encoding: Option<String>,
+    #[serde(default = "direct_source")]
+    pub source: String,
+    #[serde(default)]
+    pub fetch_cost: u32,
+}
+
+fn direct_source() -> String {
+    "direct".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -271,7 +279,12 @@ fn fetch_page(url: &str) -> Fetch {
     done(0, current, String::new(), 0, hops, None)
 }
 
-pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
+pub fn crawl_site(
+    start_url: &str,
+    max_pages: usize,
+    mode: crate::fetch::FetchMode,
+    budget: &mut crate::fetch::Budget,
+) -> Result<CrawlReport> {
     let start = crate::paths::reject_private_url(start_url)?;
     let start_clean = canonicalize(start.as_str());
     let t0 = Instant::now();
@@ -320,12 +333,16 @@ pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
     struct Done {
         url: String,
         fetch: Fetch,
+        source: &'static str,
+        cost: u32,
     }
 
     // Level-by-level parallel fetch: 8 workers per batch, cheap parse and
     // robots checks stay single-threaded. std only, no runtime dependency.
+    // One shared budget across batches so paid backends cannot overspend.
     const WORKERS: usize = 8;
     let cap = max_pages.max(1);
+    let budget_arc = std::sync::Arc::new(std::sync::Mutex::new(budget.clone()));
     while pages.len() < cap {
         let mut batch: Vec<String> = Vec::new();
         while batch.len() < WORKERS && pages.len() + batch.len() < cap {
@@ -359,9 +376,56 @@ pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
         std::thread::scope(|s| {
             for url in &batch {
                 let tx = tx.clone();
+                let budget_arc = budget_arc.clone();
                 s.spawn(move || {
-                    let fetch = fetch_page(url);
-                    let _ = tx.send(Done { url: url.clone(), fetch });
+                    let mut fetch = fetch_page(url);
+                    let mut source = "direct";
+                    let mut cost = 0u32;
+                    // Upgrade weak bodies only. Direct wins outright on good pages.
+                    if !matches!(mode, crate::fetch::FetchMode::Direct)
+                        && crate::fetch::quality(&fetch.body) < 0.4
+                    {
+                        if matches!(mode, crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Jina) {
+                            if let Ok(j) = crate::fetch::jina_fetch(url) {
+                                if crate::fetch::quality(&j.body) > crate::fetch::quality(&fetch.body) {
+                                    fetch.bytes = j.body.len();
+                                    fetch.body = j.body;
+                                    fetch.elapsed_ms += j.elapsed_ms;
+                                    source = j.source;
+                                    cost = j.cost;
+                                }
+                            }
+                        }
+                        if matches!(mode, crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Firecrawl) {
+                            // Debit under a short lock, fetch outside it.
+                            // Refund only when no call happened; billed calls stay billed.
+                            let debited = budget_arc
+                                .lock()
+                                .map(|mut b| b.allow(1))
+                                .unwrap_or(false);
+                            if debited {
+                                match crate::fetch::firecrawl_fetch(url) {
+                                    Ok(f) => {
+                                        if !f.body.trim().is_empty()
+                                            && crate::fetch::quality(&f.body) > crate::fetch::quality(&fetch.body)
+                                        {
+                                            fetch.bytes = f.body.len();
+                                            fetch.body = f.body;
+                                            fetch.elapsed_ms += f.elapsed_ms;
+                                            source = f.source;
+                                            cost = f.cost;
+                                        }
+                                    }
+                                    Err(_) => {
+                                        if let Ok(mut b) = budget_arc.lock() {
+                                            b.refund(1);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let _ = tx.send(Done { url: url.clone(), fetch, source, cost });
                 });
             }
         });
@@ -402,6 +466,8 @@ pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
                 bytes: f.bytes,
                 hops: f.hops,
                 encoding: f.encoding,
+                source: d.source.to_string(),
+                fetch_cost: d.cost,
             });
         }
         eprintln!("{} crawled {} pages", stamp(), pages.len());
@@ -409,6 +475,9 @@ pub fn crawl_site(start_url: &str, max_pages: usize) -> Result<CrawlReport> {
 
     inbound.entry(start_clean.clone()).or_insert(0);
     let capped = pages.len() >= cap && !queue.is_empty();
+    if let Ok(b) = budget_arc.lock() {
+        *budget = b.clone();
+    }
     Ok(finish_report(ReportParts {
         start_url: start_clean,
         pages,
