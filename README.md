@@ -217,7 +217,7 @@ Integrated into `jev-seo audit`:
 |---|---|---|
 | `keywords <query>` | Autocomplete discovery and Jev intent classification | `--json` |
 | `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--limit <n>`, `--provider auto\|ddg\|tavily`, `--json` |
-| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit, 50-rule findings | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--actions-csv <path>`, `--actions-xls <path>`, `--pairs-csv <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>`, `--rescore <path>` |
+| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit, 50-rule findings | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--actions-csv <path>`, `--pairs-csv <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>`, `--rescore <path>` |
 | `geo <target>` | Generative Engine Optimization citation scoring (1-10), composite dimensions, score trend | `--query <query>`, `--json`, `--jev-budget <usd>` |
 | `schema <target>` | Schema.org JSON-LD structural and deprecation validator | `--json` |
 | `robots <domain>` | Robots.txt and AI crawler permission auditor | `--json` |

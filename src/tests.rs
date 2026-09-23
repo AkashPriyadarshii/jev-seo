@@ -795,17 +795,13 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
-    fn test_action_tracker_csv_and_xml() {
-        use crate::actions::{to_csv, to_spreadsheet_xml, Action};
+    fn test_action_tracker_csv() {
+        use crate::actions::{to_csv, Action};
         let a = vec![Action::new("RULE-R19", 2, 2, "AI slop markers (2 hits)", "index.html, about.html".into())];
         let csv = to_csv(&a);
         assert!(csv.starts_with("id,priority,effort_band,impact,quick_win,title,evidence\n"));
         assert!(csv.contains("RULE-R19"));
         assert!(csv.contains("about a day"));
-        let xml = to_spreadsheet_xml(&a);
-        assert!(xml.contains("Excel.Sheet"));
-        assert!(xml.contains("RULE-R19"));
-        assert!(xml.contains("AI slop markers"));
     }
 
     #[test]
