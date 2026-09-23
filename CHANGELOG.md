@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `link` command: Jev Choice internal-link suggestions per audited page over pre-filtered destinations, with a `no_link` escape hatch.
+- Jev contract hardening: `insufficient_context` escape on intent and gap Choices, `QUESTION_VERSION` pinned in spend lines and the ledger, every fan-out appended to `~/.jev-seo/eval.jsonl` for re-evaluation, runner-up intent printed on Flag verdicts, closed `keep`/`rewrite`/`missing` meta-description verdict in the page suite.
+- GEO scoring fix: HTML inputs now score extracted body copy instead of head markup, one deduped state field, geo display gates on geo confidence only, resolved model build pinned in ledger and spend line.
+- Security hardening: MCP file tools canonicalize paths and refuse dot-directories and system trees, safety classifier fails closed on check errors, SSRF fails closed on DNS failure with decimal/hex/octal and IPv4-mapped IPv6 coverage, bounded crawl reads, spend line on stderr for clean `--json`.
+- Crawl truthfulness: text-based reader-upgrade gate, links always resolve from direct HTML, billed backends record even when direct copy wins, free-tier Jina excluded from paid lists, health blends measured areas only, orphans emit R25 with redirect-target inbound credit.
+- Audit precision: order-insensitive meta/canonical parsing, all-three OG tags required, empty alt accepted as decorative, leading heading jumps flagged, inline HTML headings in Markdown counted, code-stripped word counts, broken JSON-LD fires R33, opening size fires R24/R41.
+- Search honesty: unknown `--provider` values bail with the valid list, explicit Tavily warns like DFS, labels name the backend that actually served, rank prints the real top-N window, `brief --provider` passthrough, validated and capped `extract`.
+- Jev sample path: homepage judges first, Markdown excerpts send prose without frontmatter, drops print a note.
+- Test harness at 99 passing unit and integration tests with zero clippy warnings.
 - Designed PDF deck from one manifest: cover, scorecard with impact list, findings by area, page inventory, narrative, method appendix (`audit --pdf`).
 - PageSpeed vitals on `crawl --vitals`: keyless lab LCP/CLS/INP for the start URL with R51-R53 (slow LCP, layout shift, lab-only note); degrades cleanly offline.
 - Eval rigor: second-judge protocol, wording A/B log, and human-label sample tables in `docs/EVAL.md`; question-registry snapshot test fails on silent Jev wording edits.
@@ -48,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composite five-dimension GEO score, intent routing hints, and per-command speculative fan-out.
 - SERP relevance rerank with per-section confidence gating.
 - `audit --min-pass` CI gate with a GitHub Actions workflow, GEO score trend history, and home-directory database.
-- Test harness at 81 passing unit and integration tests with zero clippy warnings.
+- Test harness at 99 passing unit and integration tests with zero clippy warnings.
 - README rewritten for launch: What's new table, full command and MCP matrices, v0.1.2 date, build-from-source path. Ships as v0.1.2 on 2026-10-22.
 
 ## [0.1.1] - 2026-09-22

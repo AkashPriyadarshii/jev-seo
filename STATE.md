@@ -7,7 +7,11 @@
 - [x] W7 PageSpeed vitals: `crawl --vitals`, R51-R53, offline-safe degrade
 - [x] W8 eval rigor: second-judge protocol, wording A/B log, human-label table, registry snapshot test
 - [x] DFS opt-in: `query --provider dfs`, key-gated, free fallback
-- [x] 81 tests green, clippy `-D warnings` clean
+- [x] GEO state fix (`b577aa2`): body copy scoring, deduped state, geo-only gate, model pin
+- [x] Phase A security (`d6dc533`): MCP path guards, fail-closed safety/SSRF, bounded reads, stderr spend
+- [x] Phase A-addition (`6f12e54`): escapes, question versioning, eval log, runner-up flags, `link`, meta verdict
+- [x] Phase B truthfulness (`98c7bfb`): upgrade math, spend truth, rank labels, audit precision, provider honesty, R25/R33/R24/R41
+- [x] 99 tests green, clippy clean
 
 ### Shipped on master (local + pushed docs)
 - [x] Phase 0-4 skeleton, modules, crawl, llms, doctor, HTML reports (v0.1.1 on crates.io)
@@ -19,7 +23,7 @@
 - [x] W4 pair cannibalization A×B, MCP `seo_explain`/`seo_report` (13 tools), README matrices
 - [x] W5 single PDF builder, drop SpreadsheetML, drop launch DESIGN.md, reword session commits
 - [x] README launch rewrite (What's new, full matrices, 22 Oct date, build-from-source)
-- [x] 81 tests green, clippy `-D warnings` clean
+- [x] 99 tests green, clippy clean
 
 ### Review fixes (two subagent passes, same session)
 - [x] Aligned display windows to rule windows (title 30-60, desc 120-160)
@@ -42,3 +46,13 @@
 - [ ] Thin `src/main.rs`: extract printing to `src/view.rs`
 - [ ] One central fetch helper with body caps and redirect revalidation
 - [ ] Abstract HTTP and Jev behind traits for hermetic tests
+
+## Post-22-Oct Backlog (Phase C polish, after v0.1.2 ships)
+- [ ] Robots bot list refresh: Claude-User, Claude-SearchBot, Perplexity-User, Meta-ExternalAgent, Applebot-Extended, DuckAssistBot, YouBot, Cohere-ai, MistralAI-User, amazonbot, Grok; wildcard and longest-match evaluation
+- [ ] Sitemap index support, 50MB limit check, malformed-XML errors
+- [ ] Schema array `@context`/`@type` handling, HowTo deprecation correction
+- [ ] Doctor reports all keys (Tavily, DataForSEO, Jina, Firecrawl, GSC)
+- [ ] Rank DB hardening: corrupt recovery, migration, busy timeout, first-run vs dropped-out
+- [ ] GSC actionable errors (expired grant hints), INP rule, R03/R49 dedup
+- [ ] Audit/crawl scoring parity, MCP schema bounds and error framing, brief outline upgrades
+- [ ] Eval-log sampler command, `link` MCP tool
