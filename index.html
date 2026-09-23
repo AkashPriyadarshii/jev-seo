@@ -164,6 +164,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <div class="bench-row"><i class="bench-check"></i><code>jev-seo query "jev seo"</code><span class="bench-cap">competitor radar + rerank</span></div>
         <div class="bench-row"><i class="bench-check"></i><code>jev-seo rank --domain jevseo.vercel.app --query "jev seo"</code><span class="bench-cap">baseline in local SQLite</span></div>
         <div class="bench-row"><i class="bench-check"></i><code>jev-seo mcp</code><span class="bench-cap">stdio server into your agent</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo explain R19</code><span class="bench-cap">rule card: area, severity, effort, fix</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo report --baseline</code><span class="bench-cap">score delta between two audits</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo gsc query --site</code><span class="bench-cap">Search Console clicks, free</span></div>
       </div>
     </div>
   </section>
@@ -190,7 +193,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="whyspec">
         <p class="whyspec-no">04</p>
         <h3>Agent native</h3>
-        <p>A stdio JSON-RPC 2.0 MCP server feeds the same 10 tools into Claude Code, Gemini CLI, and Antigravity. SEO as a capability, not a dashboard.</p>
+        <p>A stdio JSON-RPC 2.0 MCP server feeds the same 13 tools into Claude Code, Gemini CLI, and Antigravity. SEO as a capability, not a dashboard.</p>
       </div>
     </div>
   </section>
@@ -209,19 +212,24 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="cmd"><code>jev-seo sitemap sitemap.xml</code><span class="cmd-cap">50,000 URL limit, HTTPS canonical, hreflang en-GB not en-UK, x-default</span></div>
       <div class="cmd"><code>jev-seo keywords "scraper"</code><span class="cmd-cap">autocomplete discovery + Jev intent classification</span></div>
       <div class="cmd"><code>jev-seo rank --domain crates.io --query "rust grep"</code><span class="cmd-cap">rank drift tracked in local SQLite over time</span></div>
-      <div class="cmd"><code>jev-seo mcp</code><span class="cmd-cap">stdio MCP server → the 10 tools, straight into your coding agent</span></div>
+      <div class="cmd"><code>jev-seo mcp</code><span class="cmd-cap">stdio MCP server → the 13 tools, straight into your coding agent</span></div>
       <div class="cmd"><code>jev-seo crawl example.com --max-pages 50</code><span class="cmd-cap">parallel live crawl: health score, broken links, redirect chains, orphans, timing</span></div>
       <div class="cmd"><code>jev-seo llms example.com</code><span class="cmd-cap">llms.txt plus AI crawler scoring for answer-engine readiness</span></div>
       <div class="cmd"><code>jev-seo doctor</code><span class="cmd-cap">version, API key presence, database, platform in one check</span></div>
     </div>
   </section>
 
-  <!-- ============ SEE IT RUN (v0.1.1) ============ -->
+  <!-- ============ SEE IT RUN ============ -->
   <section class="seen" id="seen">
     <h2 class="h2">Seen on a real run</h2>
-    <p class="lede">v0.1.1 output. Health score with grades, impact-ranked actions, completeness notes.</p>
-    <figure style="margin:1.5rem 0"><img src="docs/assets/terminal.png" alt="jev-seo live crawl output with health score and ranked actions" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
-    <figure style="margin:1.5rem 0"><img src="docs/assets/report.png" alt="jev-seo HTML audit report with grade scorecard" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <p class="lede">Health score with grades, impact-ranked actions, completeness notes. Scorecard, crawl session, action tracker, MCP surface.</p>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-summary.png" alt="jev-seo HTML audit scorecard, page table, and ranked findings" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-terminal.png" alt="jev-seo live crawl output with health score and ranked actions" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-actions.png" alt="jev-seo ranked action tracker with priority, impact, effort, quick-win flags" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-explain.png" alt="jev-seo explain rule card and report baseline score delta" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-mcp.png" alt="jev-seo MCP tools grid and client config block" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/trust-strip.png" alt="jev-seo trust strip: 72 tests, 50 rules, 13 MCP tools, fast cold start, MIT, zero subscriptions" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/cost-ladder.png" alt="jev-seo cost ladder: free path, capped Jev spend, opt-in paid backends, versus monthly SaaS seat" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
   </section>
 
   <!-- ============ ORACLE ============ -->
@@ -335,7 +343,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <p class="install-1"><span class="dim"># 1 — install (crates.io)</span><br><span class="ink-g">$</span> cargo install jev-seo</p>
       <p class="install-2"><span class="dim"># 2 — free oracle key for semantic scoring</span><br><span class="ink-g">$</span> export TYPESAFE_API_KEY=your_key_here</p>
     </div>
-    <p class="install-note">No credit card. No hosted dashboard. No telemetry. One binary, one local SQLite file, 30MB of RAM. v0.1.1 adds live-site crawl, llms.txt readiness, ranked fix actions, and HTML/PDF/Markdown reports.</p>
+    <p class="install-note">No credit card. No hosted dashboard. No telemetry. One binary, one local SQLite file, 30MB of RAM. v0.1.1 adds live-site crawl, llms.txt readiness, ranked fix actions, and HTML/PDF/Markdown reports. v0.1.2 (22 Oct 2026) adds explain, baseline diffs, action trackers, and MCP report tools.</p>
     <div class="install-cta">
       <a class="btn-primary" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">clone on github ↗</a>
       <a class="btn-ghost" href="https://crates.io/crates/jev-seo" target="_blank" rel="noopener">crates.io</a>
