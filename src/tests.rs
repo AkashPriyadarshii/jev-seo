@@ -295,6 +295,7 @@ Sitemap: https://example.com/sitemap.xml
             internal_links: 0,
             external_links: 0,
             schema_found: false,
+            schema_json_valid: true,
             canonical_found: false,
             og_tags_found: false,
             geo_opening_words: 0,
@@ -729,8 +730,8 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
         let pages = vec![
-            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0 },
-            PageRecord { url: "https://x.test/dead".into(), status: 404, final_url: "https://x.test/dead".into(), outlinks: 0, elapsed_ms: 50, bytes: 0, hops: vec![], encoding: None, source: "direct".into(), fetch_cost: 0 },
+            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
+            PageRecord { url: "https://x.test/dead".into(), status: 404, final_url: "https://x.test/dead".into(), outlinks: 0, elapsed_ms: 50, bytes: 0, hops: vec![], encoding: None, source: "direct".into(), fetch_cost: 0, upgraded: false },
         ];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
@@ -755,7 +756,7 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
         let pages = vec![
-            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0 },
+            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
         ];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
@@ -1038,7 +1039,7 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
         let pages = vec![
-            PageRecord { url: "https://x.test/loop".into(), status: 0, final_url: "https://x.test/loop".into(), outlinks: 0, elapsed_ms: 5, bytes: 0, hops: vec![(301, "https://x.test/loop".into()); 6], encoding: None, source: "direct".into(), fetch_cost: 0 },
+            PageRecord { url: "https://x.test/loop".into(), status: 0, final_url: "https://x.test/loop".into(), outlinks: 0, elapsed_ms: 5, bytes: 0, hops: vec![(301, "https://x.test/loop".into()); 6], encoding: None, source: "direct".into(), fetch_cost: 0, upgraded: false },
         ];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
@@ -1197,6 +1198,110 @@ Sitemap: https://example.com/sitemap.xml
             .unwrap();
         assert_eq!(intent_runner_up(&extra).as_deref(), Some("navigational (0.40)"));
         assert!(intent_runner_up(&serde_json::Map::new()).is_none());
+    }
+
+    #[test]
+    fn test_body_words_counts_text_not_markup() {
+        use crate::crawl::body_words;
+        let html = "<html><head><title>T</title><script>var x = 1;</script></head><body><p>Hello brave new world of testing</p></body></html>";
+        assert_eq!(body_words(html), 6);
+        assert_eq!(body_words(""), 0);
+    }
+
+    #[test]
+    fn test_effective_limit_clamps_paid_to_20() {
+        use crate::serp::{effective_limit, Provider};
+        assert_eq!(effective_limit(Provider::Tavily, 30), 20);
+        assert_eq!(effective_limit(Provider::Dfs, 30), 20);
+        assert_eq!(effective_limit(Provider::Ddg, 30), 30);
+        assert_eq!(effective_limit(Provider::Tavily, 5), 5);
+    }
+
+    #[test]
+    fn test_tavily_extract_validates_before_key() {
+        use crate::serp::tavily_extract;
+        assert!(tavily_extract(&[], "q").is_err());
+        assert!(tavily_extract(&["https://x.test".into()], "  ").is_err());
+        let many: Vec<String> = (0..11).map(|i| format!("https://x.test/{i}")).collect();
+        assert!(tavily_extract(&many, "q").is_err());
+    }
+
+    #[test]
+    fn test_html_attr_order_insensitive_and_og_needs_all_three() {
+        use crate::audit::audit_file;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p.html");
+        std::fs::write(
+            &path,
+            "<html><head><title>Order Test Title Here For Length Check OK</title>\
+            <meta content=\"A description long enough to pass the one hundred twenty char minimum for meta descriptions yes.\" name=\"description\">\
+            <meta property=\"og:title\" content=\"T\"></head><body><h1>H</h1><p>Body copy.</p></body></html>",
+        )
+        .unwrap();
+        let rep = audit_file(path.to_str().unwrap()).unwrap();
+        assert!(rep.description.is_some(), "reversed meta attrs must parse");
+        assert!(!rep.og_tags_found, "one og tag must not pass");
+        assert_eq!(rep.images_missing_alt, 0);
+    }
+
+    #[test]
+    fn test_empty_alt_is_decorative_not_missing() {
+        use crate::audit::audit_file;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("p.html");
+        std::fs::write(
+            &path,
+            "<html><head><title>Alt Test Title Here For Length Check OK</title></head>\
+            <body><h1>H</h1><img src=\"a.png\" alt=\"\"><img src=\"b.png\"></body></html>",
+        )
+        .unwrap();
+        let rep = audit_file(path.to_str().unwrap()).unwrap();
+        assert_eq!(rep.image_count, 2);
+        assert_eq!(rep.images_missing_alt, 1, "only the alt-less img counts");
+    }
+
+    #[test]
+    fn test_broken_jsonld_fails_r33_and_short_lede_fails_r24() {
+        use crate::audit::{audit_file, audit_path};
+        use crate::rules::check_audit;
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("p.html"),
+            "<html><head><title>Broken LD Title Here For Length Check OK</title></head>\
+            <body><h1>H</h1><p>Short lede.</p><script type=\"application/ld+json\">{\"@type\": }</script></body></html>",
+        )
+        .unwrap();
+        let file_rep = audit_file(dir.path().join("p.html").to_str().unwrap()).unwrap();
+        assert!(!file_rep.schema_json_valid);
+        let dir_rep = audit_path(dir.path().to_str().unwrap()).unwrap();
+        let findings = check_audit(&dir_rep);
+        assert!(findings.iter().any(|f| f.rule_id == "R33"), "invalid JSON-LD must fire R33");
+        assert!(findings.iter().any(|f| f.rule_id == "R24"), "short lede must fire R24");
+    }
+
+    #[test]
+    fn test_orphan_emits_r25_and_links_area_scores() {
+        use crate::crawl::{finish_report, PageRecord, ReportParts};
+        use std::collections::HashMap;
+        let pages = vec![
+            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
+            PageRecord { url: "https://x.test/orph".into(), status: 200, final_url: "https://x.test/orph".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
+        ];
+        let rep = finish_report(ReportParts {
+            start_url: "https://x.test/".into(),
+            pages,
+            redirects: vec![],
+            inbound: HashMap::new(),
+            errors: vec![],
+            seeded_from_sitemap: true,
+            capped: false,
+            robots_honored: true,
+            vitals: None,
+        });
+        assert_eq!(rep.orphans, vec!["https://x.test/orph".to_string()]);
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R25"), "orphans must emit R25");
+        assert!(rep.areas.iter().any(|a| a.area == crate::rules::Area::Links), "Links must score when R25 fires");
+        assert!(!rep.areas.iter().any(|a| a.area == crate::rules::Area::OnPage), "phantom OnPage must stay out");
     }
 
     #[test]

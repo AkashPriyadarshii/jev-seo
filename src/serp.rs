@@ -35,7 +35,7 @@ pub fn get_autocomplete(query: &str) -> Result<Vec<String>> {
     Ok(vec![])
 }
 
-pub fn scrape_serp(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
+pub fn scrape_serp(query: &str, limit: usize) -> Result<(Vec<SerpItem>, Provider)> {
     scrape_serp_with(query, limit, Provider::Auto)
 }
 
@@ -66,7 +66,7 @@ pub fn select_provider(want: Provider) -> Provider {
     }
 }
 
-pub fn scrape_serp_with(query: &str, limit: usize, want: Provider) -> Result<Vec<SerpItem>> {
+pub fn scrape_serp_with(query: &str, limit: usize, want: Provider) -> Result<(Vec<SerpItem>, Provider)> {
     scrape_serp_opts(query, limit, want, &SearchOpts::default())
 }
 
@@ -84,23 +84,32 @@ impl Default for SearchOpts {
     }
 }
 
-pub fn scrape_serp_opts(query: &str, limit: usize, want: Provider, opts: &SearchOpts) -> Result<Vec<SerpItem>> {
+/// Paid APIs clamp to 20 results; the served depth labels rank windows
+/// honestly instead of claiming a top-30 over 20 rows.
+pub fn effective_limit(served: Provider, limit: usize) -> usize {
+    match served {
+        Provider::Tavily | Provider::Dfs => limit.min(20),
+        Provider::Auto | Provider::Ddg => limit,
+    }
+}
+
+pub fn scrape_serp_opts(query: &str, limit: usize, want: Provider, opts: &SearchOpts) -> Result<(Vec<SerpItem>, Provider)> {
     match select_provider(want) {
         Provider::Tavily => match tavily_search_with(query, limit, opts) {
-            Ok(items) => Ok(items),
+            Ok(items) => Ok((items, Provider::Tavily)),
             Err(e) => {
                 eprintln!("[jev-seo] paid search failed ({}); falling back to free scrape", e);
-                scrape_ddg(query, limit)
+                Ok((scrape_ddg(query, limit)?, Provider::Ddg))
             }
         },
         Provider::Dfs => match dfs_search_with(query, limit) {
-            Ok(items) => Ok(items),
+            Ok(items) => Ok((items, Provider::Dfs)),
             Err(e) => {
                 eprintln!("[jev-seo] DataForSEO failed ({}); falling back to free scrape", e);
-                scrape_ddg(query, limit)
+                Ok((scrape_ddg(query, limit)?, Provider::Ddg))
             }
         },
-        Provider::Ddg | Provider::Auto => scrape_ddg(query, limit),
+        Provider::Ddg | Provider::Auto => Ok((scrape_ddg(query, limit)?, Provider::Ddg)),
     }
 }
 
@@ -276,8 +285,20 @@ fn base64_basic(s: &str) -> String {
 }
 
 /// Tavily /extract: URLs to clean markdown with query rerank.
-/// Returns None without a key so callers fall back silently.
-pub fn tavily_extract(urls: &[String], query: &str) -> Result<String> {    let key = std::env::var("TAVILY_API_KEY")
+/// Validates inputs and caps output; callers (CLI and MCP) share this gate.
+pub fn tavily_extract(urls: &[String], query: &str) -> Result<String> {
+    const MAX_URLS: usize = 10;
+    const MAX_CHARS: usize = 20000;
+    if urls.is_empty() {
+        anyhow::bail!("extract needs at least one URL");
+    }
+    if query.trim().is_empty() {
+        anyhow::bail!("extract needs a non-empty query");
+    }
+    if urls.len() > MAX_URLS {
+        anyhow::bail!("extract takes at most {MAX_URLS} URLs (got {})", urls.len());
+    }
+    let key = std::env::var("TAVILY_API_KEY")
         .ok()
         .filter(|k| !k.trim().is_empty())
         .context("TAVILY_API_KEY not set")?;
@@ -312,16 +333,25 @@ pub fn tavily_extract(urls: &[String], query: &str) -> Result<String> {    let k
             if let Some(url) = r.get("url").and_then(|u| u.as_str()) {
                 out.push_str(&format!("\n## {}\n", url));
             }
-            if let Some(text) = r.get("raw_content").and_then(|t| t.as_str()) {
+            // Prefer rendered content, fall back to raw when the API only
+            // returns one of the two.
+            if let Some(text) = r
+                .get("content")
+                .or_else(|| r.get("raw_content"))
+                .and_then(|t| t.as_str())
+            {
                 out.push_str(text);
                 out.push('\n');
+            }
+            if out.len() >= MAX_CHARS {
+                break;
             }
         }
     }
     if out.trim().is_empty() {
         anyhow::bail!("extract returned no content");
     }
-    Ok(out)
+    Ok(out.chars().take(MAX_CHARS).collect())
 }
 
 fn scrape_ddg(query: &str, limit: usize) -> Result<Vec<SerpItem>> {

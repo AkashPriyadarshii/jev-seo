@@ -289,7 +289,7 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
             let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
             match crate::serp::scrape_serp(q, limit) {
-                Ok(items) => serde_json::to_string_pretty(&items).unwrap_or_default(),
+                Ok((items, _)) => serde_json::to_string_pretty(&items).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }
         }

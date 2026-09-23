@@ -371,6 +371,9 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
             ));
         }
     }
+    for o in &rep.orphans {
+        out.push(mk("R25", o.clone(), "0 inbound links".into()));
+    }
     for (from, to) in &rep.redirects {
         out.push(mk("R03", from.clone(), format!("-> {}", to)));
     }
@@ -433,7 +436,9 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
                 format!("{} em-dashes, {}", r.em_dash_count, r.ai_slop_words_found.join(", ")),
             ));
         }
-        if r.word_count > 0 && r.em_dash_count * 500 / r.word_count.max(1) > 2 {
+        if r.word_count > 0
+            && (r.em_dash_count as f64) * 500.0 / (r.word_count.max(1) as f64) > 2.0
+        {
             out.push(mk("R20", scope.clone(), format!("{} em-dashes", r.em_dash_count)));
         }
         if r.internal_links == 0 && r.external_links == 0 {
@@ -441,12 +446,21 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
         }
         if !r.schema_found {
             out.push(mk("R31", scope.clone(), "no JSON-LD".into()));
+        } else if !r.schema_json_valid {
+            out.push(mk("R33", scope.clone(), "ld+json block fails to parse".into()));
         }
         if !r.canonical_found {
             out.push(mk("R36", scope.clone(), "no canonical".into()));
         }
         if !r.og_tags_found {
             out.push(mk("R35", scope.clone(), "no Open Graph tags".into()));
+        }
+        // GEO window lives on the same opening count as the display badge:
+        // thin ledes cannot answer (R24), bloated ones dilute it (R41).
+        if r.geo_opening_words < crate::audit::GEO_MIN_WORDS {
+            out.push(mk("R24", scope.clone(), format!("opening {} words", r.geo_opening_words)));
+        } else if r.geo_opening_words > crate::audit::GEO_MAX_WORDS {
+            out.push(mk("R41", scope.clone(), format!("opening {} words", r.geo_opening_words)));
         }
     }
     for (title, files) in &rep.duplicate_titles {
