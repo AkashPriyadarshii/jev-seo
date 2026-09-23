@@ -78,6 +78,10 @@ pub struct Ledger {
     pub jev_cost_usd: f64,
     pub jev_budget_usd: f64,
     pub jev_skipped_budget: u32,
+    /// Resolved model build that served (jev-latest is an alias; thresholds
+    /// couple to the versioned build). Unknown when no Jev call ran.
+    #[serde(default)]
+    pub jev_model: String,
     pub fetch_credits_spent: u32,
     pub fetch_credit_cap: u32,
     pub paid_backends_used: Vec<String>,
@@ -97,6 +101,7 @@ impl Ledger {
             jev_cost_usd: jev_cost_usd(JEV_INPUT_TOKENS.load(Ordering::Relaxed)),
             jev_budget_usd: jev_budget_usd(),
             jev_skipped_budget: jev_budget_skip_count(),
+            jev_model: crate::engine::jev_model().to_string(),
             fetch_credits_spent: 0,
             fetch_credit_cap: 0,
             paid_backends_used: Vec::new(),

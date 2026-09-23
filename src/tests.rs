@@ -1163,4 +1163,40 @@ Sitemap: https://example.com/sitemap.xml
         let prev = store.record_crawl_snapshot("https://example.com", 12, 0).unwrap().unwrap();
         assert_eq!(prev, (10, 1));
     }
+
+    #[test]
+    fn test_readable_text_scores_body_copy_not_head_markup() {
+        use crate::fetch::readable_text;
+        let html = "<!DOCTYPE html><html><head><title>Some Tool</title>\
+            <meta name=\"description\" content=\"meta words here\">\
+            <script>var tracking = {key: \"secret-beacon\", pixels: [1,2,3]};</script>\
+            <style>.nav{display:none}</style></head>\
+            <body><nav>Home Products Pricing Login</nav>\
+            <main><h1>Agent readiness checker</h1>\
+            <p>Paste any public URL and get a 0-100 agent readiness score with 118 evidence checks.</p></main>\
+            <footer>Copyright 2026</footer></body></html>";
+        let text = readable_text(html, 6000);
+        assert!(text.contains("Agent readiness checker"), "{text}");
+        assert!(text.contains("118 evidence checks"), "{text}");
+        assert!(!text.contains("secret-beacon"), "script body leaked: {text}");
+        assert!(!text.contains("meta words here"), "head markup leaked: {text}");
+        assert!(!text.contains('<'), "raw tags leaked: {text}");
+    }
+
+    #[test]
+    fn test_readable_text_caps_at_limit() {
+        use crate::fetch::readable_text;
+        let text = readable_text("<body><p>word word word</p></body>", 10);
+        assert!(text.chars().count() <= 10, "{text}");
+        assert!(text.contains("word"), "{text}");
+    }
+
+    #[test]
+    fn test_page_state_has_single_text_field() {
+        use crate::engine::page_state;
+        let state = page_state("q", Some("t".into()), None, "body copy".into(), 2);
+        assert!(state.get("content").is_none(), "duplicated content key: {state}");
+        assert_eq!(state["page"]["text"], "body copy");
+        assert_eq!(state["query"], "q");
+    }
 }

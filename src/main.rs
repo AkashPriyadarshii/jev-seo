@@ -809,19 +809,24 @@ fn main() -> Result<()> {
             }
         }
         Commands::Geo { target, query, json, jev_budget: _ } => {
-            let content = match crate::paths::read_user_file(&target, &["md", "mdx", "markdown", "html", "htm", "txt"]) {
+            let raw = match crate::paths::read_user_file(&target, &["md", "mdx", "markdown", "html", "htm", "txt"]) {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("{}", format!("Error: {e:#}").red());
                     return Ok(());
                 }
             };
+            // HTML files score body copy, never head markup. Plain text and
+            // markdown are already clean; both cap at 6k chars of signal.
+            let lower = target.to_ascii_lowercase();
+            let text = if lower.ends_with(".html") || lower.ends_with(".htm") {
+                crate::fetch::readable_text(&raw, 6000)
+            } else {
+                raw.chars().take(6000).collect::<String>()
+            };
             if let Some(client) = engine::JevClient::new() {
-                let state = json!({
-                    "query": query,
-                    "content": content,
-                    "page": { "text": content.chars().take(8000).collect::<String>(), "title": target }
-                });
+                let wc = text.split_whitespace().count();
+                let state = engine::page_state(&query, Some(target.clone()), None, text, wc);
                 match client.judge_page(state) {
                     Ok(eval) => {
                         if policy::injection_blocked(&eval.extra) {
@@ -829,9 +834,11 @@ fn main() -> Result<()> {
                             print_jev_spend_line();
                             return Ok(());
                         }
-                        let v = policy::gate("geo", eval.confidence());
+                        // Geo display gates on geo confidence only: a navigational
+                        // homepage must not veto its own citation score.
+                        let v = policy::gate("geo", eval.geo_confidence);
                         if v == policy::Verdict::Drop {
-                            eprintln!("{}", format!("Jev unsure (confidence {:.2}), no score.", eval.confidence()).yellow());
+                            eprintln!("{}", format!("Jev unsure (confidence {:.2}), no score.", eval.geo_confidence).yellow());
                             print_jev_spend_line();
                             return Ok(());
                         }
@@ -1587,15 +1594,17 @@ fn merge_extras(a: serde_json::Value, b: serde_json::Value) -> serde_json::Value
 }
 
 fn excerpt_local(path: &str) -> String {
-    std::fs::read_to_string(path)
-        .map(|s| {
-            let cleaned: String = s
-                .chars()
-                .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
-                .collect();
-            cleaned.chars().take(8000).collect()
-        })
-        .unwrap_or_default()
+    let raw = std::fs::read_to_string(path).unwrap_or_default();
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+        .collect();
+    let lower = path.to_ascii_lowercase();
+    if lower.ends_with(".html") || lower.ends_with(".htm") {
+        crate::fetch::readable_text(&cleaned, 6000)
+    } else {
+        cleaned.chars().take(6000).collect()
+    }
 }
 
 /// Speculative Jev page suite on the largest audit files. One fan-out per page.
@@ -1617,18 +1626,15 @@ fn judge_audit_sample(
         if content.trim().is_empty() {
             continue;
         }
-        let mut state = serde_json::json!({
-            "target_query": target_query.unwrap_or(""),
-            "page": {
-                "title": report.title,
-                "description": report.description,
-                "text": content,
-                "word_count": report.word_count,
-                "checks": report.checks,
-            }
-        });
+        let mut state = engine::page_state(
+            target_query.unwrap_or(""),
+            report.title.clone(),
+            report.description.clone(),
+            content,
+            report.word_count,
+        );
         if let Some(obj) = state.as_object_mut() {
-            obj.insert("content".into(), serde_json::Value::String(content.clone()));
+            obj.insert("checks".into(), serde_json::to_value(&report.checks).unwrap_or_default());
             if let Some(q) = target_query {
                 obj.insert("query".into(), serde_json::Value::String(q.to_string()));
             }
@@ -1758,8 +1764,8 @@ fn print_jev_spend_line() {
     let cost = manifest::jev_cost_usd(toks);
     if reqs > 0 {
         println!(
-            "  Jev spend:      {} request(s), {} input tokens, ${:.6}",
-            reqs, toks, cost
+            "  Jev spend:      {} request(s), {} input tokens, ${:.6} [{}]",
+            reqs, toks, cost, engine::jev_model()
         );
     }
 }
@@ -1783,17 +1789,15 @@ fn judge_crawl_site(start_url: &str) -> Option<engine::AnalysisResult> {
     std::fs::write(&tmp, &body).ok()?;
     let report = audit::audit_file(tmp.to_str()?).ok();
     let _ = std::fs::remove_file(&tmp);
-    let text: String = body.chars().take(8000).collect();
-    let state = serde_json::json!({
-        "query": start_url,
-        "content": text,
-        "page": {
-            "title": report.as_ref().and_then(|r| r.title.clone()),
-            "description": report.as_ref().and_then(|r| r.description.clone()),
-            "text": text,
-            "word_count": report.as_ref().map(|r| r.word_count).unwrap_or(0),
-        }
-    });
+    let text: String = crate::fetch::readable_text(&body, 6000);
+    let wc = text.split_whitespace().count();
+    let state = engine::page_state(
+        start_url,
+        report.as_ref().and_then(|r| r.title.clone()),
+        report.as_ref().and_then(|r| r.description.clone()),
+        text,
+        report.as_ref().map(|r| r.word_count).unwrap_or(wc),
+    );
     match client.judge_site(state) {
         Ok(eval) => Some(eval),
         Err(e) => {

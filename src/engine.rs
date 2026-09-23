@@ -33,6 +33,27 @@ impl AnalysisResult {
     }
 }
 
+/// Single deduped page state: one text field only. The old `content` +
+/// `page.text` duplication sent the same head markup twice and halved useful
+/// context; callers build state through this and add only small extras.
+pub fn page_state(
+    query: &str,
+    title: Option<String>,
+    description: Option<String>,
+    text: String,
+    word_count: usize,
+) -> serde_json::Value {
+    json!({
+        "query": query,
+        "page": {
+            "title": title,
+            "description": description,
+            "text": text,
+            "word_count": word_count
+        }
+    })
+}
+
 impl JevClient {
     pub fn new() -> Option<Self> {
         let key = std::env::var("TYPESAFE_API_KEY").ok()?;
@@ -191,7 +212,10 @@ impl JevClient {
         let geo_val = geo_obj["score"]
             .as_f64()
             .context("Jev response missing answers.geo_score.score")?;
-        let geo_confidence = geo_obj["confidence"].as_f64().unwrap_or(0.0);
+        // Score/Choice always carry confidence per the API; a missing value is
+        // unknown, not zero. 0.5 lands in Flag so it prints [verify] and
+        // needs_review surfaces it, instead of forcing a Drop.
+        let geo_confidence = geo_obj["confidence"].as_f64().unwrap_or(0.5);
         let geo_score = ((geo_val / 4.0 * 9.0) + 1.0).round().clamp(1.0, 10.0) as u32;
 
         let direct_obj = &answers["direct_answer"];
@@ -206,7 +230,7 @@ impl JevClient {
             .as_str()
             .context("Jev response missing answers.content_gap.choice")?
             .to_string();
-        let gap_confidence = gap_obj["confidence"].as_f64().unwrap_or(0.0);
+        let gap_confidence = gap_obj["confidence"].as_f64().unwrap_or(0.5);
 
         Ok(AnalysisResult {
             intent,
@@ -237,7 +261,7 @@ impl JevClient {
     pub fn injection_preflight(&self, state: &serde_json::Value) -> Result<bool> {
         let payload = json!({
             "model": MODEL,
-            "state": prefilter_state(state.clone()),
+            "state": truncate_state(prefilter_state(state.clone())),
             "questions": crate::policy::injection_question()
         });
         let body: serde_json::Value = self.post(payload)?.into_json()?;
@@ -359,6 +383,14 @@ fn prefilter_state(value: serde_json::Value) -> serde_json::Value {
 }
 
 /// Fold API usage into the run ledger (input tokens drive cost at list price).
+/// Also pins the resolved model version: thresholds couple to one model's
+/// distribution, so the ledger records which build actually served.
+pub static JEV_MODEL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+pub fn jev_model() -> &'static str {
+    JEV_MODEL.get().map(String::as_str).unwrap_or("unknown")
+}
+
 fn record_usage(body: &serde_json::Value) {
     let usage = match body.get("usage") {
         Some(u) if u.is_object() => u.clone(),
@@ -366,6 +398,9 @@ fn record_usage(body: &serde_json::Value) {
     };
     if let Some(t) = usage.get("input_tokens").and_then(|t| t.as_u64()) {
         crate::manifest::JEV_INPUT_TOKENS.fetch_add(t, Ordering::Relaxed);
+    }
+    if let Some(m) = body.get("model").and_then(|m| m.as_str()) {
+        let _ = JEV_MODEL.set(m.to_string());
     }
 }
 

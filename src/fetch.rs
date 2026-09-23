@@ -87,6 +87,62 @@ pub fn quality(body: &str) -> f64 {
     q.min(1.0)
 }
 
+/// Visible body copy for Jev state. Head-first raw markup scored markup, not
+/// copy, so this strips scripts/styles, drops tags, and returns collapsed
+/// body text capped at `limit` chars. Non-HTML input passes through to the cap.
+pub fn readable_text(html: &str, limit: usize) -> String {
+    let lower = html.to_ascii_lowercase();
+    let mut src = html;
+    if let Some(start) = lower.find("<body") {
+        let from = start + "<body".len();
+        if let Some(end_tag) = html[from..].find('>') {
+            src = &html[from + end_tag + 1..];
+        }
+    }
+    if let Some(end) = src.to_ascii_lowercase().find("</body>") {
+        src = &src[..end];
+    }
+    let mut out = src.to_string();
+    for tag in ["script", "style", "svg", "noscript"] {
+        loop {
+            let low = out.to_ascii_lowercase();
+            let open = match low.find(&format!("<{tag}")) {
+                Some(i) => i,
+                None => break,
+            };
+            let close_tag = format!("</{tag}>");
+            let rest = &low[open..];
+            let cut = match rest.find(&close_tag) {
+                Some(i) => open + i + close_tag.len(),
+                None => out.len(),
+            };
+            out.replace_range(open..cut.min(out.len()), " ");
+        }
+    }
+    let mut text = String::with_capacity(out.len());
+    let mut in_tag = false;
+    for c in out.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => {
+                in_tag = false;
+                text.push(' ');
+            }
+            _ if !in_tag => text.push(c),
+            _ => {}
+        }
+    }
+    let text = text
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'");
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    collapsed.chars().take(limit).collect()
+}
+
 fn jina_key() -> Option<String> {
     std::env::var("JINA_API_KEY").ok().filter(|k| !k.trim().is_empty())
 }

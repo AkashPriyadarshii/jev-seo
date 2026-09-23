@@ -310,17 +310,20 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
                 Err(e) => return format!("Error: {}", e),
             };
             if let Some(client) = crate::engine::JevClient::new() {
-                let state = json!({
-                    "query": query,
-                    "content": content,
-                    "page": { "text": content.chars().take(8000).collect::<String>(), "title": target }
-                });
+                let lower = target.to_ascii_lowercase();
+                let text = if lower.ends_with(".html") || lower.ends_with(".htm") {
+                    crate::fetch::readable_text(&content, 6000)
+                } else {
+                    content.chars().take(6000).collect::<String>()
+                };
+                let wc = text.split_whitespace().count();
+                let state = crate::engine::page_state(query, Some(target.to_string()), None, text, wc);
                 match client.judge_page(state) {
                     Ok(eval) => {
                         if crate::policy::injection_blocked(&eval.extra) {
                             return "Error: blocked: injection risk in content (Jev pre-screen).".into();
                         }
-                        if crate::policy::gate("geo", eval.confidence()) == crate::policy::Verdict::Drop {
+                        if crate::policy::gate("geo", eval.geo_confidence) == crate::policy::Verdict::Drop {
                             return "Error: Jev unsure (low confidence), no score.".into();
                         }
                         serde_json::to_string_pretty(&eval).unwrap_or_default()
