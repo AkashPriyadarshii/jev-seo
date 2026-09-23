@@ -29,7 +29,7 @@ git jev check
 ```
 
 ## 4. Test Harness & Diagnostics
-The test harness in `src/tests.rs` contains 81 unit and integration tests verifying:
+The test harness in `src/tests.rs` contains 99 unit and integration tests verifying:
 - Markdown and HTML on-page SEO parsers
 - Heading hierarchy skip-level detection (`H1 -> H3`)
 - Google Helpful Content and AI slop detection (em-dash density and 17 AI tells)
