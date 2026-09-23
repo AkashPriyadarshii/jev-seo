@@ -30,7 +30,7 @@ pub fn audit_sitemap(target: &str) -> Result<SitemapReport> {
             .call()
             .with_context(|| format!("Failed to fetch remote sitemap: {}", target))?;
         crate::paths::reject_redirect_target(resp.get_url())?;
-        resp.into_string()
+        crate::fetch::capped_string(resp, crate::fetch::MAX_AUX_BYTES)
             .with_context(|| format!("Failed to read sitemap body from {}", target))?
     } else {
         crate::paths::read_user_file(target, &["xml"])

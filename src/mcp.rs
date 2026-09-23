@@ -393,6 +393,9 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
         }
         "seo_crawl" => {
             let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(err) = safety_gate("seo_crawl", url) {
+                return err;
+            }
             let max_pages = args.get("max_pages").and_then(|v| v.as_u64()).unwrap_or(crate::crawl::DEFAULT_MAX_PAGES as u64) as usize;
             let mut budget = crate::fetch::Budget::default();
             match crate::crawl::crawl_site(url, max_pages, crate::fetch::FetchMode::Auto, &mut budget) {
@@ -436,8 +439,8 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
                 return err;
             }
             match (
-                std::fs::read_to_string(path),
-                std::fs::read_to_string(baseline),
+                crate::paths::read_user_file(path, &["json"]),
+                crate::paths::read_user_file(baseline, &["json"]),
             ) {
                 (Ok(c), Ok(b)) => match (
                     serde_json::from_str::<crate::audit::DirectoryAuditReport>(&c),

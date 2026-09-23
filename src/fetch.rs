@@ -25,6 +25,27 @@ pub struct FetchResult {
     pub cost: u32,
 }
 
+/// Largest aux body kept in memory (robots, sitemap, reader upgrades).
+/// Crawl page bodies use the bigger MAX_BODY_BYTES in crawl.rs.
+pub const MAX_AUX_BYTES: usize = 512_000;
+
+/// Read a response body with a hard byte cap. Truncates at a char boundary;
+/// oversized bodies shrink instead of OOMing the run.
+pub fn capped_string(resp: ureq::Response, cap: usize) -> anyhow::Result<String> {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    resp.into_reader()
+        .take(cap as u64 + 1)
+        .read_to_end(&mut buf)?;
+    if buf.len() > cap {
+        buf.truncate(cap);
+        while !buf.is_empty() && std::str::from_utf8(&buf).is_err() {
+            buf.pop();
+        }
+    }
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Budget {
     /// Max paid credits per run. 0 = paid backends stay parked.
@@ -74,13 +95,15 @@ fn firecrawl_key() -> Option<String> {
     std::env::var("FIRECRAWL_API_KEY").ok().filter(|k| !k.trim().is_empty())
 }
 
-fn firecrawl_endpoint() -> String {
-    std::env::var("FIRECRAWL_API_URL")
-        .map(|b| {
+fn firecrawl_endpoint() -> anyhow::Result<String> {
+    match std::env::var("FIRECRAWL_API_URL") {
+        Ok(b) => {
             let b = b.trim_end_matches('/').to_string();
-            if b.ends_with("/scrape") { b } else { format!("{}/scrape", b) }
-        })
-        .unwrap_or_else(|_| "https://api.firecrawl.dev/v1/scrape".to_string())
+            let full = if b.ends_with("/scrape") { b } else { format!("{}/scrape", b) };
+            crate::paths::reject_api_endpoint(&full, "FIRECRAWL_API_URL")
+        }
+        Err(_) => Ok("https://api.firecrawl.dev/v1/scrape".to_string()),
+    }
 }
 
 /// Jina reader: one GET, markdown back, no key at base tier.
@@ -93,7 +116,7 @@ pub fn jina_fetch(url: &str) -> Result<FetchResult> {
     if let Some(key) = jina_key() {
         req = req.set("Authorization", &format!("Bearer {}", key));
     }
-    let body = req.call()?.into_string()?;
+    let body = capped_string(req.call()?, MAX_AUX_BYTES)?;
     Ok(FetchResult { body, source: "jina", elapsed_ms: t0.elapsed().as_millis(), cost: 0 })
 }
 
@@ -103,7 +126,7 @@ pub fn firecrawl_fetch(url: &str) -> Result<FetchResult> {
     let key = firecrawl_key().context("FIRECRAWL_API_KEY not set")?;
     let t0 = Instant::now();
     let payload = serde_json::json!({ "url": url, "formats": ["markdown"] });
-    let resp = ureq::post(&firecrawl_endpoint())
+    let resp = ureq::post(&firecrawl_endpoint()?)
         .set("Content-Type", "application/json")
         .set("Authorization", &format!("Bearer {}", key))
         .timeout(Duration::from_secs(30))

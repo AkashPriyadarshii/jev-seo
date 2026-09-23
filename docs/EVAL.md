@@ -22,11 +22,36 @@ Run these after a rules or scoring change; record date, git SHA, and machine.
    `--jev-budget`. Compare `geo_score` and decisive band. Record input tokens
    from the spend line; budget skips must be 0.
 
-4. **Second-judge (optional)**  
-   Export one request’s state/questions; score answers with a different model
-   or human label. Agreement ≠ accuracy; report both.
+4. **Second-judge (W8)**  
+   Pick one `geo` run. Rebuild its Jev state/questions from the same page
+   file and query, then score with a different model alias. Record per-question
+   agreement on decisive-band answers only (act >= 0.80 both sides).
+   Agreement ≠ accuracy; report both numbers below. Wording changes to any
+   question in `src/policy.rs` must re-run this step; the registry snapshot
+   test (`test_question_registry_snapshot`) fails loudly on silent edits.
 
-5. **Budget guard**  
+   | Date | Model A | Model B | Decisive agreed/total | Notes |
+   |---|---|---|---|
+   | _unmeasured_ | | | / | run me |
+
+5. **Wording A/B log (W8)**  
+   When a GEO question underperforms (low confidence or needs-review churn),
+   test two phrasings on the same 5 pages. Keep the phrasing with the wider
+   decisive spread. Log every trial here; never swap wording without a row.
+
+   | Date | Question id | Phrasing A | Phrasing B | Winner | Spread A/B |
+   |---|---|---|---|---|---|
+   | _none yet_ | | | | | |
+
+6. **Human-label sample (W8)**  
+   Hand-check 20 rule findings against `audit --csv` evidence with shell
+   tools. One row per rule id sampled; refresh the sample each wave.
+
+   | Date | Rule | Scope | Evidence | Independent check | Hit? |
+   |---|---|---|---|---|---|
+   | _seed below_ | | | | | |
+
+7. **Budget guard**  
    `jev-seo audit <dir> --jev-budget 0` must run rules-only with zero Jev
    requests (`ledger.json` `jev_requests` or skip counter ≥ 1 if suite attempted).
 

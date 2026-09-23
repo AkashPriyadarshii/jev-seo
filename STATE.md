@@ -2,9 +2,16 @@
 
 ## Current Phase: Unreleased → v0.1.2 (2026-10-22)
 
+### Shipped on master (local, unpushed)
+- [x] W6 designed PDF deck: cover, scorecard, findings by area, inventory, narrative, method
+- [x] W7 PageSpeed vitals: `crawl --vitals`, R51-R53, offline-safe degrade
+- [x] W8 eval rigor: second-judge protocol, wording A/B log, human-label table, registry snapshot test
+- [x] DFS opt-in: `query --provider dfs`, key-gated, free fallback
+- [x] 81 tests green, clippy `-D warnings` clean
+
 ### Shipped on master (local + pushed docs)
 - [x] Phase 0-4 skeleton, modules, crawl, llms, doctor, HTML reports (v0.1.1 on crates.io)
-- [x] Fifty-rule engine, CSV export, rescore, multi-backend fetch, gsc, SKILL.md, EVAL.md
+- [x] Rule engine R01-R53, CSV export, rescore, multi-backend fetch, gsc, SKILL.md, EVAL.md
 - [x] W1 RunManifest (`run.json` + `ledger.json`), citation gate, completeness banners
 - [x] W1 Max Jev fan-out, `jev-latest`, act 0.80, injection pre-screen, state pre-filter
 - [x] W2 `--jev-budget`, `--no-jev`, Score legend 0-1, EVAL W2 protocol
@@ -12,7 +19,18 @@
 - [x] W4 pair cannibalization A×B, MCP `seo_explain`/`seo_report` (13 tools), README matrices
 - [x] W5 single PDF builder, drop SpreadsheetML, drop launch DESIGN.md, reword session commits
 - [x] README launch rewrite (What's new, full matrices, 22 Oct date, build-from-source)
-- [x] 72 tests green, clippy `-D warnings` clean
+- [x] 81 tests green, clippy `-D warnings` clean
+
+### Review fixes (two subagent passes, same session)
+- [x] Aligned display windows to rule windows (title 30-60, desc 120-160)
+- [x] R19 gated on density (no single-hit noise)
+- [x] SSRF recheck on Jev homepage fetch + custom API endpoint overrides
+- [x] Byte caps on aux bodies (Jina, robots, sitemap, llms, site fetch)
+- [x] MCP `safety_gate` on `seo_crawl`, guarded reads on `seo_report`
+- [x] Chain-exhaust reports R03, provider label per backend, rescore flag note
+- [x] Citation gate on action/pair CSV exports, NaN guards on vitals
+- [x] 85 tests green, clippy `-D warnings` clean
+- [ ] Deferred: thin `main.rs` to `view.rs`, trait-gate HTTP/Jev, explicit Tavily opt-in
 
 ### Before release (22 Oct)
 - [ ] Bump `Cargo.toml` 0.1.1 → 0.1.2

@@ -65,8 +65,8 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
         .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Agent Readiness Check)"))
         .call()
     {
-        Ok(r) => (r.status(), r.into_string().unwrap_or_default()),
-        Err(ureq::Error::Status(code, r)) => (code, r.into_string().unwrap_or_default()),
+        Ok(r) => (r.status(), crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default()),
+        Err(ureq::Error::Status(code, r)) => (code, crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default()),
         Err(_) => (0, String::new()),
     };
     let present = status == 200 && !body.trim().is_empty();
