@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::*;
 use serde_json::json;
+use std::collections::BTreeSet;
 
 mod audit;
 mod actions;
@@ -11,6 +12,7 @@ mod engine;
 mod fetch;
 mod gsc;
 mod llms;
+mod manifest;
 mod mcp;
 mod paths;
 mod policy;
@@ -87,6 +89,9 @@ enum Commands {
         /// Rebuild findings and actions from a saved audit JSON, no work
         #[arg(long, value_name = "PATH")]
         rescore: Option<String>,
+        /// Write run.json + ledger.json to this directory (default: beside first export)
+        #[arg(long, value_name = "DIR")]
+        manifest: Option<String>,
     },
     /// Generative Engine Optimization (GEO) citation scoring via Jev
     Geo {
@@ -161,6 +166,9 @@ enum Commands {
         /// Rebuild score and actions from a saved crawl JSON, no network
         #[arg(long, value_name = "PATH")]
         rescore: Option<String>,
+        /// Write run.json + ledger.json to this directory (default: beside first export)
+        #[arg(long, value_name = "DIR")]
+        manifest: Option<String>,
     },
     /// Check llms.txt presence and AI crawler permissions for answer-engine readiness
     Llms {
@@ -213,11 +221,14 @@ fn main() -> Result<()> {
                 "root_query": query,
                 "suggestions": suggestions
             });
-            if let Some((eval, v)) = gated_eval("keywords", state) {
+            let extras = policy::keyword_value_extras(&suggestions, 10);
+            if let Some((eval, v)) = gated_eval_with("keywords", state, extras) {
                 println!("\n{}", "Intent & Semantic Classification:".cyan().bold());
                 println!("  Primary Intent: {} (confidence: {:.2}){}", eval.intent.green(), eval.intent_confidence, policy::marker(v));
                 println!("  Content Gap:    {}", eval.content_gap.yellow());
+                print_keyword_values(&eval.extra, &suggestions);
                 println!("  Suggested Next: jev-seo {}", policy::route_for_intent(&eval.intent));
+                print_jev_spend_line();
             }
         }
         Commands::Query { query, limit, provider, depth, topic, json } => {
@@ -302,13 +313,15 @@ fn main() -> Result<()> {
                             println!("  Primary Gap:     {}", eval.content_gap.yellow());
                         }
                     }
+                    print_jev_spend_line();
                 }
                 Some(Err(e)) => eprintln!("{}", format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow()),
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, rescore } => {
+        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, rescore, manifest } => {
             let t0 = std::time::Instant::now();
+            let is_rescore = rescore.is_some();
             let dir_report = match rescore {
                 Some(path) => {
                     let raw = std::fs::read_to_string(&path)?;
@@ -325,21 +338,118 @@ fn main() -> Result<()> {
                 t0.elapsed().as_secs_f64()
             );
 
+            let actions = crate::rules::actions_for(&dir_report.findings);
+            // Max Jev: speculative page suite on the largest pages BEFORE any ledger snapshot.
+            let jev_pages = if !is_rescore {
+                judge_audit_sample(&dir_report, target_query.as_deref(), 12)
+            } else {
+                Vec::new()
+            };
+            let jev_used = !jev_pages.is_empty() || (target_query.is_some() && manifest::jev_key_present());
+            let mut completeness = manifest::completeness_audit(dir_report.total_files, false, !jev_pages.is_empty() || target_query.is_some());
+            if !jev_pages.is_empty() {
+                completeness.notes.push(format!("Jev judged {} pages (sample)", jev_pages.len()));
+                completeness.full = false;
+            }
+
+            // Build report bodies once, gate every citation, then write.
+            let body_html = html.as_ref().map(|_| audit::to_html(&dir_report));
+            let body_pdf = pdf.as_ref().map(|_| audit::to_pdf(&dir_report));
+            let body_md = md.as_ref().map(|_| audit::to_markdown(&dir_report));
+            let body_csv = csv.as_ref().map(|_| crate::rules::to_csv(&dir_report.findings));
+            if let Some(body) = &body_html {
+                manifest::gate_report(body, &dir_report.findings, &actions)?;
+            }
+            if let Some(body) = &body_pdf {
+                manifest::gate_report(&String::from_utf8_lossy(body), &dir_report.findings, &actions)?;
+            }
+            if let Some(body) = &body_md {
+                manifest::gate_report(body, &dir_report.findings, &actions)?;
+            }
+            if let Some(body) = &body_csv {
+                manifest::gate_report(body, &dir_report.findings, &actions)?;
+            }
             if let Some(out) = &html {
-                std::fs::write(out, audit::to_html(&dir_report))?;
+                std::fs::write(out, body_html.as_deref().unwrap_or_default())?;
                 println!("HTML report written to {}", out.dimmed());
             }
             if let Some(out) = &pdf {
-                std::fs::write(out, audit::to_pdf(&dir_report))?;
+                std::fs::write(out, body_pdf.as_deref().unwrap_or_default())?;
                 println!("PDF report written to {}", out.dimmed());
             }
             if let Some(out) = &md {
-                std::fs::write(out, audit::to_markdown(&dir_report))?;
+                std::fs::write(out, body_md.as_deref().unwrap_or_default())?;
                 println!("Markdown report written to {}", out.dimmed());
             }
             if let Some(out) = &csv {
-                std::fs::write(out, crate::rules::to_csv(&dir_report.findings))?;
+                std::fs::write(out, body_csv.as_deref().unwrap_or_default())?;
                 println!("CSV findings written to {}", out.dimmed());
+            }
+
+            let texts_owned: Vec<String> = body_html
+                .iter()
+                .chain(body_md.iter())
+                .chain(body_csv.iter())
+                .cloned()
+                .collect();
+            let texts: Vec<&str> = texts_owned.iter().map(|s| s.as_str()).collect();
+
+            // Ledger LAST so Jev tokens from judge_audit_sample are included.
+            let mut ledger = manifest::Ledger::new("audit", &path);
+            if !jev_pages.is_empty() {
+                ledger.note(format!("Jev page suite: {} pages judged", jev_pages.len()));
+            } else if target_query.is_some() {
+                ledger.note(if jev_used {
+                    "Jev target-query scoring available"
+                } else {
+                    "Jev target-query requested but TYPESAFE_API_KEY missing"
+                });
+            }
+            let score = manifest::ScoreCard {
+                score: dir_report.pass_rate.round().clamp(0.0, 100.0) as u32,
+                grade: crate::actions::grade(dir_report.pass_rate.round().clamp(0.0, 100.0) as u32).to_string(),
+                kind: "pass-rate".into(),
+            };
+            let run_manifest = manifest::ManifestInput {
+                command: "audit",
+                target: &path,
+                findings: &dir_report.findings,
+                actions: &actions,
+                texts: &texts,
+                score: Some(score),
+                completeness: completeness.clone(),
+                ledger,
+            }
+            .build();
+            if !run_manifest.validation.ok {
+                anyhow::bail!(
+                    "run manifest citation gate failed: {:?}",
+                    run_manifest.validation
+                );
+            }
+            let mut export_dirs = manifest::auto_dirs(&[
+                html.as_deref(),
+                pdf.as_deref(),
+                md.as_deref(),
+                csv.as_deref(),
+            ]);
+            if let Some(dir) = &manifest {
+                export_dirs = vec![std::path::PathBuf::from(dir)];
+            } else if export_dirs.is_empty() && json {
+                export_dirs.clear();
+            }
+            let force = manifest.is_some();
+            let mut wrote_manifest = false;
+            for d in &export_dirs {
+                let (run_p, led_p) = manifest::write_pair(d, &run_manifest)?;
+                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
+                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
+                wrote_manifest = true;
+            }
+            if !wrote_manifest && (force || !json) {
+                let (run_p, led_p) = manifest::write_pair(std::path::Path::new("."), &run_manifest)?;
+                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
+                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
             }
 
             if let Some(floor) = min_pass {
@@ -363,6 +473,8 @@ fn main() -> Result<()> {
                 println!("  Total Word Count:    {}", dir_report.total_words);
                 println!("  Avg Words per File:  {}", dir_report.avg_words_per_file);
                 println!("  Overall Check Pass:  {:.1}%", dir_report.pass_rate);
+                manifest::print_banner(&completeness);
+                print_jev_page_suite(&jev_pages);
 
                 if !dir_report.duplicate_titles.is_empty() {
                     println!("\n{}", "Duplicate Titles Detected:".red().bold());
@@ -427,6 +539,7 @@ fn main() -> Result<()> {
                 }
             } else if let Some(report) = dir_report.reports.first() {
                 println!("\n{} {}", "On-Page SEO Audit:".cyan().bold(), report.file_path);
+                manifest::print_banner(&completeness);
                 println!("  Title:       {}", report.title.as_deref().unwrap_or("N/A"));
                 println!("  Description: {}", report.description.as_deref().unwrap_or("N/A"));
                 println!("  Headings:    H1: {}, H2: {}, H3: {}", report.h1_count, report.h2_count, report.h3_count);
@@ -463,14 +576,26 @@ fn main() -> Result<()> {
                         "target_query": query,
                         "page_title": report.title,
                         "description": report.description,
-                        "checks": report.checks
+                        "checks": report.checks,
+                        "page": {
+                            "title": report.title,
+                            "description": report.description,
+                            "text": excerpt_local(&report.file_path),
+                            "word_count": report.word_count
+                        }
                     });
-                    if let Some((eval, v)) = gated_eval("audit", state) {
+                    if let Some((eval, v)) = gated_eval_with("audit", state, merge_extras(policy::geo_questions(), policy::page_audit_extras())) {
                         println!("\n{}", "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold());
                         println!("  GEO Score:       {}/10{}", eval.geo_score, policy::marker(v));
+                        if let Some((comp, cconf)) = policy::composite_geo(&eval.extra) {
+                            println!("  Composite GEO:   {}/10 (confidence {:.2})", comp, cconf);
+                        }
                         println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
                         println!("  Content Gap:     {}", eval.content_gap.yellow());
+                        print_page_extras(&eval.extra);
                     }
+                } else if !jev_pages.is_empty() {
+                    // Single-file run still got the suite from the sample path.
                 }
             }
         }
@@ -485,13 +610,20 @@ fn main() -> Result<()> {
             if let Some(client) = engine::JevClient::new() {
                 let state = json!({
                     "query": query,
-                    "content": content
+                    "content": content,
+                    "page": { "text": content.chars().take(8000).collect::<String>(), "title": target }
                 });
-                match client.fanout_eval_with(state, policy::geo_questions()) {
+                match client.judge_page(state) {
                     Ok(eval) => {
+                        if policy::injection_blocked(&eval.extra) {
+                            eprintln!("{}", "Jev blocked: injection risk in content (preflight); no score.".yellow());
+                            print_jev_spend_line();
+                            return Ok(());
+                        }
                         let v = policy::gate("geo", eval.confidence());
                         if v == policy::Verdict::Drop {
                             eprintln!("{}", format!("Jev unsure (confidence {:.2}), no score.", eval.confidence()).yellow());
+                            print_jev_spend_line();
                             return Ok(());
                         }
                         let m = policy::marker(v);
@@ -510,6 +642,7 @@ fn main() -> Result<()> {
                             }
                             println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
                             println!("  Primary Gap:     {}", eval.content_gap.yellow());
+                            print_page_extras(&eval.extra);
                             if let Ok(db) = rank::DbStore::open() {
                                 match db.record_geo(&target, &query, eval.geo_score) {
                                     Ok(Some(prev)) if prev != eval.geo_score => {
@@ -521,6 +654,7 @@ fn main() -> Result<()> {
                                 }
                             }
                         }
+                        print_jev_spend_line();
                     }
                     Err(e) => eprintln!("{}", format!("Error: Jev scoring failed ({e:#}).").red()),
                 }
@@ -711,7 +845,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore } => {
+        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest } => {
             if let Some(path) = rescore {
                 let raw = std::fs::read_to_string(&path)?;
                 let saved: crawl::CrawlReport = serde_json::from_str(&raw)?;
@@ -725,10 +859,12 @@ fn main() -> Result<()> {
                     capped: saved.capped,
                     robots_honored: saved.robots_honored,
                 });
+                let completeness = manifest::completeness_crawl(&report, max_pages);
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 } else {
                     println!("  Rescored:      {}/100 ({})", report.score, crate::actions::grade(report.score));
+                    manifest::print_banner(&completeness);
                 }
                 return Ok(());
             }
@@ -745,7 +881,61 @@ fn main() -> Result<()> {
             };
             let mut budget = crate::fetch::Budget { max_credits, spent: 0 };
             let report = crawl::crawl_site(&url, max_pages, mode, &mut budget)?;
+            // Max Jev: one site+GEO fan-out on the homepage before any ledger snapshot.
+            let site_jev = judge_crawl_site(&report.start_url);
+            let mut completeness_pre = manifest::completeness_crawl(&report, max_pages);
+            if site_jev.is_some() {
+                completeness_pre
+                    .notes
+                    .push("Jev site+GEO judged on homepage".into());
+            }
             if json {
+                // Still freeze the contract for agents piping --json.
+                let mut ledger = manifest::Ledger::new("crawl", &report.start_url);
+                let backends: Vec<String> = report
+                    .pages
+                    .iter()
+                    .filter(|p| p.source != "direct")
+                    .map(|p| p.source.clone())
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect();
+                ledger.with_fetch(budget.spent, budget.max_credits, backends);
+                if site_jev.is_some() {
+                    ledger.note("Jev site+GEO fan-out on homepage");
+                }
+                let run_manifest = manifest::ManifestInput {
+                    command: "crawl",
+                    target: &report.start_url,
+                    findings: &report.findings,
+                    actions: &report.actions,
+                    texts: &[],
+                    score: Some(manifest::ScoreCard {
+                        score: report.score,
+                        grade: report.grade.clone(),
+                        kind: "health".into(),
+                    }),
+                    completeness: completeness_pre,
+                    ledger,
+                }
+                .build();
+                if !run_manifest.validation.ok {
+                    anyhow::bail!("run manifest citation gate failed: {:?}", run_manifest.validation);
+                }
+                let dirs = match &manifest {
+                    Some(dir) => vec![std::path::PathBuf::from(dir)],
+                    None => manifest::auto_dirs(&[csv.as_deref()]),
+                };
+                let dirs = if dirs.is_empty() {
+                    vec![std::path::PathBuf::from(".")]
+                } else {
+                    dirs
+                };
+                for d in &dirs {
+                    let (run_p, led_p) = manifest::write_pair(d, &run_manifest)?;
+                    eprintln!("Run manifest written to {}", run_p.display());
+                    eprintln!("Spend ledger written to {}", led_p.display());
+                }
                 println!("{}", serde_json::to_string_pretty(&report)?);
                 return Ok(());
             }
@@ -824,13 +1014,6 @@ fn main() -> Result<()> {
                     println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
                 }
             }
-            println!(
-                "  Completeness:  {} seeded, robots {}, {}{}",
-                if report.seeded_from_sitemap { "sitemap" } else { "start-URL" },
-                if report.robots_honored { "honored" } else { "missing" },
-                report.pages_crawled,
-                if report.capped { " (capped, raise --max-pages)" } else { " (full)" }
-            );
             if diff {
                 match rank::DbStore::open()?.record_crawl_snapshot(
                     &report.start_url,
@@ -847,8 +1030,89 @@ fn main() -> Result<()> {
                 }
             }
             if let Some(out) = &csv {
-                std::fs::write(out, crate::rules::to_csv(&report.findings))?;
+                let body = crate::rules::to_csv(&report.findings);
+                manifest::gate_report(&body, &report.findings, &report.actions)?;
+                std::fs::write(out, body)?;
                 println!("CSV findings written to {}", out.dimmed());
+            }
+
+            let mut completeness = manifest::completeness_crawl(&report, max_pages);
+            if site_jev.is_some() {
+                completeness
+                    .notes
+                    .push("Jev site+GEO judged on homepage".into());
+            }
+            manifest::print_banner(&completeness);
+            if let Some(eval) = &site_jev {
+                let v = policy::gate("crawl", eval.confidence());
+                println!("\n{}", "Jev site view (TypeSafe):".cyan().bold());
+                println!(
+                    "  GEO:            {}/10{}",
+                    eval.geo_score,
+                    policy::marker(v)
+                );
+                if let Some((c, cf)) = policy::composite_geo(&eval.extra) {
+                    println!("  Composite GEO:   {}/10 (confidence {:.2})", c, cf);
+                }
+                println!(
+                    "  Intent:         {} (confidence {:.2})",
+                    eval.intent.green(),
+                    eval.intent_confidence
+                );
+                println!("  Value prop:     {}", eval.content_gap.yellow());
+                print_page_extras(&eval.extra);
+                print_jev_spend_line();
+            }
+            let mut ledger = manifest::Ledger::new("crawl", &report.start_url);
+            if site_jev.is_some() {
+                ledger.note("Jev site+GEO fan-out on homepage");
+            }
+            let backends: Vec<String> = report
+                .pages
+                .iter()
+                .filter(|p| p.source != "direct")
+                .map(|p| p.source.clone())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect();
+            ledger.with_fetch(budget.spent, budget.max_credits, backends);
+            if budget.spent > 0 {
+                ledger.note(format!("{} paid fetch credits spent (cap {})", budget.spent, budget.max_credits));
+            }
+            let run_manifest = manifest::ManifestInput {
+                command: "crawl",
+                target: &report.start_url,
+                findings: &report.findings,
+                actions: &report.actions,
+                texts: &[],
+                score: Some(manifest::ScoreCard {
+                    score: report.score,
+                    grade: report.grade.clone(),
+                    kind: "health".into(),
+                }),
+                completeness: completeness.clone(),
+                ledger,
+            }
+            .build();
+            if !run_manifest.validation.ok {
+                anyhow::bail!("run manifest citation gate failed: {:?}", run_manifest.validation);
+            }
+            let mut export_dirs = manifest::auto_dirs(&[csv.as_deref()]);
+            if let Some(dir) = &manifest {
+                export_dirs = vec![std::path::PathBuf::from(dir)];
+            }
+            let force = manifest.is_some();
+            let mut wrote_manifest = false;
+            for d in &export_dirs {
+                let (run_p, led_p) = manifest::write_pair(d, &run_manifest)?;
+                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
+                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
+                wrote_manifest = true;
+            }
+            if !wrote_manifest && (force || !json) {
+                let (run_p, led_p) = manifest::write_pair(std::path::Path::new("."), &run_manifest)?;
+                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
+                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
             }
         }
         Commands::Llms { domain, json } => {
@@ -884,6 +1148,8 @@ fn main() -> Result<()> {
                     println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
                 }
             }
+            let completeness = manifest::completeness_llms(&report);
+            manifest::print_banner(&completeness);
             println!("\n{}", "Checks:".bold());
             for c in &report.checks {
                 let badge = if c.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
@@ -968,6 +1234,7 @@ fn main() -> Result<()> {
 
 /// Run a Jev eval gated by policy. Returns None on low confidence or API
 /// failure, after telling the user the output is local-only. Never silent.
+#[allow(dead_code)]
 fn gated_eval(command: &str, state: serde_json::Value) -> Option<(engine::AnalysisResult, policy::Verdict)> {
     gated_eval_with(command, state, serde_json::json!({}))
 }
@@ -983,12 +1250,220 @@ fn gated_eval_with(
             let v = policy::gate(command, eval.confidence());
             if v == policy::Verdict::Drop {
                 eprintln!("{}", format!("Note: Jev unsure (confidence {:.2}), showing local-only output.", eval.confidence()).yellow());
+                print_jev_spend_line();
                 return None;
             }
             Some((eval, v))
         }
         Err(e) => {
             eprintln!("{}", format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow());
+            None
+        }
+    }
+}
+
+fn merge_extras(a: serde_json::Value, b: serde_json::Value) -> serde_json::Value {
+    let mut out = a;
+    if let (Some(dst), Some(src)) = (out.as_object_mut(), b.as_object()) {
+        for (k, v) in src {
+            dst.insert(k.clone(), v.clone());
+        }
+    }
+    out
+}
+
+fn excerpt_local(path: &str) -> String {
+    std::fs::read_to_string(path)
+        .map(|s| {
+            let cleaned: String = s
+                .chars()
+                .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+                .collect();
+            cleaned.chars().take(8000).collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Speculative Jev page suite on the largest audit files. One fan-out per page.
+/// Returns (path, eval, verdict) for pages that passed the confidence gate.
+fn judge_audit_sample(
+    dir_report: &audit::DirectoryAuditReport,
+    target_query: Option<&str>,
+    limit: usize,
+) -> Vec<(String, engine::AnalysisResult, policy::Verdict)> {
+    let client = match engine::JevClient::new() {
+        Some(c) => c,
+        None => return Vec::new(),
+    };
+    let mut pages: Vec<&audit::AuditReport> = dir_report.reports.iter().collect();
+    pages.sort_by_key(|b| std::cmp::Reverse(b.word_count));
+    let mut out = Vec::new();
+    for report in pages.into_iter().take(limit) {
+        let content = excerpt_local(&report.file_path);
+        if content.trim().is_empty() {
+            continue;
+        }
+        let mut state = serde_json::json!({
+            "target_query": target_query.unwrap_or(""),
+            "page": {
+                "title": report.title,
+                "description": report.description,
+                "text": content,
+                "word_count": report.word_count,
+                "checks": report.checks,
+            }
+        });
+        if let Some(obj) = state.as_object_mut() {
+            obj.insert("content".into(), serde_json::Value::String(content.clone()));
+            if let Some(q) = target_query {
+                obj.insert("query".into(), serde_json::Value::String(q.to_string()));
+            }
+        }
+        match client.judge_page(state) {
+            Ok(eval) => {
+                if policy::injection_blocked(&eval.extra) {
+                    eprintln!(
+                        "{}",
+                        format!(
+                            "Blocked: injection risk in {} (dedicated Noul pre-screen); quality suite not run.",
+                            report.file_path
+                        )
+                        .yellow()
+                    );
+                    continue;
+                }
+                let v = policy::gate("audit", eval.confidence());
+                if v != policy::Verdict::Drop {
+                    out.push((report.file_path.clone(), eval, v));
+                }
+            }
+            Err(e) => {
+                eprintln!("{}", format!("Jev page judge failed for {}: {e:#}", report.file_path).yellow());
+            }
+        }
+    }
+    out
+}
+
+fn print_jev_page_suite(pages: &[(String, engine::AnalysisResult, policy::Verdict)]) {
+    if pages.is_empty() {
+        return;
+    }
+    println!("\n{}", format!("Jev page suite ({} pages, full fan-out):", pages.len()).cyan().bold());
+    for (path, eval, v) in pages {
+        let name = std::path::Path::new(path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(path);
+        let review = policy::needs_review(&eval.extra, "audit");
+        println!(
+            "  {} GEO {}/10 intent {} gap {}{}",
+            name,
+            eval.geo_score,
+            eval.intent,
+            eval.content_gap,
+            policy::marker(*v)
+        );
+        print_page_extras(&eval.extra);
+        if !review.is_empty() {
+            println!("      needs review: {}", review.join(", ").dimmed());
+        }
+    }
+    print_jev_spend_line();
+}
+
+fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {
+    let keys = [
+        "page_helpfulness",
+        "page_trust",
+        "page_specificity",
+        "title_fit",
+        "meta_fit",
+        "importance",
+        "value_prop",
+        "geo_statistics",
+        "geo_directness",
+        "answer_first",
+        "clear_next_step",
+        "entity_clarity",
+        "injection_risk",
+    ];
+    let mut parts = Vec::new();
+    for k in keys {
+        if let Some(a) = extra.get(k) {
+            if let Some(s) = a.get("score").and_then(|x| x.as_f64()) {
+                let c = a.get("confidence").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                parts.push(format!("{k}={s:.2}({c:.2})"));
+            } else if let Some(n) = a.get("noul").or_else(|| a.get("probability")).and_then(|x| x.as_f64()) {
+                parts.push(format!("{k}=P{n:.2}"));
+            } else if let Some(ch) = a.get("choice").and_then(|x| x.as_str()) {
+                parts.push(format!("{k}={ch}"));
+            }
+        }
+    }
+    if !parts.is_empty() {
+        println!("      {}", parts.join(" · ").dimmed());
+    }
+}
+
+fn print_keyword_values(extra: &serde_json::Map<String, serde_json::Value>, suggestions: &[String]) {
+    let mut rows = Vec::new();
+    for (i, s) in suggestions.iter().take(10).enumerate() {
+        if let Some(a) = extra.get(format!("kw_value_{i}").as_str()) {
+            if let Some(sc) = a.get("score").and_then(|x| x.as_f64()) {
+                rows.push(format!("{sc:.1} {}", s));
+            }
+        }
+    }
+    if !rows.is_empty() {
+        println!("  Query value:    {}", rows.join(" · "));
+    }
+}
+
+fn print_jev_spend_line() {
+    let reqs = manifest::JEV_REQUESTS.load(std::sync::atomic::Ordering::Relaxed);
+    let toks = manifest::JEV_INPUT_TOKENS.load(std::sync::atomic::Ordering::Relaxed);
+    let cost = manifest::jev_cost_usd(toks);
+    if reqs > 0 {
+        println!(
+            "  Jev spend:      {} request(s), {} input tokens, ${:.6}",
+            reqs, toks, cost
+        );
+    }
+}
+
+/// Fetch homepage HTML and run one site+GEO fan-out for crawl runs.
+fn judge_crawl_site(start_url: &str) -> Option<engine::AnalysisResult> {
+    let client = engine::JevClient::new()?;
+    let body = ureq::get(start_url)
+        .timeout(std::time::Duration::from_secs(15))
+        .set("User-Agent", crawl::CRAWL_UA)
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
+    if body.trim().is_empty() {
+        return None;
+    }
+    let tmp = std::env::temp_dir().join(format!("jev-seo-site-{}.html", std::process::id()));
+    std::fs::write(&tmp, &body).ok()?;
+    let report = audit::audit_file(tmp.to_str()?).ok();
+    let _ = std::fs::remove_file(&tmp);
+    let text: String = body.chars().take(8000).collect();
+    let state = serde_json::json!({
+        "query": start_url,
+        "content": text,
+        "page": {
+            "title": report.as_ref().and_then(|r| r.title.clone()),
+            "description": report.as_ref().and_then(|r| r.description.clone()),
+            "text": text,
+            "word_count": report.as_ref().map(|r| r.word_count).unwrap_or(0),
+        }
+    });
+    match client.judge_site(state) {
+        Ok(eval) => Some(eval),
+        Err(e) => {
+            eprintln!("{}", format!("Jev site judge failed: {e:#}").yellow());
             None
         }
     }

@@ -860,6 +860,7 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
         }
     }
     m.push_str("\n## Method\n\nOn-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar. Scores rank work; they never predict rankings or traffic.\n");
+    m.push_str("\n## Completeness\n\nLocal file walk only. Jev and live crawl are not part of this report unless run separately. Companion artifacts: `run.json`, `ledger.json`.\n");
     m
 }
 
@@ -909,6 +910,8 @@ pub fn to_pdf(rep: &DirectoryAuditReport) -> Vec<u8> {
     lines.push(String::new());
     lines.push("Method: on-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar.".to_string());
     lines.push("Scores rank work; they never predict rankings or traffic.".to_string());
+    lines.push("Completeness: local file walk; Jev and live crawl not in this report.".to_string());
+    lines.push("Companion files: run.json, ledger.json.".to_string());
     pdf_lines(&format!("jev-seo audit report: {}", rep.dir_path), &lines)
 }
 
@@ -978,7 +981,7 @@ pub fn to_html(rep: &DirectoryAuditReport) -> String {
         }
         h.push_str("</ul>");
     }
-    h.push_str("<div class=\"foot\">Generated locally by <code>jev-seo audit --html</code>. Scores rank work; they never predict rankings or traffic. Method: on-page checks per file, duplicate titles, orphan detection via internal link graph, thin-page and cannibalization radar.</div>");
+    h.push_str("<div class=\"foot\">Generated locally by <code>jev-seo audit --html</code>. Scores rank work; they never predict rankings or traffic. Method: on-page checks per file, duplicate titles, orphan detection via internal link graph, thin-page and cannibalization radar. Completeness: local file walk; Jev and live crawl not part of this report unless run separately. Companion files: <code>run.json</code>, <code>ledger.json</code>.</div>");
     h.push_str("</body></html>");
     h
 }

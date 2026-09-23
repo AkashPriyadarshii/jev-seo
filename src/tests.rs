@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::audit::{audit_file, audit_path};
     use crate::brief::generate_brief;
@@ -416,10 +417,36 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_policy_gate() {
-        use crate::policy::{gate, Verdict};
+        use crate::policy::{gate, thresholds, Verdict, ACT};
+        // Skill bar: Choice/Score act only at confidence >= 0.80.
+        assert_eq!(thresholds("geo").act, ACT);
+        assert!((ACT - 0.80).abs() < 1e-12);
         assert_eq!(gate("geo", 0.9), Verdict::Act);
+        assert_eq!(gate("geo", 0.79), Verdict::Flag);
         assert_eq!(gate("geo", 0.6), Verdict::Flag);
         assert_eq!(gate("geo", 0.2), Verdict::Drop);
+        assert_eq!(gate("audit", 0.85), Verdict::Act);
+        assert_eq!(gate("audit", 0.7), Verdict::Flag);
+    }
+
+    #[test]
+    fn test_injection_blocked_band() {
+        use crate::policy::injection_blocked;
+        use serde_json::json;
+        let mut yes = serde_json::Map::new();
+        yes.insert("injection_risk".into(), json!({"type":"noul","value":0.9,"noul":0.9}));
+        assert!(injection_blocked(&yes));
+        let mut no = serde_json::Map::new();
+        no.insert("injection_risk".into(), json!({"type":"noul","value":0.1,"noul":0.1}));
+        assert!(!injection_blocked(&no));
+        assert!(!injection_blocked(&serde_json::Map::new()));
+    }
+
+    #[test]
+    fn test_route_for_intent_exists() {
+        use crate::policy::route_for_intent;
+        assert_eq!(route_for_intent("navigational"), "rank");
+        assert_eq!(route_for_intent("informational"), "geo / audit");
     }
 
     #[test]

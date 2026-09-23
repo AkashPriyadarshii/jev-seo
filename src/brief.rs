@@ -40,7 +40,7 @@ pub fn generate_brief(topic: &str, limit: usize) -> Result<ContentBrief> {
         .collect();
 
     let mut search_intent = "informational".to_string();
-    let target_audience = "practitioner / systems engineer".to_string();
+    let mut target_audience = "practitioner / systems engineer".to_string();
     let mut winning_angle = "empirical benchmarks & copy-pasteable implementation".to_string();
 
     if let Some(client) = JevClient::new() {
@@ -49,12 +49,44 @@ pub fn generate_brief(topic: &str, limit: usize) -> Result<ContentBrief> {
             "top_competitors": competitor_benchmarks.iter().take(5).collect::<Vec<_>>()
         });
 
-        match client.fanout_eval(state) {
+        match client.fanout_eval_with(state, crate::policy::brief_extras()) {
             Ok(eval) => {
                 if crate::policy::gate("brief", eval.confidence()) != crate::policy::Verdict::Drop {
                     search_intent = eval.intent;
                     if eval.content_gap != "none" {
                         winning_angle = format!("Address competitor gap: {}", eval.content_gap);
+                    }
+                    if let Some(angle) = eval
+                        .extra
+                        .get("angle")
+                        .and_then(|a| a.get("choice"))
+                        .and_then(|c| c.as_str())
+                    {
+                        winning_angle = match angle {
+                            "benchmarks" => "Lead with empirical benchmarks and reproducible numbers".to_string(),
+                            "step_by_step" => "Lead with a copy-pasteable step-by-step implementation".to_string(),
+                            "comparison" => "Lead with a trade-off comparison matrix".to_string(),
+                            "unique_data" => "Lead with first-hand data or a case study".to_string(),
+                            other => format!("Angle: {}", other),
+                        };
+                    }
+                    if let Some(aud) = eval
+                        .extra
+                        .get("audience")
+                        .and_then(|a| a.get("choice"))
+                        .and_then(|c| c.as_str())
+                    {
+                        target_audience = match aud {
+                            "practitioner" => "practitioner / systems engineer".to_string(),
+                            "founder" => "technical founder".to_string(),
+                            "learner" => "learner new to the topic".to_string(),
+                            "buyer" => "buyer / decision maker".to_string(),
+                            other => other.to_string(),
+                        };
+                    }
+                    let review = crate::policy::needs_review(&eval.extra, "brief");
+                    if !review.is_empty() {
+                        eprintln!("brief: needs review [{}]", review.join(", "));
                     }
                 }
             }
