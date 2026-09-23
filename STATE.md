@@ -18,7 +18,7 @@
 - [ ] Bump `Cargo.toml` 0.1.1 → 0.1.2
 - [ ] Rename CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-10-22`
 - [ ] Tag `v0.1.2`, `cargo publish`, GitHub Release binaries
-- [ ] Push remaining master code commits when ready (currently local)
+- [x] Push master code + docs (`254e7ac`, `[skip ci]`, no release today)
 
 ## v0.2.0 Structural Backlog (from independent arch review)
 - [ ] Thin `src/main.rs`: extract printing to `src/view.rs`
