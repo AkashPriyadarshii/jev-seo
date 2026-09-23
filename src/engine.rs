@@ -81,19 +81,29 @@ impl JevClient {
     }
 
     fn post(&self, payload: serde_json::Value) -> Result<ureq::Response> {
+        let body = payload.to_string();
+        // Hard spend cap before dispatch: estimate tokens from request size.
+        let est_tokens = (body.len() / 3) as u64;
+        if crate::manifest::jev_budget_exhausted(est_tokens) {
+            crate::manifest::note_budget_skip();
+            return Err(anyhow::anyhow!(
+                "Jev budget cap reached (${:.4}); raise --jev-budget to continue",
+                crate::manifest::jev_budget_usd()
+            ));
+        }
         let resp = ureq::post(&self.endpoint)
             .set("Authorization", &format!("Bearer {}", self.api_key))
             .set("Content-Type", "application/json")
             .timeout(std::time::Duration::from_secs(12))
-            .send_json(payload)
+            .send_string(&body)
             .context("Failed to communicate with TypeSafe Jev API");
         match &resp {
             Ok(_) => {
-                crate::manifest::JEV_REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
             }
             Err(_) => {
-                crate::manifest::JEV_REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                crate::manifest::JEV_FAILED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
+                crate::manifest::JEV_FAILED.fetch_add(1, Ordering::Relaxed);
             }
         }
         resp

@@ -13,10 +13,36 @@ use std::sync::atomic::{AtomicU64, AtomicU32, Ordering};
 pub const SCHEMA_VERSION: &str = "1.0";
 /// TypeSafe list price, USD per million input tokens (docs.typesafe.ai).
 pub const JEV_USD_PER_MTOK: f64 = 0.042;
+/// Default hard spend cap when the CLI does not pass `--jev-budget`.
+pub const DEFAULT_JEV_BUDGET_USD: f64 = 0.25;
 
 pub static JEV_REQUESTS: AtomicU32 = AtomicU32::new(0);
 pub static JEV_INPUT_TOKENS: AtomicU64 = AtomicU64::new(0);
 pub static JEV_FAILED: AtomicU32 = AtomicU32::new(0);
+/// Budget in micro-USD (u64) so we can compare without floats in the hot path.
+static JEV_BUDGET_MICROUSD: AtomicU64 = AtomicU64::new((DEFAULT_JEV_BUDGET_USD * 1_000_000.0) as u64);
+static JEV_SKIPPED_BUDGET: AtomicU32 = AtomicU32::new(0);
+
+pub fn set_jev_budget_usd(usd: f64) {
+    let micro = (usd.max(0.0) * 1_000_000.0) as u64;
+    JEV_BUDGET_MICROUSD.store(micro, Ordering::Relaxed);
+}
+
+pub fn jev_budget_usd() -> f64 {
+    JEV_BUDGET_MICROUSD.load(Ordering::Relaxed) as f64 / 1_000_000.0
+}
+
+/// True when posting `est_tokens` more would exceed the hard USD cap.
+/// Spent tokens so far + reservation estimate, at list price.
+pub fn jev_budget_exhausted(est_tokens: u64) -> bool {
+    let spent = JEV_INPUT_TOKENS.load(Ordering::Relaxed) + est_tokens;
+    let micro = (spent as f64 / 1_000_000.0 * JEV_USD_PER_MTOK * 1_000_000.0).ceil() as u64;
+    micro > JEV_BUDGET_MICROUSD.load(Ordering::Relaxed)
+}
+
+pub fn note_budget_skip() {
+    JEV_SKIPPED_BUDGET.fetch_add(1, Ordering::Relaxed);
+}
 
 /// What the score could and could not see. Always print with a score.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -50,6 +76,8 @@ pub struct Ledger {
     pub jev_input_tokens: u64,
     pub jev_failed: u32,
     pub jev_cost_usd: f64,
+    pub jev_budget_usd: f64,
+    pub jev_skipped_budget: u32,
     pub fetch_credits_spent: u32,
     pub fetch_credit_cap: u32,
     pub paid_backends_used: Vec<String>,
@@ -67,6 +95,8 @@ impl Ledger {
             jev_input_tokens: JEV_INPUT_TOKENS.load(Ordering::Relaxed),
             jev_failed: JEV_FAILED.load(Ordering::Relaxed),
             jev_cost_usd: jev_cost_usd(JEV_INPUT_TOKENS.load(Ordering::Relaxed)),
+            jev_budget_usd: jev_budget_usd(),
+            jev_skipped_budget: jev_budget_skip_count(),
             fetch_credits_spent: 0,
             fetch_credit_cap: 0,
             paid_backends_used: Vec::new(),
@@ -151,6 +181,11 @@ pub fn jev_key_present() -> bool {
 
 pub fn jev_cost_usd(input_tokens: u64) -> f64 {
     (input_tokens as f64 / 1_000_000.0) * JEV_USD_PER_MTOK
+}
+
+/// Ledger field for budget skips this process (filled at snapshot time).
+pub fn jev_budget_skip_count() -> u32 {
+    JEV_SKIPPED_BUDGET.load(Ordering::Relaxed)
 }
 
 fn now_unix_ms() -> u128 {

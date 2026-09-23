@@ -450,6 +450,50 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_jev_budget_cap() {
+        use crate::manifest::{
+            jev_budget_exhausted, jev_budget_usd, set_jev_budget_usd, DEFAULT_JEV_BUDGET_USD,
+            JEV_INPUT_TOKENS,
+        };
+        use std::sync::atomic::Ordering;
+        set_jev_budget_usd(0.0);
+        assert!(jev_budget_exhausted(1));
+        set_jev_budget_usd(DEFAULT_JEV_BUDGET_USD);
+        assert!(!jev_budget_exhausted(1));
+        // Tokens already spent count toward the cap.
+        let before = JEV_INPUT_TOKENS.load(Ordering::Relaxed);
+        JEV_INPUT_TOKENS.fetch_add(10_000_000, Ordering::Relaxed); // $0.42 at list price
+        assert!(jev_budget_exhausted(1));
+        JEV_INPUT_TOKENS.fetch_sub(10_000_000, Ordering::Relaxed);
+        assert_eq!(JEV_INPUT_TOKENS.load(Ordering::Relaxed), before);
+        set_jev_budget_usd(DEFAULT_JEV_BUDGET_USD);
+        assert!((jev_budget_usd() - DEFAULT_JEV_BUDGET_USD).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_normalize_score_maps_legend_top_to_one() {
+        use serde_json::json;
+        // Same logic as main::normalize_score (duplicated for unit access).
+        fn normalize_score(a: &serde_json::Value) -> Option<f64> {
+            let s = a.get("score")?.as_f64()?;
+            let legend = a.get("legend")?;
+            let top = legend
+                .as_object()?
+                .keys()
+                .filter_map(|k| k.parse::<f64>().ok())
+                .fold(0.0f64, f64::max);
+            if top <= 0.0 {
+                return Some(s.clamp(0.0, 1.0));
+            }
+            Some((s / top).clamp(0.0, 1.0))
+        }
+        let a = json!({"score": 3.0, "legend": {"0": "a", "1": "b", "2": "c", "3": "d"}});
+        assert!((normalize_score(&a).unwrap() - 1.0).abs() < 1e-9);
+        let b = json!({"score": 1.5, "legend": {"0": "a", "1": "b", "2": "c", "3": "d"}});
+        assert!((normalize_score(&b).unwrap() - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
     fn test_composite_geo() {
         use crate::policy::composite_geo;
         use serde_json::json;

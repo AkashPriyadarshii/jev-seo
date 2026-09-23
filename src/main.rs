@@ -92,6 +92,12 @@ enum Commands {
         /// Write run.json + ledger.json to this directory (default: beside first export)
         #[arg(long, value_name = "DIR")]
         manifest: Option<String>,
+        /// Skip all Jev semantic calls (rules and local audit only)
+        #[arg(long)]
+        no_jev: bool,
+        /// Hard Jev spend cap in USD for this run
+        #[arg(long, default_value_t = 0.25, value_name = "USD")]
+        jev_budget: f64,
     },
     /// Generative Engine Optimization (GEO) citation scoring via Jev
     Geo {
@@ -101,6 +107,9 @@ enum Commands {
         query: String,
         #[arg(long)]
         json: bool,
+        /// Hard Jev spend cap in USD for this run
+        #[arg(long, default_value_t = 0.25, value_name = "USD")]
+        jev_budget: f64,
     },
     /// Validate Schema.org JSON-LD markup against active 2026 search specifications
     Schema {
@@ -169,6 +178,12 @@ enum Commands {
         /// Write run.json + ledger.json to this directory (default: beside first export)
         #[arg(long, value_name = "DIR")]
         manifest: Option<String>,
+        /// Skip the homepage Jev site+GEO judgment
+        #[arg(long)]
+        no_jev: bool,
+        /// Hard Jev spend cap in USD for this run
+        #[arg(long, default_value_t = 0.25, value_name = "USD")]
+        jev_budget: f64,
     },
     /// Check llms.txt presence and AI crawler permissions for answer-engine readiness
     Llms {
@@ -201,8 +216,20 @@ enum Commands {
     Mcp,
 }
 
+/// Push CLI `--jev-budget` into the process-wide spend cap (USD).
+fn apply_jev_budget_from(cli: &Cli) {
+    let usd = match &cli.command {
+        Commands::Audit { jev_budget, .. }
+        | Commands::Geo { jev_budget, .. }
+        | Commands::Crawl { jev_budget, .. } => *jev_budget,
+        _ => manifest::DEFAULT_JEV_BUDGET_USD,
+    };
+    manifest::set_jev_budget_usd(usd);
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    apply_jev_budget_from(&cli);
 
     match cli.command {
         Commands::Keywords { query, json } => {
@@ -319,7 +346,7 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, rescore, manifest } => {
+        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -340,7 +367,7 @@ fn main() -> Result<()> {
 
             let actions = crate::rules::actions_for(&dir_report.findings);
             // Max Jev: speculative page suite on the largest pages BEFORE any ledger snapshot.
-            let jev_pages = if !is_rescore {
+            let jev_pages = if !is_rescore && !no_jev {
                 judge_audit_sample(&dir_report, target_query.as_deref(), 12)
             } else {
                 Vec::new()
@@ -599,7 +626,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Geo { target, query, json } => {
+        Commands::Geo { target, query, json, jev_budget: _ } => {
             let content = match crate::paths::read_user_file(&target, &["md", "mdx", "markdown", "html", "htm", "txt"]) {
                 Ok(c) => c,
                 Err(e) => {
@@ -845,7 +872,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest } => {
+        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest, no_jev, jev_budget: _ } => {
             if let Some(path) = rescore {
                 let raw = std::fs::read_to_string(&path)?;
                 let saved: crawl::CrawlReport = serde_json::from_str(&raw)?;
@@ -882,7 +909,7 @@ fn main() -> Result<()> {
             let mut budget = crate::fetch::Budget { max_credits, spent: 0 };
             let report = crawl::crawl_site(&url, max_pages, mode, &mut budget)?;
             // Max Jev: one site+GEO fan-out on the homepage before any ledger snapshot.
-            let site_jev = judge_crawl_site(&report.start_url);
+            let site_jev = if no_jev { None } else { judge_crawl_site(&report.start_url) };
             let mut completeness_pre = manifest::completeness_crawl(&report, max_pages);
             if site_jev.is_some() {
                 completeness_pre
@@ -1393,7 +1420,8 @@ fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {
         if let Some(a) = extra.get(k) {
             if let Some(s) = a.get("score").and_then(|x| x.as_f64()) {
                 let c = a.get("confidence").and_then(|x| x.as_f64()).unwrap_or(0.0);
-                parts.push(format!("{k}={s:.2}({c:.2})"));
+                let norm = normalize_score(a).unwrap_or(s);
+                parts.push(format!("{k}={norm:.2}({c:.2})"));
             } else if let Some(n) = a.get("noul").or_else(|| a.get("probability")).and_then(|x| x.as_f64()) {
                 parts.push(format!("{k}=P{n:.2}"));
             } else if let Some(ch) = a.get("choice").and_then(|x| x.as_str()) {
@@ -1404,6 +1432,23 @@ fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {
     if !parts.is_empty() {
         println!("      {}", parts.join(" · ").dimmed());
     }
+}
+
+/// Score answers are positions on ordered levels (0..N). Map to 0..1 using the
+/// legend keys so display matches confidence scale (skill: score is not probability,
+/// but comparing levels as a fraction is what the rubric means).
+fn normalize_score(a: &serde_json::Value) -> Option<f64> {
+    let s = a.get("score")?.as_f64()?;
+    let legend = a.get("legend")?;
+    let top = legend
+        .as_object()?
+        .keys()
+        .filter_map(|k| k.parse::<f64>().ok())
+        .fold(0.0f64, f64::max);
+    if top <= 0.0 {
+        return Some(s.clamp(0.0, 1.0));
+    }
+    Some((s / top).clamp(0.0, 1.0))
 }
 
 fn print_keyword_values(extra: &serde_json::Map<String, serde_json::Value>, suggestions: &[String]) {
