@@ -258,13 +258,6 @@ fn safety_gate(tool: &str, target: &str) -> Option<String> {
 
 fn execute_tool(name: &str, args: &serde_json::Value) -> String {
     match name {
-        "seo_keywords" => {
-            let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-            match crate::serp::get_autocomplete(q) {
-                Ok(items) => serde_json::to_string_pretty(&items).unwrap_or_default(),
-                Err(e) => format!("Error: {}", e),
-            }
-        }
         "seo_serp_inspect" => {
             let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
             let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
@@ -294,9 +287,16 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
                 Err(e) => return format!("Error: {}", e),
             };
             if let Some(client) = crate::engine::JevClient::new() {
-                let state = json!({ "query": query, "content": content });
-                match client.fanout_eval(state) {
+                let state = json!({
+                    "query": query,
+                    "content": content,
+                    "page": { "text": content.chars().take(8000).collect::<String>(), "title": target }
+                });
+                match client.judge_page(state) {
                     Ok(eval) => {
+                        if crate::policy::injection_blocked(&eval.extra) {
+                            return "Error: blocked: injection risk in content (Jev pre-screen).".into();
+                        }
                         if crate::policy::gate("geo", eval.confidence()) == crate::policy::Verdict::Drop {
                             return "Error: Jev unsure (low confidence), no score.".into();
                         }
@@ -306,6 +306,31 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
                 }
             } else {
                 "Error: TYPESAFE_API_KEY environment variable not configured.".into()
+            }
+        }
+        "seo_keywords" => {
+            let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::serp::get_autocomplete(q) {
+                Ok(items) => {
+                    if let Some(client) = crate::engine::JevClient::new() {
+                        let state = json!({ "root_query": q, "suggestions": items });
+                        let extras = crate::policy::keyword_value_extras(&items, 10);
+                        if let Ok(eval) = client.fanout_eval_with(state, extras) {
+                            if crate::policy::gate("keywords", eval.confidence()) != crate::policy::Verdict::Drop {
+                                let out = json!({
+                                    "suggestions": items,
+                                    "intent": eval.intent,
+                                    "intent_confidence": eval.intent_confidence,
+                                    "content_gap": eval.content_gap,
+                                    "keyword_values": eval.extra
+                                });
+                                return serde_json::to_string_pretty(&out).unwrap_or_default();
+                            }
+                        }
+                    }
+                    serde_json::to_string_pretty(&items).unwrap_or_default()
+                }
+                Err(e) => format!("Error: {}", e),
             }
         }
         "seo_schema" => {

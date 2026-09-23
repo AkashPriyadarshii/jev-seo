@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- RunManifest contract (`src/manifest.rs`): frozen `run.json` + `ledger.json` with schema 1.0, citation gate on report writers, completeness banners on audit/crawl/llms scores.
+- Max Jev fan-out: page suite on audit sample, site+GEO on crawl homepage, richer GEO/page/keyword/brief questions, MCP `seo_keywords`/`seo_geo` wired to the same suites; model alias `jev-latest`; usage tokens recorded after each call.
+- Skill-hard thresholds: Choice/Score act at confidence 0.80; dedicated injection Noul pre-screen before quality suites; state pre-filter before truncate.
+- `--manifest <DIR>` on `audit` and `crawl` to place companion artifacts.
 - `audit --pdf` and `audit --md` report writers: pure-Rust multi-page PDF and Markdown tables from the same audit data.
 - `gsc` command: free Search Console query data via OAuth device flow with owner-only token storage.
 - Optional paid search backend: `query --provider tavily` (or auto when `TAVILY_API_KEY` is set) with free DuckDuckGo fallback, hardened browser headers, and clean `--json` stdout. Thanks to @jerryrat for the API path and header research in PR #2.

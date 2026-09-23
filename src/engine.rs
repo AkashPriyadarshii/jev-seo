@@ -1,6 +1,10 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::atomic::Ordering;
+
+/// Alias from docs.typesafe.ai; resolves to the active production model.
+pub const MODEL: &str = "jev-latest";
 
 pub struct JevClient {
     api_key: String,
@@ -41,6 +45,7 @@ impl JevClient {
         })
     }
 
+    #[allow(dead_code)]
     pub fn fanout_eval(&self, state: serde_json::Value) -> Result<AnalysisResult> {
         self.fanout_eval_with(state, serde_json::json!({}))
     }
@@ -50,7 +55,7 @@ impl JevClient {
     /// API failure fails open: the static path guard already ran.
     pub fn safety_block(&self, tool: &str, target: &str) -> bool {
         let payload = json!({
-            "model": "jev-1.13.0",
+            "model": MODEL,
             "state": { "tool": tool, "target": target },
             "questions": {
                 "unsafe_target": {
@@ -66,6 +71,7 @@ impl JevClient {
             Ok(b) => b,
             Err(_) => return false,
         };
+        record_usage(&body);
         body.get("answers")
             .and_then(|a| a.get("unsafe_target"))
             .and_then(|u| u.get("noul"))
@@ -75,21 +81,32 @@ impl JevClient {
     }
 
     fn post(&self, payload: serde_json::Value) -> Result<ureq::Response> {
-        ureq::post(&self.endpoint)
+        let resp = ureq::post(&self.endpoint)
             .set("Authorization", &format!("Bearer {}", self.api_key))
             .set("Content-Type", "application/json")
             .timeout(std::time::Duration::from_secs(12))
             .send_json(payload)
-            .context("Failed to communicate with TypeSafe Jev API")
+            .context("Failed to communicate with TypeSafe Jev API");
+        match &resp {
+            Ok(_) => {
+                crate::manifest::JEV_REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+            Err(_) => {
+                crate::manifest::JEV_REQUESTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                crate::manifest::JEV_FAILED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+        resp
     }
     /// Same as fanout_eval plus command-specific questions merged into the one
     /// request. Answers land in `extra` for code to consume.
+    /// State is pre-filtered (skill: strip junk) then truncated.
     pub fn fanout_eval_with(
         &self,
         state: serde_json::Value,
         extra_questions: serde_json::Value,
     ) -> Result<AnalysisResult> {
-        let state = truncate_state(state);
+        let state = truncate_state(prefilter_state(state));
         let mut questions = json!({
                 "intent": {
                     "type": "choice",
@@ -140,7 +157,7 @@ impl JevClient {
             }
         }
         let payload = json!({
-            "model": "jev-1.13.0",
+            "model": MODEL,
             "state": state,
             "questions": questions
         });
@@ -148,6 +165,7 @@ impl JevClient {
         let resp = self.post(payload)?;
 
         let body: serde_json::Value = resp.into_json()?;
+        record_usage(&body);
         let answers = body.get("answers").context("Invalid Jev response schema")?;
 
         let intent_obj = &answers["intent"];
@@ -202,6 +220,142 @@ impl JevClient {
                 })
                 .unwrap_or_default(),
         })
+    }
+
+    /// Dedicated injection pre-screen (skill jaggedness #6): one Noul before the
+    /// full suite. True = block; do not trust further semantic answers on this state.
+    pub fn injection_preflight(&self, state: &serde_json::Value) -> Result<bool> {
+        let payload = json!({
+            "model": MODEL,
+            "state": prefilter_state(state.clone()),
+            "questions": crate::policy::injection_question()
+        });
+        let body: serde_json::Value = self.post(payload)?.into_json()?;
+        record_usage(&body);
+        let p = body
+            .pointer("/answers/injection_risk/noul")
+            .or_else(|| body.pointer("/answers/injection_risk/probability"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        Ok(p >= 0.70)
+    }
+
+    /// Judge one page (or snippet) with the full speculative suite in a single
+    /// request: base intent/GEO/gap + geo dimensions + page quality.
+    /// Runs injection preflight first; blocked content returns a Drop-tier result
+    /// without asking quality questions.
+    pub fn judge_page(
+        &self,
+        state: serde_json::Value,
+    ) -> Result<AnalysisResult> {
+        if self.injection_preflight(&state)? {
+            return Ok(AnalysisResult {
+                intent: "unclear".into(),
+                intent_confidence: 0.0,
+                geo_score: 1,
+                geo_confidence: 0.0,
+                direct_answer: false,
+                direct_answer_p: 0.0,
+                content_gap: "generic_prose".into(),
+                gap_confidence: 0.0,
+                extra: serde_json::json!({
+                    "injection_risk": { "type": "noul", "value": 1.0, "band": "yes", "blocked": true }
+                })
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            });
+        }
+        let mut extras = crate::policy::geo_questions();
+        let page = crate::policy::page_audit_extras();
+        if let (Some(dst), Some(src)) = (extras.as_object_mut(), page.as_object()) {
+            for (k, v) in src {
+                dst.insert(k.clone(), v.clone());
+            }
+        }
+        self.fanout_eval_with(state, extras)
+    }
+
+    /// Site/homepage judgment: base + GEO dims + value prop / entity / model.
+    pub fn judge_site(&self, state: serde_json::Value) -> Result<AnalysisResult> {
+        if self.injection_preflight(&state)? {
+            return Ok(AnalysisResult {
+                intent: "unclear".into(),
+                intent_confidence: 0.0,
+                geo_score: 1,
+                geo_confidence: 0.0,
+                direct_answer: false,
+                direct_answer_p: 0.0,
+                content_gap: "generic_prose".into(),
+                gap_confidence: 0.0,
+                extra: serde_json::json!({
+                    "injection_risk": { "type": "noul", "value": 1.0, "band": "yes", "blocked": true }
+                })
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            });
+        }
+        let mut extras = crate::policy::geo_questions();
+        let site = crate::policy::site_extras();
+        if let (Some(dst), Some(src)) = (extras.as_object_mut(), site.as_object()) {
+            for (k, v) in src {
+                dst.insert(k.clone(), v.clone());
+            }
+        }
+        self.fanout_eval_with(state, extras)
+    }
+}
+
+/// Drop noise fields before truncate so Jev sees decisive evidence only.
+fn prefilter_state(value: serde_json::Value) -> serde_json::Value {
+    const DROP_KEYS: &[&str] = &[
+        "raw_html",
+        "html",
+        "scripts",
+        "styles",
+        "css",
+        "inline_script",
+        "dom_snapshot",
+        "history",
+        "chat_transcript",
+        "entire_repo",
+        "conversation",
+    ];
+    match value {
+        serde_json::Value::Object(map) => serde_json::Value::Object(
+            map.into_iter()
+                .filter(|(k, v)| {
+                    let kl = k.to_ascii_lowercase();
+                    if DROP_KEYS.iter().any(|d| kl == *d) {
+                        return false;
+                    }
+                    // Drop empty containers and pure-whitespace strings.
+                    match v {
+                        serde_json::Value::Array(a) => !a.is_empty(),
+                        serde_json::Value::Object(o) => !o.is_empty(),
+                        serde_json::Value::String(s) => !s.trim().is_empty(),
+                        _ => true,
+                    }
+                })
+                .map(|(k, v)| (k, prefilter_state(v)))
+                .collect(),
+        ),
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.into_iter().map(prefilter_state).collect())
+        }
+        other => other,
+    }
+}
+
+/// Fold API usage into the run ledger (input tokens drive cost at list price).
+fn record_usage(body: &serde_json::Value) {
+    let usage = match body.get("usage") {
+        Some(u) if u.is_object() => u.clone(),
+        _ => return,
+    };
+    if let Some(t) = usage.get("input_tokens").and_then(|t| t.as_u64()) {
+        crate::manifest::JEV_INPUT_TOKENS.fetch_add(t, Ordering::Relaxed);
     }
 }
 
