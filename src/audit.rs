@@ -4,6 +4,73 @@ use gray_matter::Matter;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::LazyLock;
+
+static SLOP_RE: LazyLock<Regex> = LazyLock::new(|| {
+    let mut alts: Vec<String> = AI_SLOP_PHRASES.iter().map(|p| regex::escape(p)).collect();
+    alts.sort_by_key(|a| std::cmp::Reverse(a.len()));
+    Regex::new(&format!("(?i)\\b(?:{})\\b", alts.join("|"))).expect("slop regex")
+});
+static TAG_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?is)<(script|style|head)\b[^>]*>.*?</(script|style|head)\s*>").expect("tag regex"));
+static MD_HTML_H_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?i)<h([1-6])\b[^>]*>"#).expect("md html heading regex"));
+static MD_FENCE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?s)```.*?```").expect("fence regex"));
+static MD_LINK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"!\[([^\]]*)\]\([^)]+\)|\[([^\]]*)\]\([^)]+\)").expect("md link regex"));
+
+/// Attribute value from a single HTML tag, any attribute order.
+fn tag_attr(tag: &str, attr: &str) -> Option<String> {
+    let pat = format!(r#"(?i)\b{}\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)"#, regex::escape(attr));
+    let re = Regex::new(&pat).ok()?;
+    re.captures(tag).and_then(|c| {
+        c.get(1).map(|m| {
+            m.as_str()
+                .trim_matches(|c: char| c == '"' || c == '\'')
+                .to_string()
+        })
+    })
+}
+
+/// Distinct AI-slop markers with word boundaries: "robust" no longer fires
+/// inside "robustness", but multi-word tells like "in summary" still match.
+fn slop_hits(text: &str) -> Vec<String> {
+    let mut found: Vec<String> = SLOP_RE
+        .find_iter(text)
+        .map(|m| m.as_str().to_lowercase())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    found.sort();
+    found
+}
+
+/// Markdown body stripped of fences, code spans, and link markup for honest
+/// word counts: syntax characters are not prose.
+pub fn md_plain_text(body: &str) -> String {
+    let no_fence = MD_FENCE_RE.replace_all(body, " ");
+    let no_links = MD_LINK_RE.replace_all(&no_fence, "$1$2");
+    let no_code: String = no_links
+        .split('`')
+        .enumerate()
+        .filter(|(i, _)| i % 2 == 0)
+        .map(|(_, s)| s)
+        .collect::<Vec<_>>()
+        .join(" ");
+    no_code
+        .split_whitespace()
+        .filter(|w| {
+            let t = w.trim_matches(|c: char| c == '#' || c == '*' || c == '_' || c == '-' || c == '>' || c == '|');
+            !t.is_empty()
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn md_prose_words(body: &str) -> usize {
+    md_plain_text(body).split_whitespace().count()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditReport {
@@ -28,7 +95,15 @@ pub struct AuditReport {
     pub em_dash_count: usize,
     pub ai_slop_words_found: Vec<String>,
     pub internal_link_targets: Vec<String>,
+    /// False only when an ld+json block failed to parse. Defaults true so
+    /// reports saved before validation existed do not newly fail R33.
+    #[serde(default = "schema_valid_default")]
+    pub schema_json_valid: bool,
     pub checks: Vec<CheckItem>,
+}
+
+fn schema_valid_default() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -237,6 +312,37 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
     }
 
     let body = parsed.content;
+    // Inline HTML in markdown bodies counts: layout tags the author wrote
+    // by hand satisfy canonical/schema/OG the same as frontmatter keys.
+    let mut schema_json_valid = true;
+    {
+        let link_tag_re = Regex::new(r#"(?is)<link\b[^>]*>"#)?;
+        for cap in link_tag_re.captures_iter(&body) {
+            if tag_attr(&cap[0], "rel").is_some_and(|v| v.eq_ignore_ascii_case("canonical")) {
+                canonical_found = true;
+            }
+        }
+        let script_re = Regex::new(r#"(?is)<script\b[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
+        for cap in script_re.captures_iter(&body) {
+            schema_found = true;
+            if serde_json::from_str::<serde_json::Value>(&cap[1]).is_err() {
+                schema_json_valid = false;
+            }
+        }
+        let meta_tag_re = Regex::new(r#"(?is)<meta\b[^>]*>"#)?;
+        let mut og_seen = std::collections::BTreeSet::new();
+        for cap in meta_tag_re.captures_iter(&body) {
+            if let Some(prop) = tag_attr(&cap[0], "property") {
+                let p = prop.to_ascii_lowercase();
+                if p == "og:title" || p == "og:description" || p == "og:image" {
+                    og_seen.insert(p);
+                }
+            }
+        }
+        if og_seen.len() == 3 {
+            og_tags_found = true;
+        }
+    }
     let mut h1_count = 0;
     let mut h2_count = 0;
     let mut h3_count = 0;
@@ -255,6 +361,22 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
 
     for line in body.lines() {
         let trimmed = line.trim();
+        // Inline HTML headings count too: docs often mix <h2> into markdown.
+        let mut html_heading: Option<usize> = None;
+        if !trimmed.starts_with('#') {
+            if let Some(cap) = MD_HTML_H_RE.captures(trimmed) {
+                if let Some(lvl) = cap[1].parse::<usize>().ok() {
+                    html_heading = Some(lvl);
+                    match lvl {
+                        1 => h1_count += 1,
+                        2 => h2_count += 1,
+                        3 => h3_count += 1,
+                        _ => {}
+                    }
+                    past_first_heading = true;
+                }
+            }
+        }
         let heading_lvl = if let Some(stripped) = trimmed.strip_prefix("# ") {
             h1_count += 1;
             past_first_heading = true;
@@ -276,7 +398,7 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         } else if trimmed.starts_with("###### ") {
             Some(6)
         } else {
-            None
+            html_heading
         };
 
         if let Some(lvl) = heading_lvl {
@@ -284,6 +406,10 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
                 if lvl > prev + 1 {
                     heading_skipped_levels.push(format!("H{} -> H{}", prev, lvl));
                 }
+            } else if lvl > 2 {
+                // Leading jump with no prior heading: H3-first skips H1+H2.
+                // H2-first is covered by the missing-H1 check instead.
+                heading_skipped_levels.push(format!("H1 -> H{}", lvl));
             }
             prev_heading_level = Some(lvl);
         } else if !past_first_heading || h2_count == 0 {
@@ -308,20 +434,13 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         }
     }
 
-    let words: Vec<&str> = body.split_whitespace().collect();
-    let word_count = words.len();
+    let word_count = md_prose_words(&body);
 
     let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
     let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
 
     let em_dash_count = content.chars().filter(|&c| c == '\u{2014}').count();
-    let lower_body = body.to_lowercase();
-    let mut ai_slop_words_found = Vec::new();
-    for &phrase in AI_SLOP_PHRASES {
-        if lower_body.contains(phrase) {
-            ai_slop_words_found.push(phrase.to_string());
-        }
-    }
+    let ai_slop_words_found = slop_hits(&body);
 
     let checks = vec![
         check_title_length(title_len),
@@ -331,126 +450,6 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         check_content_depth(word_count),
         check_image_alt_tags(image_count, images_missing_alt),
         check_geo_citation_density(first_section_words),
-        check_ai_slop(em_dash_count, &ai_slop_words_found, word_count),
-        check_schema_markup(schema_found),
-        check_canonical_reference(canonical_found),
-    ];
-
-    Ok(AuditReport {
-        file_path: path_str.to_string(),
-        title,
-        title_len,
-        description,
-        description_len,
-        h1_count,
-        h2_count,
-        h3_count,
-        word_count,
-        image_count,
-        images_missing_alt,
-        internal_links,
-        external_links,
-        schema_found,
-        canonical_found,
-        og_tags_found,
-        geo_opening_words: first_section_words,
-        heading_skipped_levels,
-        em_dash_count,
-        ai_slop_words_found,
-        internal_link_targets,
-        checks,
-    })
-}
-
-fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
-    let title_re = Regex::new(r#"(?is)<title[^>]*>(.*?)</title>"#)?;
-    let meta_desc_re = Regex::new(r#"(?is)<meta[^>]*name=["']description["'][^>]*content=["'](.*?)["']"#)?;
-    let img_re = Regex::new(r#"(?is)<img\b([^>]*)>"#)?;
-    let alt_re = Regex::new(r#"(?is)alt=["']([^"']+)["']"#)?;
-    let a_re = Regex::new(r#"(?is)<a\b[^>]*href=["']([^"']*)["']"#)?;
-    let schema_re = Regex::new(r#"(?is)<script[^>]*type=["']application/ld\+json["'][^>]*>.*?</script>"#)?;
-    let canonical_re = Regex::new(r#"(?is)<link[^>]*rel=["']canonical["'][^>]*href=["'](.*?)["']"#)?;
-    let og_re = Regex::new(r#"(?is)<meta[^>]*property=["']og:(title|description|image)["']"#)?;
-    let strip_html = Regex::new(r#"<[^>]+>"#)?;
-
-    let title = title_re.captures(content).map(|c| c[1].trim().to_string());
-    let description = meta_desc_re.captures(content).map(|c| c[1].trim().to_string());
-
-    let h1_count = Regex::new(r#"(?is)<h1\b[^>]*>.*?</h1>"#)?.find_iter(content).count();
-    let h2_count = Regex::new(r#"(?is)<h2\b[^>]*>.*?</h2>"#)?.find_iter(content).count();
-    let h3_count = Regex::new(r#"(?is)<h3\b[^>]*>.*?</h3>"#)?.find_iter(content).count();
-
-    let heading_seq_re = Regex::new(r#"(?is)<(h[1-6])\b[^>]*>"#)?;
-    let mut prev_heading_level: Option<usize> = None;
-    let mut heading_skipped_levels = Vec::new();
-    for cap in heading_seq_re.captures_iter(content) {
-        let tag = &cap[1];
-        if let Some(lvl_char) = tag.chars().nth(1) {
-            if let Some(lvl) = lvl_char.to_digit(10).map(|d| d as usize) {
-                if let Some(prev) = prev_heading_level {
-                    if lvl > prev + 1 {
-                        heading_skipped_levels.push(format!("H{} -> H{}", prev, lvl));
-                    }
-                }
-                prev_heading_level = Some(lvl);
-            }
-        }
-    }
-
-    let schema_found = schema_re.is_match(content);
-    let canonical_found = canonical_re.is_match(content);
-    let og_tags_found = og_re.is_match(content);
-
-    let mut image_count = 0;
-    let mut images_missing_alt = 0;
-    for cap in img_re.captures_iter(content) {
-        image_count += 1;
-        let attrs = &cap[1];
-        if !alt_re.is_match(attrs) {
-            images_missing_alt += 1;
-        }
-    }
-
-    let mut internal_links = 0;
-    let mut external_links = 0;
-    let mut internal_link_targets = Vec::new();
-    for cap in a_re.captures_iter(content) {
-        let href = cap[1].trim();
-        let target = href.split('#').next().unwrap_or("").trim();
-        if target.starts_with("http://") || target.starts_with("https://") {
-            external_links += 1;
-        } else if !target.is_empty() && !target.starts_with('#') && !target.starts_with("mailto:") {
-            internal_links += 1;
-            internal_link_targets.push(target.to_string());
-        }
-    }
-
-    let plain_text = strip_html.replace_all(content, " ");
-    let words: Vec<&str> = plain_text.split_whitespace().collect();
-    let word_count = words.len();
-
-    let first_30_pct_words = (word_count as f64 * 0.30).round() as usize;
-
-    let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
-    let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
-
-    let em_dash_count = content.chars().filter(|&c| c == '\u{2014}').count();
-    let lower_content = plain_text.to_lowercase();
-    let mut ai_slop_words_found = Vec::new();
-    for &phrase in AI_SLOP_PHRASES {
-        if lower_content.contains(phrase) {
-            ai_slop_words_found.push(phrase.to_string());
-        }
-    }
-
-    let checks = vec![
-        check_title_length(title_len),
-        check_meta_description(description_len),
-        check_h1_uniqueness(h1_count),
-        check_heading_hierarchy(&heading_skipped_levels),
-        check_content_depth(word_count),
-        check_image_alt_tags(image_count, images_missing_alt),
-        check_geo_citation_density(first_30_pct_words),
         check_ai_slop(em_dash_count, &ai_slop_words_found, word_count),
         check_schema_markup(schema_found),
         check_canonical_reference(canonical_found),
@@ -472,9 +471,170 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
         internal_links,
         external_links,
         schema_found,
+        schema_json_valid,
         canonical_found,
         og_tags_found,
-        geo_opening_words: first_30_pct_words,
+        geo_opening_words: first_section_words,
+        heading_skipped_levels,
+        em_dash_count,
+        ai_slop_words_found,
+        internal_link_targets,
+        checks,
+    })
+}
+
+fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
+    let title_re = Regex::new(r#"(?is)<title[^>]*>(.*?)</title>"#)?;
+    let tag_re = Regex::new(r#"(?is)<(meta|link)\b[^>]*>"#)?;
+    let img_re = Regex::new(r#"(?is)<img\b([^>]*)>"#)?;
+    let alt_attr_re = Regex::new(r#"(?is)\balt\s*="#)?;
+    let a_re = Regex::new(r#"(?is)<a\b[^>]*href=["']([^"']*)["']"#)?;
+    let schema_block_re = Regex::new(r#"(?is)<script\b[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
+    let strip_html = Regex::new(r#"<[^>]+>"#)?;
+
+    let title = title_re.captures(content).map(|c| c[1].trim().to_string());
+    // Attribute order must not matter: find the tag by one attribute,
+    // read the value from the other.
+    let mut description: Option<String> = None;
+    let mut canonical_found = false;
+    let mut og_seen = std::collections::BTreeSet::new();
+    for cap in tag_re.captures_iter(content) {
+        let tag = &cap[0];
+        let is_meta = cap[1].eq_ignore_ascii_case("meta");
+        if is_meta {
+            if let Some(name) = tag_attr(tag, "name") {
+                if name.eq_ignore_ascii_case("description") && description.is_none() {
+                    description = tag_attr(tag, "content").map(|s| s.trim().to_string());
+                }
+            }
+            if let Some(prop) = tag_attr(tag, "property") {
+                let p = prop.to_ascii_lowercase();
+                if p == "og:title" || p == "og:description" || p == "og:image" {
+                    og_seen.insert(p);
+                }
+            }
+        } else if tag_attr(tag, "rel").is_some_and(|v| v.eq_ignore_ascii_case("canonical")) {
+            canonical_found = true;
+        }
+    }
+    // All three OG tags required: one of three passing hid partial markup.
+    let og_tags_found = og_seen.len() == 3;
+
+    let h1_count = Regex::new(r#"(?is)<h1\b[^>]*>.*?</h1>"#)?.find_iter(content).count();
+    let h2_count = Regex::new(r#"(?is)<h2\b[^>]*>.*?</h2>"#)?.find_iter(content).count();
+    let h3_count = Regex::new(r#"(?is)<h3\b[^>]*>.*?</h3>"#)?.find_iter(content).count();
+
+    let heading_seq_re = Regex::new(r#"(?is)<(h[1-6])\b[^>]*>"#)?;
+    let mut prev_heading_level: Option<usize> = None;
+    let mut heading_skipped_levels = Vec::new();
+    for cap in heading_seq_re.captures_iter(content) {
+        let tag = &cap[1];
+        if let Some(lvl_char) = tag.chars().nth(1) {
+            if let Some(lvl) = lvl_char.to_digit(10).map(|d| d as usize) {
+                if let Some(prev) = prev_heading_level {
+                    if lvl > prev + 1 {
+                        heading_skipped_levels.push(format!("H{} -> H{}", prev, lvl));
+                    }
+                } else if lvl > 2 {
+                    heading_skipped_levels.push(format!("H1 -> H{}", lvl));
+                }
+                prev_heading_level = Some(lvl);
+            }
+        }
+    }
+
+    let mut schema_found = false;
+    let mut schema_json_valid = true;
+    for cap in schema_block_re.captures_iter(content) {
+        schema_found = true;
+        if serde_json::from_str::<serde_json::Value>(&cap[1]).is_err() {
+            schema_json_valid = false;
+        }
+    }
+
+    let mut image_count = 0;
+    let mut images_missing_alt = 0;
+    for cap in img_re.captures_iter(content) {
+        image_count += 1;
+        // Missing means no alt attribute at all. Empty alt is valid:
+        // it marks decorative images screen readers should skip.
+        if !alt_attr_re.is_match(&cap[1]) {
+            images_missing_alt += 1;
+        }
+    }
+
+    let mut internal_links = 0;
+    let mut external_links = 0;
+    let mut internal_link_targets = Vec::new();
+    for cap in a_re.captures_iter(content) {
+        let href = cap[1].trim();
+        let target = href.split('#').next().unwrap_or("").trim();
+        if target.starts_with("http://") || target.starts_with("https://") {
+            external_links += 1;
+        } else if !target.is_empty() && !target.starts_with('#') && !target.starts_with("mailto:") {
+            internal_links += 1;
+            internal_link_targets.push(target.to_string());
+        }
+    }
+
+    // Word count runs on body copy only: head, scripts, and styles are not
+    // prose, and counting them inflated depth passes.
+    let copy = TAG_RE.replace_all(content, " ");
+    let plain_text = strip_html.replace_all(&copy, " ");
+    let words: Vec<&str> = plain_text.split_whitespace().collect();
+    let word_count = words.len();
+
+    // Opening passage for the GEO window: words before the first H2, which
+    // approximates the lede. The old 30%-of-total metric failed every real
+    // page by construction.
+    let h2_at = Regex::new(r#"(?is)<h2\b"#)
+        .ok()
+        .and_then(|re| re.find(content))
+        .map(|m| m.start())
+        .unwrap_or(content.len());
+    let lede_clean = TAG_RE.replace_all(&content[..h2_at], " ");
+    let lede_text = strip_html.replace_all(&lede_clean, " ");
+    let opening_words = lede_text.split_whitespace().count();
+
+    let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
+    let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
+
+    let em_dash_count = content.chars().filter(|&c| c == '\u{2014}').count();
+    let ai_slop_words_found = slop_hits(&plain_text);
+
+    let checks = vec![
+        check_title_length(title_len),
+        check_meta_description(description_len),
+        check_h1_uniqueness(h1_count),
+        check_heading_hierarchy(&heading_skipped_levels),
+        check_content_depth(word_count),
+        check_image_alt_tags(image_count, images_missing_alt),
+        check_geo_citation_density(opening_words),
+        check_ai_slop(em_dash_count, &ai_slop_words_found, word_count),
+        check_schema_markup(schema_found),
+        check_canonical_reference(canonical_found),
+        check_opengraph_metadata(og_tags_found),
+    ];
+
+    Ok(AuditReport {
+        file_path: path_str.to_string(),
+        title,
+        title_len,
+        description,
+        description_len,
+        h1_count,
+        h2_count,
+        h3_count,
+        word_count,
+        image_count,
+        images_missing_alt,
+        internal_links,
+        external_links,
+        schema_found,
+        schema_json_valid,
+        canonical_found,
+        og_tags_found,
+        geo_opening_words: opening_words,
         heading_skipped_levels,
         em_dash_count,
         ai_slop_words_found,

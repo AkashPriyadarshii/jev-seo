@@ -35,6 +35,11 @@ pub struct PageRecord {
     pub source: String,
     #[serde(default)]
     pub fetch_cost: u32,
+    /// True when an alt-backend copy replaced the direct body. Distinct from
+    /// `source`: a billed Firecrawl call that lost on quality still records
+    /// its backend in `source` with cost, but `upgraded` stays false.
+    #[serde(default)]
+    pub upgraded: bool,
 }
 
 fn direct_source() -> String {
@@ -224,6 +229,17 @@ struct Fetch {
     encoding: Option<String>,
 }
 
+/// Bodies below this many real words try reader upgrades. Raw-HTML bodies
+/// always score ~0.2 on markdown-density, so the gate runs on extracted
+/// text instead: thin shells escalate, real articles do not.
+pub const MIN_UPGRADE_WORDS: usize = 200;
+
+pub(crate) fn body_words(body: &str) -> usize {
+    crate::fetch::readable_text(body, 65536)
+        .split_whitespace()
+        .count()
+}
+
 fn fetch_page(url: &str) -> Fetch {
     let agent: ureq::Agent = ureq::AgentBuilder::new().redirects(0).build();
     let base_host = Url::parse(url)
@@ -289,6 +305,9 @@ pub fn crawl_site(
 ) -> Result<CrawlReport> {
     let start = crate::paths::reject_private_url(start_url)?;
     let start_clean = canonicalize(start.as_str());
+    if matches!(mode, crate::fetch::FetchMode::Firecrawl) && budget.max_credits == 0 {
+        eprintln!("Note: --fetch firecrawl with 0 fetch credits parks the paid backend; direct-only.");
+    }
     let t0 = Instant::now();
     let stamp = || {
         let s = t0.elapsed().as_secs();
@@ -337,6 +356,10 @@ pub fn crawl_site(
         fetch: Fetch,
         source: &'static str,
         cost: u32,
+        upgraded: bool,
+        /// Outlinks resolved in the worker from the direct HTML. Upgraded
+        /// reader markdown has no `<a href>` and must never feed discovery.
+        links: Vec<String>,
     }
 
     // Level-by-level parallel fetch: 8 workers per batch, cheap parse and
@@ -381,26 +404,46 @@ pub fn crawl_site(
                 let budget_arc = budget_arc.clone();
                 s.spawn(move || {
                     let mut fetch = fetch_page(url);
+                    // Links resolve here from the direct HTML, before any
+                    // reader upgrade swaps the body for markdown.
+                    let links = if fetch.status == 200 && !fetch.body.is_empty() {
+                        match Url::parse(&fetch.final_url) {
+                            Ok(base) => extract_links(&fetch.body, &base),
+                            Err(_) => Vec::new(),
+                        }
+                    } else {
+                        Vec::new()
+                    };
                     let mut source = "direct";
                     let mut cost = 0u32;
-                    // Upgrade weak bodies only. Direct wins outright on good pages.
+                    let mut upgraded = false;
+                    // Upgrade thin bodies only. Word count on extracted text:
+                    // markdown-density on raw HTML always reads ~0.2 and
+                    // escalated every page.
+                    let mut words = body_words(&fetch.body);
                     if !matches!(mode, crate::fetch::FetchMode::Direct)
-                        && crate::fetch::quality(&fetch.body) < 0.4
+                        && words < MIN_UPGRADE_WORDS
                     {
                         if matches!(mode, crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Jina) {
                             if let Ok(j) = crate::fetch::jina_fetch(url) {
-                                if crate::fetch::quality(&j.body) > crate::fetch::quality(&fetch.body) {
+                                let jw = body_words(&j.body);
+                                if jw > words.max(50) {
                                     fetch.bytes = j.body.len();
                                     fetch.body = j.body;
                                     fetch.elapsed_ms += j.elapsed_ms;
                                     source = j.source;
                                     cost = j.cost;
+                                    words = jw;
+                                    upgraded = true;
                                 }
                             }
                         }
-                        if matches!(mode, crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Firecrawl) {
+                        // Re-check after Jina: a fixed page must not burn a
+                        // Firecrawl credit on top.
+                        if matches!(mode, crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Firecrawl)
+                            && words < MIN_UPGRADE_WORDS
+                        {
                             // Debit under a short lock, fetch outside it.
-                            // Refund only when no call happened; billed calls stay billed.
                             let debited = budget_arc
                                 .lock()
                                 .map(|mut b| b.allow(1))
@@ -408,14 +451,18 @@ pub fn crawl_site(
                             if debited {
                                 match crate::fetch::firecrawl_fetch(url) {
                                     Ok(f) => {
-                                        if !f.body.trim().is_empty()
-                                            && crate::fetch::quality(&f.body) > crate::fetch::quality(&fetch.body)
-                                        {
+                                        // Non-empty return is billed: keep the
+                                        // debit and record the backend even
+                                        // when the direct copy wins.
+                                        cost = f.cost;
+                                        source = f.source;
+                                        let fw = body_words(&f.body);
+                                        if !f.body.trim().is_empty() && fw > words.max(50) {
                                             fetch.bytes = f.body.len();
                                             fetch.body = f.body;
                                             fetch.elapsed_ms += f.elapsed_ms;
-                                            source = f.source;
-                                            cost = f.cost;
+                                            words = fw;
+                                            upgraded = true;
                                         }
                                     }
                                     Err(_) => {
@@ -427,7 +474,7 @@ pub fn crawl_site(
                             }
                         }
                     }
-                    let _ = tx.send(Done { url: url.clone(), fetch, source, cost });
+                    let _ = tx.send(Done { url: url.clone(), fetch, source, cost, upgraded, links });
                 });
             }
         });
@@ -439,23 +486,20 @@ pub fn crawl_site(
             }
             // Raw compare modulo trailing slash: canonical-only rewrites
             // (tracking params, index.html) must not count as redirects.
+            // Redirect plumbing: credit the landing URL so redirect targets
+            // are never flagged orphan, and the hop source stays visible.
             if f.final_url.trim_end_matches('/') != d.url.trim_end_matches('/') && f.status != 0 {
                 redirects.push((d.url.clone(), f.final_url.clone()));
+                *inbound.entry(f.final_url.clone()).or_insert(0) += 1;
             }
-            let outlinks = if f.status == 200 && !f.body.is_empty() {
-                match Url::parse(&f.final_url) {
-                    Ok(base) => {
-                        let links = extract_links(&f.body, &base);
-                        for l in &links {
-                            *inbound.entry(l.clone()).or_insert(0) += 1;
-                            if !visited.contains(l) {
-                                queue.push_back(l.clone());
-                            }
-                        }
-                        links.len()
+            let outlinks = if f.status == 200 {
+                for l in &d.links {
+                    *inbound.entry(l.clone()).or_insert(0) += 1;
+                    if !visited.contains(l) {
+                        queue.push_back(l.clone());
                     }
-                    Err(_) => 0,
                 }
+                d.links.len()
             } else {
                 0
             };
@@ -470,6 +514,7 @@ pub fn crawl_site(
                 encoding: f.encoding,
                 source: d.source.to_string(),
                 fetch_cost: d.cost,
+                upgraded: d.upgraded,
             });
         }
         eprintln!("{} crawled {} pages", stamp(), pages.len());
@@ -553,16 +598,32 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
 /// Re-run the one scoring truth on a mutated report (vitals attach).
 /// Shared by finish_report and the `--vitals` post-pass.
 pub fn score_into(rep: &mut CrawlReport, findings: Vec<crate::rules::Finding>) {
+    use std::collections::HashSet;
     let mut totals = HashMap::new();
     for area in [
         crate::rules::Area::Crawl,
         crate::rules::Area::Performance,
         crate::rules::Area::Security,
         crate::rules::Area::Canonical,
+        crate::rules::Area::Links,
     ] {
         totals.insert(area, rep.pages_crawled);
     }
-    let areas = crate::rules::score_areas(&findings, &totals);
+    let mut areas = crate::rules::score_areas(&findings, &totals);
+    // Health blends measured areas only. The crawler fills Crawl,
+    // Performance, Security, and Canonical; any other area scores only when
+    // it actually fired (orphan R25 lights up Links). Phantom 100s that made
+    // F/D unreachable are gone.
+    let with_findings: HashSet<crate::rules::Area> = findings.iter().map(|f| f.area).collect();
+    areas.retain(|a| {
+        matches!(
+            a.area,
+            crate::rules::Area::Crawl
+                | crate::rules::Area::Performance
+                | crate::rules::Area::Security
+                | crate::rules::Area::Canonical
+        ) || with_findings.contains(&a.area)
+    });
     let score = crate::rules::overall(&areas);
     rep.score = score;
     rep.grade = crate::actions::grade(score).to_string();

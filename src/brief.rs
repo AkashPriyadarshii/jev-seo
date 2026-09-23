@@ -27,7 +27,11 @@ pub struct CompetitorBenchmark {
 }
 
 pub fn generate_brief(topic: &str, limit: usize) -> Result<ContentBrief> {
-    let competitors = serp::scrape_serp(topic, limit)?;
+    generate_brief_with(topic, limit, serp::Provider::Auto)
+}
+
+pub fn generate_brief_with(topic: &str, limit: usize, provider: serp::Provider) -> Result<ContentBrief> {
+    let (competitors, _) = serp::scrape_serp_with(topic, limit, provider)?;
 
     let competitor_benchmarks: Vec<CompetitorBenchmark> = competitors
         .iter()

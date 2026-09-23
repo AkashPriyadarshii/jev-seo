@@ -149,6 +149,9 @@ enum Commands {
         topic: String,
         #[arg(short, long, default_value_t = 5)]
         limit: usize,
+        /// Search backend: auto, ddg, tavily or dfs (paid: TAVILY_API_KEY or DATAFORSEO_* keys)
+        #[arg(long, default_value = "auto")]
+        provider: String,
         #[arg(long)]
         markdown: bool,
         #[arg(long)]
@@ -366,21 +369,25 @@ fn main() -> Result<()> {
                 "ddg" => serp::Provider::Ddg,
                 "tavily" => serp::Provider::Tavily,
                 "dfs" => serp::Provider::Dfs,
-                _ => serp::Provider::Auto,
+                "auto" => serp::Provider::Auto,
+                other => anyhow::bail!("unknown --provider '{other}' (auto, ddg, tavily, dfs)"),
             };
             let opts = serp::SearchOpts { depth, topic, answer: false };
             if backend == serp::Provider::Dfs && !serp::dfs_enabled() {
                 eprintln!("{}", "Note: DATAFORSEO keys missing; explicit dfs falls back to free scrape.".yellow());
             }
+            if backend == serp::Provider::Tavily && !serp::tavily_enabled() {
+                eprintln!("{}", "Note: TAVILY_API_KEY missing; explicit tavily falls back to free scrape.".yellow());
+            }
             eprintln!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
-            let items = serp::scrape_serp_opts(&query, limit, backend, &opts)?;
+            let (items, served) = serp::scrape_serp_opts(&query, limit, backend, &opts)?;
 
             if json {
                 println!("{}", serde_json::to_string_pretty(&items)?);
                 return Ok(());
             }
 
-            let source_label = match backend {
+            let source_label = match served {
                 serp::Provider::Tavily => "Tavily",
                 serp::Provider::Dfs => "DataForSEO",
                 _ => "DuckDuckGo",
@@ -1045,8 +1052,15 @@ fn main() -> Result<()> {
                 println!("               {}", rule.rule_snippet.dimmed());
             }
         }
-        Commands::Brief { topic, limit, markdown, json } => {
-            let brief = brief::generate_brief(&topic, limit)?;
+        Commands::Brief { topic, limit, provider, markdown, json } => {
+            let backend = match provider.as_str() {
+                "ddg" => serp::Provider::Ddg,
+                "tavily" => serp::Provider::Tavily,
+                "dfs" => serp::Provider::Dfs,
+                "auto" => serp::Provider::Auto,
+                other => anyhow::bail!("unknown --provider '{other}' (auto, ddg, tavily, dfs)"),
+            };
+            let brief = brief::generate_brief_with(&topic, limit, backend)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&brief)?);
                 return Ok(());
@@ -1078,8 +1092,9 @@ fn main() -> Result<()> {
             }
         }
         Commands::Rank { domain, query } => {
-            println!("{}", format!("Searching DuckDuckGo rank for domain: \"{}\" on query: \"{}\"...", domain, query).dimmed());
-            let items = serp::scrape_serp(&query, 30)?;
+            println!("{}", format!("Searching rank for domain: \"{}\" on query: \"{}\"...", domain, query).dimmed());
+            let (items, served) = serp::scrape_serp(&query, 30)?;
+            let depth = serp::effective_limit(served, 30);
             let position = items.iter().position(|i| paths::url_matches_domain(&i.url, &domain)).map(|p| p + 1);
             let target_url = position.and_then(|p| items.get(p - 1)).map(|i| i.url.as_str());
 
@@ -1092,7 +1107,7 @@ fn main() -> Result<()> {
 
             let rank_str = match delta.curr_rank {
                 Some(r) => format!("#{}", r).green().bold().to_string(),
-                None => "Not in top 30".red().to_string(),
+                None => format!("Not in top {depth}").red().to_string(),
             };
             println!("  Current:  {}", rank_str);
 
@@ -1214,14 +1229,7 @@ fn main() -> Result<()> {
             if json {
                 // Still freeze the contract for agents piping --json.
                 let mut ledger = manifest::Ledger::new("crawl", &report.start_url);
-                let backends: Vec<String> = report
-                    .pages
-                    .iter()
-                    .filter(|p| p.source != "direct")
-                    .map(|p| p.source.clone())
-                    .collect::<BTreeSet<_>>()
-                    .into_iter()
-                    .collect();
+                let backends = paid_backend_sources(&report.pages);
                 ledger.with_fetch(budget.spent, budget.max_credits, backends);
                 if site_jev.is_some() {
                     ledger.note("Jev site+GEO fan-out on homepage");
@@ -1265,7 +1273,7 @@ fn main() -> Result<()> {
             println!("\n{} {}", "Live Site Crawl:".cyan().bold(), report.start_url);
             println!("  Pages crawled: {}", report.pages_crawled);
             println!("  Health:        {}/100 ({})", report.score, crate::actions::grade(report.score).green().bold());
-            let upgraded = report.pages.iter().filter(|p| p.source != "direct").count();
+            let upgraded = report.pages.iter().filter(|p| p.upgraded).count();
             if upgraded > 0 {
                 println!("  Upgraded:      {} pages via alt backends", upgraded.to_string().yellow());
             }
@@ -1408,14 +1416,7 @@ fn main() -> Result<()> {
             if site_jev.is_some() {
                 ledger.note("Jev site+GEO fan-out on homepage");
             }
-            let backends: Vec<String> = report
-                .pages
-                .iter()
-                .filter(|p| p.source != "direct")
-                .map(|p| p.source.clone())
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect();
+            let backends = paid_backend_sources(&report.pages);
             ledger.with_fetch(budget.spent, budget.max_credits, backends);
             if budget.spent > 0 {
                 ledger.note(format!("{} paid fetch credits spent (cap {})", budget.spent, budget.max_credits));
@@ -1699,9 +1700,34 @@ fn excerpt_local(path: &str) -> String {
     let lower = path.to_ascii_lowercase();
     if lower.ends_with(".html") || lower.ends_with(".htm") {
         crate::fetch::readable_text(&cleaned, 6000)
+    } else if lower.ends_with(".md") || lower.ends_with(".mdx") || lower.ends_with(".markdown") {
+        // Markdown sends prose, not frontmatter fences and link markup.
+        let body = gray_matter_strip(&cleaned);
+        crate::audit::md_plain_text(&body).chars().take(6000).collect()
     } else {
         cleaned.chars().take(6000).collect()
     }
+}
+
+/// Markdown body without the frontmatter block. Frontmatter keys are metadata
+/// for Jev state, not evidence; the audit report already carries them.
+fn gray_matter_strip(cleaned: &str) -> String {
+    let mut lines = cleaned.lines();
+    if lines.next().is_some_and(|l| l.trim() == "---") {
+        let mut rest = Vec::new();
+        let mut closed = false;
+        for l in lines.by_ref() {
+            if l.trim() == "---" {
+                closed = true;
+                break;
+            }
+        }
+        if closed {
+            rest.extend(lines.map(|l| l.to_string()));
+            return rest.join("\n");
+        }
+    }
+    cleaned.to_string()
 }
 
 /// Speculative Jev page suite on the largest audit files. One fan-out per page.
@@ -1716,7 +1742,17 @@ fn judge_audit_sample(
         None => return Vec::new(),
     };
     let mut pages: Vec<&audit::AuditReport> = dir_report.reports.iter().collect();
-    pages.sort_by_key(|b| std::cmp::Reverse(b.word_count));
+    // Homepage first: the largest-files sort buried index/readme, so the
+    // most representative page never got judged.
+    pages.sort_by_key(|b| {
+        let stem = std::path::Path::new(&b.file_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let home = ["index", "readme", "home", "main"].contains(&stem.as_str());
+        (!home, std::cmp::Reverse(b.word_count))
+    });
     let mut out = Vec::new();
     for report in pages.into_iter().take(limit) {
         let content = excerpt_local(&report.file_path);
@@ -1752,6 +1788,11 @@ fn judge_audit_sample(
                 let v = policy::gate("audit", eval.confidence());
                 if v != policy::Verdict::Drop {
                     out.push((report.file_path.clone(), eval, v));
+                } else {
+                    eprintln!(
+                        "{}",
+                        format!("Note: Jev unsure on {} (confidence {:.2}), local checks stand.", report.file_path, eval.confidence()).yellow()
+                    );
                 }
             }
             Err(e) => {
@@ -1792,6 +1833,21 @@ fn print_jev_page_suite(pages: &[(String, engine::AnalysisResult, policy::Verdic
 
 /// Runner-up suffix for Flag verdicts: shows the ambiguity instead of a bare
 /// low confidence, so reviewers see what the call almost chose.
+/// Backends that actually billed. Free-tier Jina (no JINA_API_KEY) reads as
+/// `jina` in page sources but cost nothing, so it stays out of the paid set.
+fn paid_backend_sources(pages: &[crawl::PageRecord]) -> Vec<String> {
+    let jina_paid = std::env::var("JINA_API_KEY")
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false);
+    pages
+        .iter()
+        .filter(|p| p.source != "direct" && (p.source != "jina" || jina_paid))
+        .map(|p| p.source.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
 fn runner_up_suffix(extra: &serde_json::Map<String, serde_json::Value>, v: policy::Verdict) -> String {
     if v == policy::Verdict::Flag {
         if let Some(r) = policy::intent_runner_up(extra) {
