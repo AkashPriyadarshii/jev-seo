@@ -26,17 +26,33 @@ git jev check
 ```
 
 ## 4. Test Harness & Diagnostics
-The test harness in `src/tests.rs` contains 21 unit and integration tests verifying:
+The test harness in `src/tests.rs` contains 72 unit and integration tests verifying:
 - Markdown and HTML on-page SEO parsers
 - Heading hierarchy skip-level detection (`H1 -> H3`)
 - Google Helpful Content and AI slop detection (em-dash density and 17 AI tells)
 - Internal link graph analysis and orphan page detection
-- Keyword cannibalization radar and stem collision grouping
+- Keyword cannibalization radar, stem collision grouping, and A×B conflict pairs
 - XML sitemap protocol enforcement (HTTPS, query parameter detection, 50,000 URL limit)
 - International hreflang tag validation and fallback verification (`x-default`)
-- Native stdio JSON-RPC 2.0 MCP server dispatch across all 8 tools
+- RunManifest citation gates, Jev budget cap, injection pre-screen
+- Narrative contract (unknown action IDs, unverified numbers, effort bands)
+- `explain` rule cards and `report --baseline` score diffs
+- Native stdio JSON-RPC 2.0 MCP server dispatch across all 13 tools
+
+Always run before commit:
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+```
 
 To test a live sitemap:
 ```bash
 jev-seo sitemap https://example.com/sitemap.xml
 ```
+
+## 5. Release checklist (v0.1.2 on 2026-10-22)
+1. Bump `Cargo.toml` to `0.1.2`
+2. Rename CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-10-22`
+3. Tag `v0.1.2` and `cargo publish`
+4. Cut GitHub Release binaries from the release workflow

@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Pair cannibalization: expand each multi-file stem into explicit A×B conflict pairs with word-count winner; print top pairs on audit, table in Markdown, `audit --pairs-csv`.
 - MCP tools `seo_explain` and `seo_report` (score delta + actions + pairs); tools list is now 13.
-- README Command Reference and MCP matrix cover `explain`, `report`, new audit/crawl flags, and narrative.json.
 - Action tracker export: `audit --actions-csv` (same ranked list as terminal; Excel opens CSV).
 - `jev-seo explain R19|RULE-R19`: stable rule card (area, severity, effort band, fix); unknown ids fail closed.
 - `jev-seo report --baseline`: diff two saved audit JSONs (score delta, rules cleared/new) with optional action-tracker CSV and `--json`.
@@ -19,12 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Max Jev fan-out: page suite on audit sample, site+GEO on crawl homepage, richer GEO/page/keyword/brief questions, MCP `seo_keywords`/`seo_geo` wired to the same suites; model alias `jev-latest`; usage tokens recorded after each call.
 - Skill-hard thresholds: Choice/Score act at confidence 0.80; dedicated injection Noul pre-screen before quality suites; state pre-filter before truncate.
 - `--manifest <DIR>` on `audit` and `crawl` to place companion artifacts.
+- `--no-jev` and `--jev-budget <USD>` on audit, crawl, and geo (default $0.25 hard cap).
 - `audit --pdf` and `audit --md` report writers: pure-Rust multi-page PDF and Markdown tables from the same audit data.
 - `gsc` command: free Search Console query data via OAuth device flow with owner-only token storage.
 - Optional paid search backend: `query --provider tavily` (or auto when `TAVILY_API_KEY` is set) with free DuckDuckGo fallback, hardened browser headers, and clean `--json` stdout. Thanks to @jerryrat for the API path and header research in PR #2.
 - Paid `/extract` endpoint as `seo_extract` MCP tool, search depth/topic flags on `query`, Tavily-compatible URL override.
 - Multi-backend page fetch: direct first, Jina and Firecrawl upgrade weak bodies only, quality math picks, per-page source labels, shared credit budget with `--max-credits`.
-- `gsc` command: free Search Console query data via OAuth device flow with owner-only token storage.
 - Fifty-rule audit engine (`src/rules.rs`): stable R01-R50 registry across 9 areas with severity weights, reach factors, area scores, and a weighted overall blend.
 - `crawl` scoring unified on the rules engine: findings, areas, and impact-ranked actions from one truth, stored in JSON for agents.
 - `audit` findings from the same engine, CSV findings export for crawl and audit, and `audit --rescore` for offline rebuilds with backward-compatible JSON.
@@ -44,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composite five-dimension GEO score, intent routing hints, and per-command speculative fan-out.
 - SERP relevance rerank with per-section confidence gating.
 - `audit --min-pass` CI gate with a GitHub Actions workflow, GEO score trend history, and home-directory database.
-- Expanded test harness to 27 passing unit and integration tests.
+- Test harness at 72 passing unit and integration tests with zero clippy warnings.
+- README rewritten for launch: What's new table, full command and MCP matrices, v0.1.2 date, build-from-source path. Ships as v0.1.2 on 2026-10-22.
 
 ## [0.1.1] - 2026-09-22
 
