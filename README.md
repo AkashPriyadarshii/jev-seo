@@ -72,7 +72,7 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 - **2026 Schema.org Validator**: Deeply inspects JSON-LD schemas (`SoftwareApplication`, `Article`, `Organization`, `Product`) and flags deprecated schemas.
 - **Robots.txt & AI Crawler Radar**: Evaluates permissions for AI bots (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Google-Extended`, `Bytespider`).
 - **SERP Content Briefs**: Synthesizes competitor SERP snippets into an actionable content blueprint with H2 outlines and optimal 134-167 word GEO blocks.
-- **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 11 SEO tools into Claude Code, Gemini CLI, and Antigravity.
+- **Agent native (MCP)**: Native stdio JSON-RPC 2.0 MCP server directly feeds 13 SEO tools into Claude Code, Gemini CLI, and Antigravity.
 - **Live-site crawler**: Parallel BFS crawl with canonical dedup, per-page timing, health scores, and ranked fix actions.
 - **Fifty-rule engine**: R01-R50 checks with severity weights and reach scoring across nine areas, one truth for crawl and audit output.
 - **Answer-engine readiness**: `llms.txt` plus AI crawler permission scoring with readiness actions.
@@ -86,7 +86,7 @@ Semrush and Ahrefs cost upwards of $130 per month. OpenSEO still requires paid D
 | One-site audit with fixes | Monthly seat, queued crawl | `crawl` in seconds, ranked actions free |
 | Rank tracking over time | Subscription per project | SQLite drift history, zero cost |
 | AI visibility scoring | Add-on tier | `geo` plus `llms` readiness, fractions of a cent |
-| Agent access | API credits per call | 10-tool MCP server on stdio |
+| Agent access | API credits per call | 13-tool MCP server on stdio |
 | Report exports | Export limits per plan | HTML, PDF, Markdown, CSV from every run |
 
 ---
@@ -217,24 +217,28 @@ Integrated into `jev-seo audit`:
 |---|---|---|
 | `keywords <query>` | Autocomplete discovery and Jev intent classification | `--json` |
 | `query <query>` | Live SERP competitor scraping, Jev relevance rerank, and winning gap analysis | `--limit <n>`, `--provider auto\|ddg\|tavily`, `--json` |
-| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit, 50-rule findings | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--rescore <path>` |
-| `geo <target>` | Generative Engine Optimization citation scoring (1-10), composite dimensions, score trend | `--query <query>`, `--json` |
+| `audit <path>` | Batch directory or file on-page, orphan, and AI-slop audit, 50-rule findings | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--actions-csv <path>`, `--actions-xls <path>`, `--pairs-csv <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>`, `--rescore <path>` |
+| `geo <target>` | Generative Engine Optimization citation scoring (1-10), composite dimensions, score trend | `--query <query>`, `--json`, `--jev-budget <usd>` |
 | `schema <target>` | Schema.org JSON-LD structural and deprecation validator | `--json` |
 | `robots <domain>` | Robots.txt and AI crawler permission auditor | `--json` |
 | `brief <topic>` | SERP-driven heading outline and 150-word GEO direct-answer | `--limit <n>`, `--markdown`, `--json` |
 | `rank` | SQLite rank drift tracker (~/.jev-seo/jev-seo.db) | `--domain <domain>`, `--query <query>` |
 | `sitemap <target>` | XML sitemap, 50k limit, HTTPS, and hreflang validator | `--json` |
-| `crawl <url>` | Live-site BFS crawl: health score, ranked actions, broken links, redirect chains, orphans, timing | `--max-pages <n>`, `--fetch auto\|direct\|jina\|firecrawl`, `--max-credits <n>`, `--json`, `--diff`, `--csv <path>`, `--rescore <path>` |
+| `crawl <url>` | Live-site BFS crawl: health score, ranked actions, broken links, redirect chains, orphans, timing | `--max-pages <n>`, `--fetch auto\|direct\|jina\|firecrawl`, `--max-credits <n>`, `--json`, `--diff`, `--csv <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>`, `--rescore <path>` |
 | `llms <domain>` | llms.txt plus AI crawler scoring with ranked readiness actions | `--json` |
+| `explain <id>` | Stable rule card: area, severity, effort band, title, fix (`R19` or `RULE-R19`) | `--json` |
+| `report <path>` | Diff two saved audit JSONs: score delta, rules cleared/new, ranked actions | `--baseline <path>`, `--actions-csv <path>`, `--json` |
 | `doctor` | Environment check: version, API key presence, database, platform | `--json` |
 | `gsc <auth\|sites\|query>` | Google Search Console: free first-party query data for your own sites | `--site <url>`, `--limit <n>`, `--json` |
 | `mcp` | Native Stdio JSON-RPC 2.0 Agent MCP Server | (None) |
 
+Optional `narrative.json` beside audit exports is loaded at report time: unknown action IDs fail closed; missing file embeds an automatic evidence-only summary (see `references/narrative.md`).
+
 ---
 
-## Native MCP Server (11 Tools)
+## Native MCP Server (13 Tools)
 
-When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 11 tools. It answers the `initialize` handshake, stays silent on notifications, reports parse errors, and flags tool failures with `isError`. File tools share a guarded reader (content extensions only, no dot-files, no URLs) plus a Jev safety classifier that blocks secret-looking targets. Remote fetches refuse private hosts, resolved DNS, and redirect landings.
+When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model Context Protocol server exposing 13 tools. It answers the `initialize` handshake, stays silent on notifications, reports parse errors, and flags tool failures with `isError`. File tools share a guarded reader (content extensions only, no dot-files, no URLs) plus a Jev safety classifier that blocks secret-looking targets. Remote fetches refuse private hosts, resolved DNS, and redirect landings.
 
 | MCP Tool | Arguments | Purpose |
 |---|---|---|
@@ -249,6 +253,8 @@ When launched via `jev-seo mcp`, the binary acts as a stdio JSON-RPC 2.0 Model C
 | `seo_crawl` | `url: string`, `max_pages?: int` | Crawl a live site for broken links, redirect chains, and orphan pages |
 | `seo_llms` | `domain: string` | Check llms.txt presence and AI crawler permissions |
 | `seo_extract` | `urls: string[]`, `query: string` | Extract clean markdown via paid API (key-gated) |
+| `seo_explain` | `id: string` | Rule card for `R19` / `RULE-R19`: area, severity, effort, fix |
+| `seo_report` | `path: string`, `baseline: string` | Diff two audit JSONs: score delta, rules cleared/new, actions, pairs |
 
 ---
 

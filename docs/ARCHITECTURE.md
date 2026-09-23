@@ -88,6 +88,8 @@
   - `seo_crawl`: Live-site crawl with health score and findings.
   - `seo_llms`: llms.txt and AI crawler readiness check.
   - `seo_extract`: Paid URL-to-markdown extraction (key-gated).
+  - `seo_explain`: Rule card for stable R01-R50 ids.
+  - `seo_report`: Diff two saved audit JSONs (score, rules, actions, pairs).
 
 ### `crawl.rs` (Live-Site Crawler)
 - Level-batched parallel fetch over 8 std threads, no async runtime.

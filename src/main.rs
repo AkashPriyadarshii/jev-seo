@@ -93,6 +93,9 @@ enum Commands {
         /// Write action-tracker SpreadsheetML (.xls) Excel opens without conversion
         #[arg(long, value_name = "PATH")]
         actions_xls: Option<String>,
+        /// Write stem×URL conflict pairs CSV (cannibalization)
+        #[arg(long, value_name = "PATH")]
+        pairs_csv: Option<String>,
         /// Rebuild findings and actions from a saved audit JSON, no work
         #[arg(long, value_name = "PATH")]
         rescore: Option<String>,
@@ -292,6 +295,14 @@ fn cloned_set(s: &std::collections::BTreeSet<String>) -> std::collections::BTree
     s.clone()
 }
 
+/// Shared by CLI `report` and MCP `seo_report`.
+pub(crate) fn main_report_diff(
+    current: &audit::DirectoryAuditReport,
+    base: &audit::DirectoryAuditReport,
+) -> serde_json::Value {
+    diff_audit_reports(current, base)
+}
+
 /// Test seam for report diff (binary crate cannot use crate::main helpers from tests otherwise).
 #[cfg(test)]
 pub(crate) fn main_shim_diff(
@@ -420,7 +431,7 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, actions_csv, actions_xls, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, actions_csv, actions_xls, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -643,6 +654,41 @@ fn main() -> Result<()> {
                         println!("  - Target Stem: \"{}\" in {} pages:", item.keyword_stem.cyan(), item.colliding_files.len());
                         for f in &item.colliding_files {
                             println!("      {}", f.dimmed());
+                        }
+                    }
+                    let pairs = audit::cannibalization_pairs(&dir_report);
+                    if !pairs.is_empty() {
+                        println!("\n{}", format!("Conflict pairs ({}):", pairs.len()).yellow().bold());
+                        for p in pairs.iter().take(10) {
+                            println!(
+                                "  \"{}\"  {} ({}w) × {} ({}w)  → keep {}",
+                                p.keyword_stem.cyan(),
+                                p.a,
+                                p.a_words,
+                                p.b,
+                                p.b_words,
+                                p.winner.green()
+                            );
+                        }
+                        if pairs.len() > 10 {
+                            println!("    ... and {} more pairs", pairs.len() - 10);
+                        }
+                        if let Some(out) = &pairs_csv {
+                            let mut s = String::from("stem,a,b,a_words,b_words,winner\n");
+                            let cell = |v: &str| format!("\"{}\"", v.replace('"', "\"\""));
+                            for p in &pairs {
+                                s.push_str(&format!(
+                                    "{},{},{},{},{},{}\n",
+                                    cell(&p.keyword_stem),
+                                    cell(&p.a),
+                                    cell(&p.b),
+                                    p.a_words,
+                                    p.b_words,
+                                    cell(&p.winner)
+                                ));
+                            }
+                            std::fs::write(out, s)?;
+                            println!("Cannibalization pairs CSV written to {}", out.dimmed());
                         }
                     }
                 } else {

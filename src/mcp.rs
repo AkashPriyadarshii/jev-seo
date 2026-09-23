@@ -208,6 +208,29 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
                             },
                             "required": ["urls", "query"]
                         }
+                    },
+                    {
+                        "name": "seo_explain",
+                        "description": "Explain a stable rule id (R19 or RULE-R19): area, severity, effort, title, fix",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string", "description": "Rule id, e.g. R19 or RULE-R19" }
+                            },
+                            "required": ["id"]
+                        }
+                    },
+                    {
+                        "name": "seo_report",
+                        "description": "Diff two saved audit JSON reports: score delta, rules cleared/new, ranked actions",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string", "description": "Current audit JSON path" },
+                                "baseline": { "type": "string", "description": "Baseline audit JSON path" }
+                            },
+                            "required": ["path", "baseline"]
+                        }
                     }
                 ]
             })),
@@ -394,6 +417,44 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             match crate::serp::tavily_extract(&urls, query) {
                 Ok(md) => md,
                 Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_explain" => {
+            let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            match crate::rules::explain(id) {
+                Some(text) => text,
+                None => format!("Error: unknown rule id: {}", id),
+            }
+        }
+        "seo_report" => {
+            let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            let baseline = args.get("baseline").and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(err) = safety_gate("seo_report", path) {
+                return err;
+            }
+            if let Some(err) = safety_gate("seo_report", baseline) {
+                return err;
+            }
+            match (
+                std::fs::read_to_string(path),
+                std::fs::read_to_string(baseline),
+            ) {
+                (Ok(c), Ok(b)) => match (
+                    serde_json::from_str::<crate::audit::DirectoryAuditReport>(&c),
+                    serde_json::from_str::<crate::audit::DirectoryAuditReport>(&b),
+                ) {
+                    (Ok(cur), Ok(base)) => {
+                        let actions = crate::rules::actions_for(&cur.findings);
+                        let out = json!({
+                            "diff": crate::main_report_diff(&cur, &base),
+                            "actions": actions,
+                            "pairs": crate::audit::cannibalization_pairs(&cur),
+                        });
+                        serde_json::to_string_pretty(&out).unwrap_or_default()
+                    }
+                    (Err(e), _) | (_, Err(e)) => format!("Error: parse audit JSON: {}", e),
+                },
+                (Err(e), _) | (_, Err(e)) => format!("Error: read audit JSON: {}", e),
             }
         }
         _ => format!("Error: unknown tool: {}", name),
