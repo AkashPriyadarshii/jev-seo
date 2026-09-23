@@ -401,7 +401,7 @@ Live DuckDuckGo competitors, word-count estimate, Jev fan-out for H2 outline plu
 jev-seo geo README.md --query "agentic skills framework for coding agents"
 ```
 
-Citation likelihood 1-10 from Jev `Score` and `Noul`. Five-dimension composite (structure, density, directness, statistics, freshness) with published weights and history delta. Low-confidence answers are withheld.
+Citation likelihood 1-10 from Jev `Score` and `Noul`. Five-dimension composite (structure, density, directness, statistics, freshness) with published weights and history delta. Low-confidence answers are withheld. For a broader view of how AI engines perceive your brand, see [Prefer](https://tryprefer.com/).
 
 ### 6. Confidence-gated scoring
 
@@ -643,6 +643,7 @@ CI runs `cargo check --all-targets`, `cargo test --all`, and the SEO gate on eve
 - [jev-git](https://github.com/AkashPriyadarshii/jev-git) — Jev reflex gates for git
 - [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android) — Precompiled TDLib binaries for four Android ABIs
 - [kharcha](https://github.com/AkashPriyadarshii/kharcha) — Offline-first UPI expense tracker for Android
+- [Prefer](https://tryprefer.com/) — AI visibility platform for understanding how ChatGPT, Claude, Gemini, and Perplexity talk about your brand
 
 ---
 
