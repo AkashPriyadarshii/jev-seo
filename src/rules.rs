@@ -110,7 +110,28 @@ pub const RULES: &[Rule] = &[
 ];
 
 pub fn rule(id: &str) -> Option<&'static Rule> {
-    RULES.iter().find(|r| r.id == id)
+    let bare = id.strip_prefix("RULE-").unwrap_or(id);
+    RULES.iter().find(|r| r.id.eq_ignore_ascii_case(bare))
+}
+
+/// One-line explain for `jev-seo explain RULE-R19`.
+pub fn explain(id: &str) -> Option<String> {
+    let r = rule(id)?;
+    Some(format!(
+        "{} | {} | {:?} | effort {} ({})\n  title: {}\n  fix:   {}",
+        r.id,
+        label(&r.area),
+        r.severity,
+        r.effort,
+        match r.effort {
+            1 => "hours",
+            2 => "about a day",
+            3 => "several days",
+            _ => "a project",
+        },
+        r.title,
+        r.fix
+    ))
 }
 
 fn deduct(sev: Severity) -> f64 {

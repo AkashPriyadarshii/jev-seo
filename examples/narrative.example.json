@@ -1,0 +1,26 @@
+{
+  "executive_summary": [
+    "Pass rate is shown on the scorecard; scores rank work and never predict rankings or traffic.",
+    "Top work for this tree is listed under Risks and Plan with stable action IDs."
+  ],
+  "strengths": [
+    "Local walk covered every file under the audit path.",
+    "Findings cite rule IDs and file paths you can re-check offline."
+  ],
+  "risks": [
+    "Missing or weak titles and thin pages block both classic search and AI answers until fixed.",
+    "Duplicate titles and orphan pages split equity across near-identical URLs."
+  ],
+  "plan": [
+    {
+      "horizon": "This week",
+      "items": []
+    },
+    {
+      "horizon": "This month",
+      "items": []
+    }
+  ],
+  "closing": "Re-run audit after the P1 list; compare pass rate and the same rule IDs.",
+  "author": "jev-seo example"
+}
