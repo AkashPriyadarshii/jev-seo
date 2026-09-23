@@ -703,6 +703,65 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_action_tracker_csv_and_xml() {
+        use crate::actions::{to_csv, to_spreadsheet_xml, Action};
+        let a = vec![Action::new("RULE-R19", 2, 2, "AI slop markers (2 hits)", "index.html, about.html".into())];
+        let csv = to_csv(&a);
+        assert!(csv.starts_with("id,priority,effort_band,impact,quick_win,title,evidence\n"));
+        assert!(csv.contains("RULE-R19"));
+        assert!(csv.contains("about a day"));
+        let xml = to_spreadsheet_xml(&a);
+        assert!(xml.contains("Excel.Sheet"));
+        assert!(xml.contains("RULE-R19"));
+        assert!(xml.contains("AI slop markers"));
+    }
+
+    #[test]
+    fn test_explain_rule_forms() {
+        use crate::rules::explain;
+        let a = explain("R19").expect("bare id");
+        let b = explain("RULE-R19").expect("prefixed id");
+        assert!(a.contains("AI slop markers"));
+        assert!(b.contains("content"));
+        assert!(b.contains("Rewrite flagged boilerplate"));
+        assert!(explain("R99").is_none());
+    }
+
+    #[test]
+    fn test_audit_report_diff() {
+        use crate::audit::DirectoryAuditReport;
+        use crate::rules::{Area, Finding, Severity};
+        let mk = |pass: f64, rule: &str| DirectoryAuditReport {
+            dir_path: "d".into(),
+            total_files: 3,
+            total_words: 100,
+            avg_words_per_file: 33,
+            pass_rate: pass,
+            reports: vec![],
+            duplicate_titles: Default::default(),
+            thin_pages: vec![],
+            missing_canonicals: vec![],
+            missing_descriptions: vec![],
+            orphan_pages: vec![],
+            keyword_cannibalization: vec![],
+            findings: vec![Finding {
+                rule_id: rule.into(),
+                area: Area::OnPage,
+                severity: Severity::Medium,
+                scope: "x.html".into(),
+                evidence: "e".into(),
+                fix: "f".into(),
+            }],
+        };
+        let base = mk(50.0, "R09");
+        let cur = mk(80.0, "R10");
+        let diff = crate::main_shim_diff(&cur, &base);
+        assert_eq!(diff["baseline_score"], 50);
+        assert_eq!(diff["current_score"], 80);
+        assert_eq!(diff["delta"], 30);
+    }
+
+    #[test]
     fn test_llms_parse() {
         use crate::llms::parse_llms_txt;
         let body = "# Title\n\nSome prose.\n\n## Docs\n\n- item\n";

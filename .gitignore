@@ -5,3 +5,44 @@
 .desloppify/
 /scorecard.png
 docs/jev-design-universe/
+
+# Local promo/render output (media assets stay out of git)
+brag-output/
+
+# Secrets and tokens — never commit
+.env
+.env.*
+*.key
+*.pem
+*.p12
+gsc-token.json
+*oauth*token*
+
+# Agent / brain isolation (local-only)
+.sevolve/
+brain.db
+**/brain.db
+vault/
+session-traces/
+*.session.json
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
+
+# Local run artifacts from ad-hoc audits
+run.json
+ledger.json
+narrative.json
+report.html
+report.md
+report.pdf
+findings.csv
+crawl.json
+!examples/**/run.json
+!examples/**/ledger.json
+!examples/**/crawl.json
+!examples/narrative.example.json

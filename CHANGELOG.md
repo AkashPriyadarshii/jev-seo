@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Action tracker export: `audit --actions-csv` and `audit --actions-xls` (SpreadsheetML opens in Excel without a zip dependency); same ranked list as terminal output.
+- `jev-seo explain R19|RULE-R19`: stable rule card (area, severity, effort band, fix); unknown ids fail closed.
+- `jev-seo report --baseline`: diff two saved audit JSONs (score delta, rules cleared/new) with optional action-tracker CSV and `--json`.
+- Optional `narrative.json` beside audit exports (`references/narrative.md`): required executive_summary/strengths/risks/plan keys, hard refusal of unknown action IDs, unverified-number and plan effort-band warnings; absent file embeds an automatic evidence-only summary labeled automatic.
 - RunManifest contract (`src/manifest.rs`): frozen `run.json` + `ledger.json` with schema 1.0, citation gate on report writers, completeness banners on audit/crawl/llms scores.
 - Max Jev fan-out: page suite on audit sample, site+GEO on crawl homepage, richer GEO/page/keyword/brief questions, MCP `seo_keywords`/`seo_geo` wired to the same suites; model alias `jev-latest`; usage tokens recorded after each call.
 - Skill-hard thresholds: Choice/Score act at confidence 0.80; dedicated injection Noul pre-screen before quality suites; state pre-filter before truncate.

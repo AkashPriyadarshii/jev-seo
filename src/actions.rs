@@ -65,3 +65,76 @@ pub fn rank(mut actions: Vec<Action>) -> Vec<Action> {
 pub fn top(actions: &[Action], n: usize) -> &[Action] {
     &actions[..actions.len().min(n)]
 }
+
+fn effort_label(e: u8) -> &'static str {
+    match e {
+        1 => "hours",
+        2 => "about a day",
+        3 => "several days",
+        _ => "a project",
+    }
+}
+
+/// Spreadsheet-ready action tracker (CSV). Same shape every command ranks.
+pub fn to_csv(actions: &[Action]) -> String {
+    let mut s = String::from("id,priority,effort_band,impact,quick_win,title,evidence\n");
+    for a in actions {
+        let cell = |v: &str| format!("\"{}\"", v.replace('"', "\"\""));
+        s.push_str(&format!(
+            "{},{},{},{},{},{},{}\n",
+            a.id,
+            a.priority,
+            effort_label(a.effort),
+            a.impact,
+            a.quick_win,
+            cell(&a.title),
+            cell(&a.evidence)
+        ));
+    }
+    s
+}
+
+/// SpreadsheetML worksheet Excel/LibreOffice open without a zip dependency.
+pub fn to_spreadsheet_xml(actions: &[Action]) -> String {
+    let esc = |s: &str| {
+        s.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+    };
+    let mut rows = String::from(
+        "<Row><Cell><Data ss:Type=\"String\">id</Data></Cell>\
+         <Cell><Data ss:Type=\"String\">priority</Data></Cell>\
+         <Cell><Data ss:Type=\"String\">effort</Data></Cell>\
+         <Cell><Data ss:Type=\"String\">impact</Data></Cell>\
+         <Cell><Data ss:Type=\"String\">quick_win</Data></Cell>\
+         <Cell><Data ss:Type=\"String\">title</Data></Cell>\
+         <Cell><Data ss:Type=\"String\">evidence</Data></Cell></Row>",
+    );
+    for a in actions {
+        rows.push_str(&format!(
+            "<Row><Cell><Data ss:Type=\"String\">{}</Data></Cell>\
+             <Cell><Data ss:Type=\"Number\">{}</Data></Cell>\
+             <Cell><Data ss:Type=\"String\">{}</Data></Cell>\
+             <Cell><Data ss:Type=\"Number\">{}</Data></Cell>\
+             <Cell><Data ss:Type=\"String\">{}</Data></Cell>\
+             <Cell><Data ss:Type=\"String\">{}</Data></Cell>\
+             <Cell><Data ss:Type=\"String\">{}</Data></Cell></Row>",
+            esc(&a.id),
+            a.priority,
+            esc(effort_label(a.effort)),
+            a.impact,
+            a.quick_win,
+            esc(&a.title),
+            esc(&a.evidence)
+        ));
+    }
+    format!(
+        "<?xml version=\"1.0\"?>\n\
+         <?mso-application progid=\"Excel.Sheet\"?>\n\
+         <Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\"\
+          xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\">\
+         <Worksheet ss:Name=\"Actions\"><Table>{}</Table></Worksheet></Workbook>",
+        rows
+    )
+}

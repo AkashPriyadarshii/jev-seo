@@ -13,6 +13,7 @@ mod fetch;
 mod gsc;
 mod llms;
 mod manifest;
+mod narrative;
 mod mcp;
 mod paths;
 mod policy;
@@ -86,6 +87,12 @@ enum Commands {
         /// Write a CSV findings export to this path
         #[arg(long, value_name = "PATH")]
         csv: Option<String>,
+        /// Write ranked action-tracker CSV (id, priority, effort, impact)
+        #[arg(long, value_name = "PATH")]
+        actions_csv: Option<String>,
+        /// Write action-tracker SpreadsheetML (.xls) Excel opens without conversion
+        #[arg(long, value_name = "PATH")]
+        actions_xls: Option<String>,
         /// Rebuild findings and actions from a saved audit JSON, no work
         #[arg(long, value_name = "PATH")]
         rescore: Option<String>,
@@ -197,6 +204,26 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Explain a stable rule id (R19 or RULE-R19): area, severity, fix
+    Explain {
+        /// Rule id, e.g. R19 or RULE-R19
+        id: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Diff two saved audit JSON reports (current vs baseline)
+    Report {
+        /// Current audit JSON (from `audit --json` or audit path written)
+        path: String,
+        /// Baseline audit JSON to compare against
+        #[arg(long, value_name = "PATH")]
+        baseline: String,
+        /// Write action-tracker CSV for the current report
+        #[arg(long, value_name = "PATH")]
+        actions_csv: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Google Search Console: free first-party query data (auth, sites, query)
     Gsc {
         /// Action: auth, sites, or query
@@ -225,6 +252,53 @@ fn apply_jev_budget_from(cli: &Cli) {
         _ => manifest::DEFAULT_JEV_BUDGET_USD,
     };
     manifest::set_jev_budget_usd(usd);
+}
+
+/// Write an action-tracker CSV beside optional export path (or given path).
+fn write_actions_csv(path: &str, actions: &[actions::Action]) -> Result<()> {
+    std::fs::write(path, actions::to_csv(actions))?;
+    println!("Action tracker CSV written to {}", path.dimmed());
+    Ok(())
+}
+
+/// Diff two DirectoryAuditReport JSONs: score delta, rule set changes.
+fn diff_audit_reports(current: &audit::DirectoryAuditReport, base: &audit::DirectoryAuditReport) -> serde_json::Value {
+    use std::collections::BTreeSet;
+    let score = |r: &audit::DirectoryAuditReport| r.pass_rate.round().clamp(0.0, 100.0) as u32;
+    let rules = |r: &audit::DirectoryAuditReport| -> BTreeSet<String> {
+        r.findings.iter().map(|f| f.rule_id.clone()).collect()
+    };
+    let cur = rules(current);
+    let old = rules(base);
+    let fixed: Vec<String> = old.difference(&cloned_set(&cur)).cloned().collect();
+    let new: Vec<String> = cur.difference(&cloned_set(&old)).cloned().collect();
+    let sc_now = score(current);
+    let sc_old = score(base);
+    json!({
+        "baseline_score": sc_old,
+        "current_score": sc_now,
+        "delta": sc_now as i32 - sc_old as i32,
+        "grade": crate::actions::grade(sc_now),
+        "rules_fixed": fixed,
+        "rules_new": new,
+        "findings_baseline": base.findings.len(),
+        "findings_current": current.findings.len(),
+        "files_baseline": base.total_files,
+        "files_current": current.total_files,
+    })
+}
+
+fn cloned_set(s: &std::collections::BTreeSet<String>) -> std::collections::BTreeSet<String> {
+    s.clone()
+}
+
+/// Test seam for report diff (binary crate cannot use crate::main helpers from tests otherwise).
+#[cfg(test)]
+pub(crate) fn main_shim_diff(
+    current: &audit::DirectoryAuditReport,
+    base: &audit::DirectoryAuditReport,
+) -> serde_json::Value {
+    diff_audit_reports(current, base)
 }
 
 fn main() -> Result<()> {
@@ -346,7 +420,7 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, actions_csv, actions_xls, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -379,10 +453,62 @@ fn main() -> Result<()> {
                 completeness.full = false;
             }
 
+            // Optional narrative.json beside exports (or --manifest dir); else auto summary.
+            let mut export_dirs = manifest::auto_dirs(&[
+                html.as_deref(),
+                pdf.as_deref(),
+                md.as_deref(),
+                csv.as_deref(),
+            ]);
+            if let Some(dir) = &manifest {
+                export_dirs = vec![std::path::PathBuf::from(dir)];
+            } else if !export_dirs.iter().any(|d| d.join("narrative.json").is_file()) {
+                let cwd = std::path::PathBuf::from(".");
+                if cwd.join("narrative.json").is_file() {
+                    export_dirs.push(cwd);
+                }
+            }
+            let mut n_story: Option<narrative::Narrative> = None;
+            for d in export_dirs.iter() {
+                match narrative::load(d, &dir_report.findings, &actions, dir_report.total_files) {
+                    Ok(Some(n)) => {
+                        n_story = Some(n);
+                        break;
+                    }
+                    Ok(None) => {}
+                    Err(e) => anyhow::bail!("{e:#}"),
+                }
+            }
+            if n_story.is_none() {
+                n_story = Some(narrative::auto(
+                    &dir_report.findings,
+                    &actions,
+                    dir_report.total_files,
+                    dir_report.pass_rate,
+                ));
+            }
+            let n = n_story.as_ref().expect("narrative always set");
+            if !n.unverified_numbers.is_empty() {
+                eprintln!(
+                    "{} narrative numbers not in audit: {}",
+                    "warn".yellow(),
+                    n.unverified_numbers.join(", ")
+                );
+            }
+            if !n.effort_mismatches.is_empty() {
+                eprintln!(
+                    "{} narrative effort mismatches: {}",
+                    "warn".yellow(),
+                    n.effort_mismatches.join("; ")
+                );
+            }
+            let n_md = narrative::to_markdown(n);
+            let n_html = narrative::to_html(n);
+
             // Build report bodies once, gate every citation, then write.
-            let body_html = html.as_ref().map(|_| audit::to_html(&dir_report));
-            let body_pdf = pdf.as_ref().map(|_| audit::to_pdf(&dir_report));
-            let body_md = md.as_ref().map(|_| audit::to_markdown(&dir_report));
+            let body_html = html.as_ref().map(|_| audit::to_html(&dir_report) + &n_html);
+            let body_pdf = pdf.as_ref().map(|_| audit::to_pdf_with_narrative(&dir_report, n));
+            let body_md = md.as_ref().map(|_| audit::to_markdown(&dir_report) + &n_md);
             let body_csv = csv.as_ref().map(|_| crate::rules::to_csv(&dir_report.findings));
             if let Some(body) = &body_html {
                 manifest::gate_report(body, &dir_report.findings, &actions)?;
@@ -411,6 +537,13 @@ fn main() -> Result<()> {
             if let Some(out) = &csv {
                 std::fs::write(out, body_csv.as_deref().unwrap_or_default())?;
                 println!("CSV findings written to {}", out.dimmed());
+            }
+            if let Some(out) = &actions_csv {
+                write_actions_csv(out, &actions)?;
+            }
+            if let Some(out) = &actions_xls {
+                std::fs::write(out, actions::to_spreadsheet_xml(&actions))?;
+                println!("Action tracker SpreadsheetML written to {}", out.dimmed());
             }
 
             let texts_owned: Vec<String> = body_html
@@ -453,17 +586,6 @@ fn main() -> Result<()> {
                     "run manifest citation gate failed: {:?}",
                     run_manifest.validation
                 );
-            }
-            let mut export_dirs = manifest::auto_dirs(&[
-                html.as_deref(),
-                pdf.as_deref(),
-                md.as_deref(),
-                csv.as_deref(),
-            ]);
-            if let Some(dir) = &manifest {
-                export_dirs = vec![std::path::PathBuf::from(dir)];
-            } else if export_dirs.is_empty() && json {
-                export_dirs.clear();
             }
             let force = manifest.is_some();
             let mut wrote_manifest = false;
@@ -1204,6 +1326,81 @@ fn main() -> Result<()> {
                 if key_set { "set (value hidden)".green().to_string() } else { "missing, Jev scores will skip".yellow().to_string() }
             );
             println!("  Database:      {}", if db_ok { "writable".green().to_string() } else { "ERROR".red().to_string() });
+        }
+        Commands::Explain { id, json } => {
+            let text = rules::explain(&id)
+                .ok_or_else(|| anyhow::anyhow!("unknown rule id: {id} (try R01..R50 or RULE-R01..RULE-R50)"))?;
+            if json {
+                let bare = id.strip_prefix("RULE-").unwrap_or(&id).to_string();
+                let r = rules::rule(&bare).expect("explain found it");
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json!({
+                        "id": r.id,
+                        "area": rules::label(&r.area),
+                        "severity": format!("{:?}", r.severity),
+                        "effort": r.effort,
+                        "title": r.title,
+                        "fix": r.fix,
+                    }))?
+                );
+                return Ok(());
+            }
+            println!("{}", text.cyan());
+        }
+        Commands::Report { path, baseline, actions_csv, json } => {
+            let cur: audit::DirectoryAuditReport = serde_json::from_str(&std::fs::read_to_string(&path)?)?;
+            let base: audit::DirectoryAuditReport = serde_json::from_str(&std::fs::read_to_string(&baseline)?)?;
+            let diff = diff_audit_reports(&cur, &base);
+            let actions = crate::rules::actions_for(&cur.findings);
+            if let Some(out) = &actions_csv {
+                write_actions_csv(out, &actions)?;
+            }
+            if json {
+                println!("{}", serde_json::to_string_pretty(&json!({
+                    "diff": diff,
+                    "actions": actions,
+                }))?);
+                return Ok(());
+            }
+            let delta = diff["delta"].as_i64().unwrap_or(0);
+            let sign = if delta > 0 { "+" } else { "" };
+            println!("\n{}", "Report diff (baseline → current):".cyan().bold());
+            println!(
+                "  Score:  {} → {} ({sign}{delta}) grade {}",
+                diff["baseline_score"],
+                diff["current_score"],
+                diff["grade"]
+            );
+            println!(
+                "  Findings: {} → {}",
+                diff["findings_baseline"], diff["findings_current"]
+            );
+            let fixed: Vec<String> = serde_json::from_value(diff["rules_fixed"].clone())?;
+            let added: Vec<String> = serde_json::from_value(diff["rules_new"].clone())?;
+            if fixed.is_empty() && added.is_empty() {
+                println!("  Rules: no new or cleared rule ids");
+            } else {
+                if !fixed.is_empty() {
+                    println!("  Cleared: {}", fixed.join(", ").green());
+                }
+                if !added.is_empty() {
+                    println!("  New:     {}", added.join(", ").yellow());
+                }
+            }
+            if !actions.is_empty() {
+                println!("\n{}", "Top actions:".cyan().bold());
+                for a in actions::top(&actions, 5) {
+                    println!(
+                        "  [P{}] {}  {}  impact {}{}",
+                        a.priority,
+                        a.id.bold(),
+                        a.title,
+                        a.impact,
+                        if a.quick_win { "  quick-win".green().to_string() } else { String::new() }
+                    );
+                }
+            }
         }
         Commands::Gsc { op, site, code, limit, json } => {
             match op.as_str() {
