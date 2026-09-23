@@ -114,9 +114,9 @@ jev-seo sitemap https://jevseo.vercel.app</pre>
   <h3>8. Wire it into an agent</h3>
   <pre>jev-seo mcp</pre>
   <p>Starts an MCP server so Claude Code, Cursor, and other agents call every command above as native tools.</p>
-  <h3>9. Keep the tool fresh</h3>
-  <pre>jev-seo update</pre>
-  <p>Automatically lifts the latest release binary from GitHub.</p>
+  <h3>9. Check the environment</h3>
+  <pre>jev-seo doctor</pre>
+  <p>Reports version, API key presence, database state, and platform in one check before you run anything else.</p>
 
   <h2>When Jev for SEO is the wrong call</h2>
   <p>Jev does not write articles, generate meta descriptions from scratch, or explain its recommendations in prose. It also cannot crawl on its own; someone has to collect state. If your workflow needs generative copy or a full site crawl with rendered JavaScript, pair Jev with an LLM for writing and a real crawler for fetching, and keep Jev on the judgment layer where it is cheap and typed.</p>

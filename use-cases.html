@@ -20,7 +20,7 @@
 {"@context":"https://schema.org","@type":"Article","headline":"Use cases: ten ways to run jev-seo","description":"The ten jev-seo commands and the SEO or GEO job each one handles, with output from real runs.","author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"datePublished":"2026-09-22","publisher":{"@type":"Organization","name":"Akash Priyadarshi","logo":{"@type":"ImageObject","url":"https://jevseo.vercel.app/assets/og-image.png"}},"mainEntityOfPage":"https://jevseo.vercel.app/use-cases.html"}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What can jev-seo do?","acceptedAnswer":{"@type":"Answer","text":"jev-seo runs ten commands: audit, schema, robots, sitemap, geo, keywords, brief, query, rank, and update. They cover local SEO audits, schema validation, AI crawler radar, GEO citation scoring, keyword intent, SERP briefs, and rank tracking, free and offline-capable."}},{"@type":"Question","name":"Is jev-seo an MCP server?","acceptedAnswer":{"@type":"Answer","text":"Yes. The jev-seo mcp command starts a Model Context Protocol server, so agents like Claude Code and Cursor call every other command as native tools."}},{"@type":"Question","name":"What is GEO scoring in jev-seo?","acceptedAnswer":{"@type":"Answer","text":"The geo command scores how likely a generative engine is to cite a page for a given query, from 1 to 10, with confidence and direct-answer detection. It is the competitive edge no hosted SEO dashboard offers."}},{"@type":"Question","name":"Does jev-seo track rankings?","acceptedAnswer":{"@type":"Answer","text":"Yes. The rank command stores weekly position history for your domain and queries in a local SQLite file, so you can watch drift without opening a dashboard."}}]}
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What can jev-seo do?","acceptedAnswer":{"@type":"Answer","text":"jev-seo runs sixteen commands: audit, schema, robots, sitemap, geo, keywords, brief, query, rank, mcp, crawl, llms, doctor, explain, report, and gsc. They cover local SEO audits, schema validation, AI crawler radar, GEO citation scoring, keyword intent, SERP briefs, and rank tracking, free and offline-capable."}},{"@type":"Question","name":"Is jev-seo an MCP server?","acceptedAnswer":{"@type":"Answer","text":"Yes. The jev-seo mcp command starts a Model Context Protocol server, so agents like Claude Code and Cursor call every other command as native tools."}},{"@type":"Question","name":"What is GEO scoring in jev-seo?","acceptedAnswer":{"@type":"Answer","text":"The geo command scores how likely a generative engine is to cite a page for a given query, from 1 to 10, with confidence and direct-answer detection. It is the competitive edge no hosted SEO dashboard offers."}},{"@type":"Question","name":"Does jev-seo track rankings?","acceptedAnswer":{"@type":"Answer","text":"Yes. The rank command stores weekly position history for your domain and queries in a local SQLite file, so you can watch drift without opening a dashboard."}}]}
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://jevseo.vercel.app/"},{"@type":"ListItem","position":2,"name":"Use cases","item":"https://jevseo.vercel.app/use-cases.html"}]}
@@ -47,13 +47,13 @@
     <a class="toplink" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">github ↗</a>
   </nav>
   <div class="rule"></div>
-  <p class="jobno">JOB SE-004 / USE CASES / TEN COMMANDS</p>
+  <p class="jobno">JOB SE-004 / USE CASES / SIXTEEN COMMANDS</p>
 </header>
 
 <main class="guide" id="top">
   <p class="tb-line">CATALOG · 2026-09-22 · READ TIME 5 MIN</p>
-  <h1>Use cases: ten commands, ten jobs</h1>
-  <p class="guide-lede">jev-seo is one Rust binary with ten commands. Each command maps to one SEO or GEO job that a freelancer, an agency, or an agent would otherwise pay a dashboard for. Every use case below ran on this site.</p>
+  <h1>Use cases: ten jobs, sixteen commands</h1>
+  <p class="guide-lede">jev-seo is one Rust binary with sixteen commands. Each command maps to one SEO or GEO job that a freelancer, an agency, or an agent would otherwise pay a dashboard for. Every use case below ran on this site.</p>
 
   <h2>1. <code>audit</code> — page-level site health</h2>
   <pre>jev-seo audit .</pre>
@@ -91,12 +91,11 @@
   <pre>jev-seo rank --domain jevseo.vercel.app --query "jev seo"</pre>
   <p>Records your position for a query in a local SQLite file, and reports drift over weeks. Sets the baseline before content changes and measures whether they moved the needle.</p>
 
-  <h2>10. <code>mcp</code> and <code>update</code> — agents and maintenance</h2>
-  <pre>jev-seo mcp
-jev-seo update</pre>
-  <p><code>mcp</code> starts the Model Context Protocol server so Claude Code, Cursor, and other agents call audit, geo, and robots as native tools. <code>update</code> pulls the latest release binary from GitHub automatically.</p>
+  <h2>10. <code>mcp</code> — agents and maintenance</h2>
+  <pre>jev-seo mcp</pre>
+  <p><code>mcp</code> starts the Model Context Protocol server so Claude Code, Cursor, and other agents call audit, geo, and robots as native tools.</p>
 
-  <h2>What the ten commands replace</h2>
+  <h2>What the commands replace</h2>
   <table class="guide-table">
     <tr><th>Dashboard feature</th><th>jev-seo command</th><th>Monthly cost replaced</th></tr>
     <tr><td>Site audit</td><td>audit, schema</td><td>$80+ tier</td></tr>
