@@ -73,8 +73,9 @@ impl JevClient {
 
     /// Pre-execution safety classifier for agent-driven file/URL tools.
     /// True = target looks like a secret, credential, or system path, block it.
-    /// API failure fails open: the static path guard already ran.
-    pub fn safety_block(&self, tool: &str, target: &str) -> bool {
+    /// None = the check itself failed (transport error, bad schema): callers
+    /// must fail closed, because an unreachable guard is not a clean bill.
+    pub fn safety_block(&self, tool: &str, target: &str) -> Option<bool> {
         let payload = json!({
             "model": MODEL,
             "state": { "tool": tool, "target": target },
@@ -90,15 +91,18 @@ impl JevClient {
             .and_then(|r| r.into_json().map_err(anyhow::Error::from))
         {
             Ok(b) => b,
-            Err(_) => return false,
+            Err(_) => return None,
         };
         record_usage(&body);
-        body.get("answers")
+        match body
+            .get("answers")
             .and_then(|a| a.get("unsafe_target"))
             .and_then(|u| u.get("noul"))
             .and_then(|n| n.as_f64())
-            .map(|p| p >= 0.7)
-            .unwrap_or(false)
+        {
+            Some(p) => Some(p >= 0.7),
+            None => None,
+        }
     }
 
     fn post(&self, payload: serde_json::Value) -> Result<ureq::Response> {

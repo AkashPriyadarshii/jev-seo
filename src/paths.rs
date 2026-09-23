@@ -24,15 +24,34 @@ pub fn read_user_file(target: &str, allowed: &[&str]) -> Result<String> {
     if !path.exists() {
         anyhow::bail!("file not found: {}", trimmed);
     }
-    if !path.is_file() {
+    // Canonicalize: resolves symlinks, `..`, and relative prefixes so the
+    // checks below run on the real location, not the spelled one.
+    let canon = path
+        .canonicalize()
+        .map_err(|_| anyhow::anyhow!("file not found: {}", trimmed))?;
+    if !canon.is_file() {
         anyhow::bail!("not a file: {}", trimmed);
     }
-    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+    // Deny dot-files AND dot-directories anywhere in the real path, so
+    // `~/.config/x.json` or `sub/.git/hooks/x.html` cannot pass on extension.
+    // Scratch files directly under the system temp root are exempt.
+    if has_dot_component(&canon) {
+        anyhow::bail!("refusing dot-file or dot-directory: {}", trimmed);
+    }
+    // Deny system trees even when reached without dots (symlink, /etc/hosts).
+    // Deny system trees even when reached without dots (symlink, /etc/hosts).
+    let canon_str = canon.to_string_lossy().to_ascii_lowercase();
+    for prefix in ["/etc/", "/proc/", "/sys/", "/dev/"] {
+        if canon_str == prefix.trim_end_matches('/') || canon_str.starts_with(prefix) {
+            anyhow::bail!("refusing system path: {}", trimmed);
+        }
+    }
+    if let Some(name) = canon.file_name().and_then(|n| n.to_str()) {
         if name.starts_with('.') {
             anyhow::bail!("refusing dot-file: {}", trimmed);
         }
     }
-    let ext_ok = path
+    let ext_ok = canon
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| allowed.contains(&e.to_ascii_lowercase().as_str()))
@@ -40,7 +59,59 @@ pub fn read_user_file(target: &str, allowed: &[&str]) -> Result<String> {
     if !ext_ok {
         anyhow::bail!("refusing non-content file: {}", trimmed);
     }
-    Ok(std::fs::read_to_string(path)?)
+    Ok(std::fs::read_to_string(&canon)?)
+}
+
+/// Guard for directory-scoped tools (audit path). Same canonicalization and
+/// denials as read_user_file, minus the file-only and extension checks, so
+/// agents cannot point audits at home, dot-dirs, or system trees.
+pub fn check_audit_path(target: &str) -> Result<String> {
+    let trimmed = target.trim();
+    if trimmed.is_empty() {
+        anyhow::bail!("empty path");
+    }
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        anyhow::bail!("pass a local directory path, not a URL");
+    }
+    let path = std::path::Path::new(trimmed);
+    if !path.exists() {
+        anyhow::bail!("path not found: {}", trimmed);
+    }
+    let canon = path
+        .canonicalize()
+        .map_err(|_| anyhow::anyhow!("path not found: {}", trimmed))?;
+    if has_dot_component(&canon) {
+        anyhow::bail!("refusing dot-file or dot-directory: {}", trimmed);
+    }
+    let canon_str = canon.to_string_lossy().to_ascii_lowercase();
+    for prefix in ["/etc/", "/proc/", "/sys/", "/dev/", "/root/"] {
+        if canon_str == prefix.trim_end_matches('/') || canon_str.starts_with(prefix) {
+            anyhow::bail!("refusing system path: {}", trimmed);
+        }
+    }
+    Ok(canon.to_string_lossy().into_owned())
+}
+
+/// True when any path component starts with a dot. The system temp root is
+/// special: session leaves (tempdir() nests dot-dirs there on some platforms)
+/// are exempt, but anything nested below the leaf is still checked, so
+/// `<tmp>/.session/.git/x` stays denied while staged scratch files pass.
+fn has_dot_component(canon: &std::path::Path) -> bool {
+    use std::path::Component;
+    let dotted = |c: &Component| {
+        c.as_os_str()
+            .to_str()
+            .map(|s| s.starts_with('.'))
+            .unwrap_or(false)
+    };
+    match std::env::temp_dir().canonicalize() {
+        Ok(root) => match canon.strip_prefix(&root) {
+            // Skip the session leaf itself, check the rest.
+            Ok(rel) => rel.components().skip(1).any(|c| dotted(&c)),
+            Err(_) => canon.components().any(|c| dotted(&c)),
+        },
+        Err(_) => canon.components().any(|c| dotted(&c)),
+    }
 }
 
 /// True when a SERP result URL belongs to the tracked domain (exact host or
@@ -65,10 +136,11 @@ pub fn reject_private_url(raw: &str) -> anyhow::Result<url::Url> {
         anyhow::bail!("refusing non-http URL: {}", raw);
     }
     let host = url.host_str().unwrap_or("").to_ascii_lowercase();
+    let host = host.trim_end_matches('.');
     if host == "localhost" || host == "::1" || host.ends_with(".localhost") {
         anyhow::bail!("refusing private fetch target: {}", host);
     }
-    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+    if let Some(ip) = normalize_host_ip(host) {
         if is_private_ip(ip) {
             anyhow::bail!("refusing private fetch target: {}", host);
         }
@@ -78,7 +150,7 @@ pub fn reject_private_url(raw: &str) -> anyhow::Result<url::Url> {
     // Note: std DNS has no timeout knob; callers already bound total time
     // with per-request timeouts, so a slow resolver stalls one call, not the run.
     let port = url.port_or_known_default().unwrap_or(443);
-    match (host.as_str(), port).to_socket_addrs() {
+    match (host, port).to_socket_addrs() {
         Ok(addrs) => {
             for addr in addrs {
                 if is_private_ip(addr.ip()) {
@@ -87,8 +159,42 @@ pub fn reject_private_url(raw: &str) -> anyhow::Result<url::Url> {
             }
             Ok(url)
         }
-        Err(_) => Ok(url),
+        // Fail closed: an unverified host is not fetchable. A DNS failure for
+        // the checker can still resolve for a third-party fetcher, so passing
+        // here would punch a hole through Jina/Firecrawl delegation.
+        Err(_) => anyhow::bail!("refusing unverified fetch target (DNS failed): {}", host),
     }
+}
+
+/// Parse dotted, decimal, octal, and hex IPv4 forms (`2130706433`,
+/// `0x7f.0.0.1`, `0177.0.0.1`) the way resolvers do, so non-dotted literals
+/// cannot slip past the private-IP check.
+fn normalize_host_ip(host: &str) -> Option<std::net::IpAddr> {
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return Some(ip);
+    }
+    fn part(s: &str) -> Option<u32> {
+        if s.len() > 2 && (s.starts_with("0x") || s.starts_with("0X")) {
+            u32::from_str_radix(&s[2..], 16).ok()
+        } else if s.len() > 1 && s.starts_with('0') {
+            u32::from_str_radix(&s[1..], 8).ok()
+        } else {
+            s.parse::<u32>().ok()
+        }
+    }
+    let parts: Vec<Option<u32>> = host.split('.').map(part).collect();
+    if parts.iter().any(|p| p.is_none()) {
+        return None;
+    }
+    let p: Vec<u32> = parts.into_iter().flatten().collect();
+    let n: u32 = match p.len() {
+        1 => p[0],
+        2 if p[0] <= 0xff && p[1] <= 0xff_ffff => (p[0] << 24) | p[1],
+        3 if p[0] <= 0xff && p[1] <= 0xff && p[2] <= 0xffff => (p[0] << 24) | (p[1] << 16) | p[2],
+        4 if p.iter().all(|x| *x <= 0xff) => (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3],
+        _ => return None,
+    };
+    Some(std::net::IpAddr::V4(std::net::Ipv4Addr::from(n)))
 }
 
 fn is_private_ip(ip: std::net::IpAddr) -> bool {
@@ -107,8 +213,14 @@ fn is_private_ip(ip: std::net::IpAddr) -> bool {
         }
         std::net::IpAddr::V6(v6) => {
             let s = v6.segments();
+            // IPv4-mapped IPv6 (::ffff:127.0.0.1) must face the IPv4 checks.
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return is_private_ip(std::net::IpAddr::V4(mapped));
+            }
             v6.is_loopback()
                 || v6.is_unspecified()
+                || v6.is_multicast()
+                || (s[0] == 0x2001 && s[1] == 0x0db8) // documentation 2001:db8::/32
                 || (s[0] & 0xfe00) == 0xfc00 // unique local fc00::/7
                 || (s[0] & 0xffc0) == 0xfe80 // link-local fe80::/10
         }
