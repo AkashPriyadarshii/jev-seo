@@ -104,7 +104,7 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
 <div align="center">
   <h1>jev-seo</h1>
   <p><strong>Free Rust SEO and GEO CLI with a 13-tool MCP for devs and agents</strong></p>
-  <p><strong>Open-source Semrush alternative:</strong> 50-rule audits, live crawls, GEO scores, rank drift, CI gates. One MIT binary. Zero subscription.</p>
+  <p><strong>Your agent edits code. jev-seo tells it whether that code is SEO-ready:</strong> 50-rule audits, live crawls, GEO scores, rank drift, CI gates. One MIT binary. Zero subscription. Open-source Semrush alternative.</p>
   <p>Audit pages, crawl sites, score AI citation readiness, gate CI, and hand the same tools to your agent over MCP. No seat. No dashboard login. No DataForSEO card on the free path.</p>
   <p>
     <a href="https://github.com/AkashPriyadarshii/jev-seo/blob/master/LICENSE"><img src="https://img.shields.io/github/license/AkashPriyadarshii/jev-seo?style=flat-square&label=license&color=0055ff" alt="MIT License" /></a>
@@ -329,6 +329,8 @@ jev-seo audit docs/ --min-pass 40
 jev-seo mcp
 ```
 
+*If jev-seo saved you a dashboard seat, star the repo so you can find it later.*
+
 ### Install
 
 | Lane | Command |
@@ -378,6 +380,9 @@ jev-seo robots example.com
 ```
 
 Reads `robots.txt` for GPTBot, ClaudeBot, anthropic-ai, PerplexityBot, Google-Extended, Bytespider. Prints allow/disallow and readiness actions.
+
+<details>
+<summary><strong>More workflows</strong> — briefs, GEO scoring, CI gate, sitemap, AI-slop radar, explain, baselines, narrative (click to expand)</summary>
 
 ### 4. SERP-driven content brief
 
@@ -444,6 +449,8 @@ jev-seo report after.json --baseline before.json
 ### 11. Optional narrative beside the report
 
 Drop `narrative.json` next to exports (or in `--manifest`). Required keys: `executive_summary`, `strengths`, `risks`, `plan`. Every `RULE-Rxx` you cite must exist or load fails. Numbers that match nothing and plan effort bands that fight the action table print as warnings. Missing file embeds an automatic evidence-only summary, labeled automatic. Spec: `references/narrative.md`. Shape: `examples/narrative.example.json`.
+
+</details>
 
 ---
 
