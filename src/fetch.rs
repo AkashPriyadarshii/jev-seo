@@ -164,6 +164,7 @@ fn firecrawl_endpoint() -> anyhow::Result<String> {
 
 /// Jina reader: one GET, markdown back, no key at base tier.
 pub fn jina_fetch(url: &str) -> Result<FetchResult> {
+    crate::paths::reject_private_url(url)?;
     let t0 = Instant::now();
     let target = format!("{}{}", JINA_ENDPOINT, url);
     let mut req = ureq::get(&target)
@@ -179,6 +180,7 @@ pub fn jina_fetch(url: &str) -> Result<FetchResult> {
 /// Firecrawl scrape: JS-rendered markdown. Paid, key-gated.
 /// No budget inside: callers debit before and refund on empty.
 pub fn firecrawl_fetch(url: &str) -> Result<FetchResult> {
+    crate::paths::reject_private_url(url)?;
     let key = firecrawl_key().context("FIRECRAWL_API_KEY not set")?;
     let t0 = Instant::now();
     let payload = serde_json::json!({ "url": url, "formats": ["markdown"] });

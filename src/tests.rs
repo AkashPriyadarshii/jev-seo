@@ -1029,7 +1029,8 @@ Sitemap: https://example.com/sitemap.xml
     fn test_api_endpoint_override_refuses_private() {
         assert!(crate::paths::reject_api_endpoint("http://127.0.0.1:8000/x", "TEST").is_err());
         assert!(crate::paths::reject_api_endpoint("http://10.0.0.5/", "TEST").is_err());
-        assert!(crate::paths::reject_api_endpoint("https://api.example.com/v1", "TEST").is_ok());
+        // Fail closed: .invalid never resolves, so the host is unverifiable.
+        assert!(crate::paths::reject_api_endpoint("https://unresolvable.invalid/", "TEST").is_err());
     }
 
     #[test]
@@ -1152,6 +1153,29 @@ Sitemap: https://example.com/sitemap.xml
         assert!(md.starts_with("# SEO audit:"));
         assert!(md.contains("| Page | Words | Title | Checks |"));
         assert!(md.contains("## Method"));
+    }
+
+    #[test]
+    fn test_ssrf_non_dotted_ip_forms_refused() {
+        use crate::paths::reject_private_url;
+        assert!(reject_private_url("http://2130706433/").is_err());
+        assert!(reject_private_url("http://0x7f.0.0.1/").is_err());
+        assert!(reject_private_url("http://0177.0.0.1/").is_err());
+        assert!(reject_private_url("http://[::ffff:127.0.0.1]/").is_err());
+        assert!(reject_private_url("http://10.0.0.5/").is_err());
+        assert!(reject_private_url("http://unresolvable.invalid/").is_err());
+    }
+
+    #[test]
+    fn test_check_audit_path_denies_system_and_dotdirs() {
+        use crate::paths::check_audit_path;
+        assert!(check_audit_path("/etc").is_err());
+        assert!(check_audit_path("/proc").is_err());
+        let dir = tempfile::tempdir().unwrap();
+        assert!(check_audit_path(dir.path().to_str().unwrap()).is_ok());
+        let dot = dir.path().join(".git");
+        std::fs::create_dir(&dot).unwrap();
+        assert!(check_audit_path(dot.to_str().unwrap()).is_err());
     }
 
     #[test]

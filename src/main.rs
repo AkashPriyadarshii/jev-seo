@@ -1446,8 +1446,10 @@ fn main() -> Result<()> {
             println!("{}", text.cyan());
         }
         Commands::Report { path, baseline, actions_csv, json } => {
-            let cur: audit::DirectoryAuditReport = serde_json::from_str(&std::fs::read_to_string(&path)?)?;
-            let base: audit::DirectoryAuditReport = serde_json::from_str(&std::fs::read_to_string(&baseline)?)?;
+            let cur_src = crate::paths::read_user_file(&path, &["json"])?;
+            let base_src = crate::paths::read_user_file(&baseline, &["json"])?;
+            let cur: audit::DirectoryAuditReport = serde_json::from_str(&cur_src)?;
+            let base: audit::DirectoryAuditReport = serde_json::from_str(&base_src)?;
             let diff = diff_audit_reports(&cur, &base);
             let actions = crate::rules::actions_for(&cur.findings);
             if let Some(out) = &actions_csv {
@@ -1763,7 +1765,7 @@ fn print_jev_spend_line() {
     let toks = manifest::JEV_INPUT_TOKENS.load(std::sync::atomic::Ordering::Relaxed);
     let cost = manifest::jev_cost_usd(toks);
     if reqs > 0 {
-        println!(
+        eprintln!(
             "  Jev spend:      {} request(s), {} input tokens, ${:.6} [{}]",
             reqs, toks, cost, engine::jev_model()
         );

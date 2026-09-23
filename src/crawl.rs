@@ -251,10 +251,9 @@ fn fetch_page(url: &str) -> Fetch {
                     .unwrap_or(true);
                 let encoding = r.header("content-encoding").map(str::to_string);
                 let declared: Option<usize> = r.header("content-length").and_then(|v| v.parse().ok());
-                let mut body = if is_html { r.into_string().unwrap_or_default() } else { String::new() };
-                if body.len() > MAX_BODY_BYTES {
-                    body.truncate(MAX_BODY_BYTES);
-                }
+                // Bounded read: capped_string stops at the cap on a char
+                // boundary instead of loading a gzip-bomb into RAM first.
+                let body = if is_html { crate::fetch::capped_string(r, MAX_BODY_BYTES).unwrap_or_default() } else { String::new() };
                 let bytes = declared.unwrap_or(body.len());
                 return done(200, final_url, body, bytes, hops, encoding);
             }

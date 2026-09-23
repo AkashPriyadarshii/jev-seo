@@ -269,13 +269,17 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
 }
 
 /// Second-layer guard for agent-chosen targets. Static path rules already ran;
-/// this asks Jev whether the target smells like a secret. Fails open offline.
+/// this asks Jev whether the target smells like a secret. No key configured
+/// means this layer is off (static guards still apply); a failed check while
+/// configured blocks, because an unreachable guard is not a clean bill.
 fn safety_gate(tool: &str, target: &str) -> Option<String> {
     match crate::engine::JevClient::new() {
-        Some(client) if client.safety_block(tool, target) => {
-            Some(format!("Error: blocked unsafe target for {}: {}", tool, target))
-        }
-        _ => None,
+        None => None,
+        Some(client) => match client.safety_block(tool, target) {
+            Some(true) => Some(format!("Error: blocked unsafe target for {}: {}", tool, target)),
+            Some(false) => None,
+            None => Some(format!("Error: safety check unreachable for {}: {}", tool, target)),
+        },
     }
 }
 
@@ -294,7 +298,11 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             if let Some(err) = safety_gate("seo_audit", path) {
                 return err;
             }
-            match crate::audit::audit_path(path) {
+            let checked = match crate::paths::check_audit_path(path) {
+                Ok(p) => p,
+                Err(e) => return format!("Error: {e:#}"),
+            };
+            match crate::audit::audit_path(&checked) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }
