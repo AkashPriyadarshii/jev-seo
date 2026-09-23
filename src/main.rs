@@ -65,6 +65,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Suggest one contextual internal link per page via Jev Choice
+    Link {
+        /// File path or directory path to inspect
+        path: String,
+        /// Max source pages to evaluate
+        #[arg(short, long, default_value_t = 10)]
+        limit: usize,
+        #[arg(long)]
+        json: bool,
+    },
     /// Audit a local file or directory for on-page SEO issues, duplicate titles, and thin pages
     Audit {
         /// File path or directory path to inspect
@@ -344,7 +354,7 @@ fn main() -> Result<()> {
             let extras = policy::keyword_value_extras(&suggestions, 10);
             if let Some((eval, v)) = gated_eval_with("keywords", state, extras) {
                 println!("\n{}", "Intent & Semantic Classification:".cyan().bold());
-                println!("  Primary Intent: {} (confidence: {:.2}){}", eval.intent.green(), eval.intent_confidence, policy::marker(v));
+                println!("  Primary Intent: {} (confidence: {:.2}){}{}", eval.intent.green(), eval.intent_confidence, policy::marker(v), runner_up_suffix(&eval.extra, v).dimmed());
                 println!("  Content Gap:    {}", eval.content_gap.yellow());
                 print_keyword_values(&eval.extra, &suggestions);
                 println!("  Suggested Next: jev-seo {}", policy::route_for_intent(&eval.intent));
@@ -437,7 +447,7 @@ fn main() -> Result<()> {
                         policy::Verdict::Drop => eprintln!("{}", format!("Note: Jev unsure on gap analysis (confidence {:.2}), local results above stand.", eval.confidence()).yellow()),
                         v => {
                             println!("\n{}", "Competitive Gap Analysis (TypeSafe Jev):".cyan().bold());
-                            println!("  Intent Class:    {}", eval.intent.green());
+                            println!("  Intent Class:    {}{}", eval.intent.green(), runner_up_suffix(&eval.extra, v).dimmed());
                             println!("  AI Citations:    {}/10 GEO Score{}", eval.geo_score, policy::marker(v));
                             println!("  Primary Gap:     {}", eval.content_gap.yellow());
                         }
@@ -447,6 +457,90 @@ fn main() -> Result<()> {
                 Some(Err(e)) => eprintln!("{}", format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow()),
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
+        }
+        Commands::Link { path, limit, json } => {
+            let dir_report = audit::audit_path(&path)?;
+            let client = match engine::JevClient::new() {
+                Some(c) => c,
+                None => {
+                    eprintln!("{}", "Note: TYPESAFE_API_KEY not set, link suggestions need Jev.".yellow());
+                    return Ok(());
+                }
+            };
+            // Eligible destinations: titled pages only. Deterministic checks
+            // run first (self-skip, already-linked skip); Jev only chooses.
+            let pages: Vec<&audit::AuditReport> = dir_report
+                .reports
+                .iter()
+                .filter(|r| r.title.as_ref().is_some_and(|t| !t.trim().is_empty()))
+                .collect();
+            let stem_of = |p: &str| {
+                std::path::Path::new(p)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(p)
+                    .to_string()
+            };
+            let mut rows: Vec<serde_json::Value> = Vec::new();
+            if !json {
+                println!("{}", "Internal-Link Suggestions (TypeSafe Jev):".cyan().bold());
+            }
+            for src in pages.iter().take(limit.max(1)) {
+                let src_stem = stem_of(&src.file_path);
+                let mut cands: Vec<(String, String)> = Vec::new();
+                for dst in &pages {
+                    if dst.file_path == src.file_path {
+                        continue;
+                    }
+                    let id = stem_of(&dst.file_path);
+                    if src.internal_link_targets.iter().any(|t| t.contains(&id)) {
+                        continue;
+                    }
+                    let summary = format!(
+                        "{} — {}",
+                        dst.title.clone().unwrap_or_default(),
+                        dst.description.clone().unwrap_or_default()
+                    );
+                    cands.push((id, summary.chars().take(160).collect()));
+                    if cands.len() >= 15 {
+                        break;
+                    }
+                }
+                if cands.is_empty() {
+                    continue;
+                }
+                let excerpt: String = excerpt_local(&src.file_path).chars().take(1200).collect();
+                let state = json!({
+                    "source": { "title": src.title, "excerpt": excerpt },
+                    "candidates": cands.iter().map(|(id, s)| json!({"id": id, "summary": s})).collect::<Vec<_>>()
+                });
+                match client.fanout_eval_with(state, policy::link_question(&cands)) {
+                    Ok(eval) => {
+                        let ans = eval.extra.get("link_target");
+                        let target = ans.and_then(|a| a.get("choice")).and_then(|c| c.as_str()).unwrap_or("no_link");
+                        let conf = ans.and_then(|a| a.get("confidence")).and_then(|c| c.as_f64()).unwrap_or(0.5);
+                        let v = policy::gate("link", conf);
+                        if v == policy::Verdict::Drop {
+                            continue;
+                        }
+                        if json {
+                            rows.push(json!({"source": src.file_path, "target": target, "confidence": conf}));
+                        } else {
+                            println!(
+                                "  {} → {}{}",
+                                src_stem.green(),
+                                target.yellow(),
+                                policy::marker(v)
+                            );
+                        }
+                    }
+                    Err(e) => eprintln!("{}", format!("Warning: link judge failed for {} ({e:#})", src.file_path).yellow()),
+                }
+            }
+            if json {
+                println!("{}", serde_json::to_string_pretty(&rows)?);
+            }
+            print_jev_spend_line();
         }
         Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
@@ -1301,9 +1395,10 @@ fn main() -> Result<()> {
                     println!("  Composite GEO:   {}/10 (confidence {:.2})", c, cf);
                 }
                 println!(
-                    "  Intent:         {} (confidence {:.2})",
+                    "  Intent:         {} (confidence {:.2}){}",
                     eval.intent.green(),
-                    eval.intent_confidence
+                    eval.intent_confidence,
+                    runner_up_suffix(&eval.extra, v).dimmed()
                 );
                 println!("  Value prop:     {}", eval.content_gap.yellow());
                 print_page_extras(&eval.extra);
@@ -1679,12 +1774,13 @@ fn print_jev_page_suite(pages: &[(String, engine::AnalysisResult, policy::Verdic
             .unwrap_or(path);
         let review = policy::needs_review(&eval.extra, "audit");
         println!(
-            "  {} GEO {}/10 intent {} gap {}{}",
+            "  {} GEO {}/10 intent {} gap {}{}{}",
             name,
             eval.geo_score,
             eval.intent,
             eval.content_gap,
-            policy::marker(*v)
+            policy::marker(*v),
+            runner_up_suffix(&eval.extra, *v).dimmed()
         );
         print_page_extras(&eval.extra);
         if !review.is_empty() {
@@ -1694,13 +1790,24 @@ fn print_jev_page_suite(pages: &[(String, engine::AnalysisResult, policy::Verdic
     print_jev_spend_line();
 }
 
-fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {
-    let keys = [
+/// Runner-up suffix for Flag verdicts: shows the ambiguity instead of a bare
+/// low confidence, so reviewers see what the call almost chose.
+fn runner_up_suffix(extra: &serde_json::Map<String, serde_json::Value>, v: policy::Verdict) -> String {
+    if v == policy::Verdict::Flag {
+        if let Some(r) = policy::intent_runner_up(extra) {
+            return format!(" ← runner-up {r}");
+        }
+    }
+    String::new()
+}
+
+fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {    let keys = [
         "page_helpfulness",
         "page_trust",
         "page_specificity",
         "title_fit",
         "meta_fit",
+        "meta_verdict",
         "importance",
         "value_prop",
         "geo_statistics",
@@ -1766,8 +1873,12 @@ fn print_jev_spend_line() {
     let cost = manifest::jev_cost_usd(toks);
     if reqs > 0 {
         eprintln!(
-            "  Jev spend:      {} request(s), {} input tokens, ${:.6} [{}]",
-            reqs, toks, cost, engine::jev_model()
+            "  Jev spend:      {} request(s), {} input tokens, ${:.6} [{}|{}]",
+            reqs,
+            toks,
+            cost,
+            engine::jev_model(),
+            policy::QUESTION_VERSION
         );
     }
 }

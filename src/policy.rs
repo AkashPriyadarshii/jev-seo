@@ -1,5 +1,9 @@
 //! One place for every Jev confidence threshold. Tune numbers here, nowhere else.
 
+/// Question-set version. Bump on ANY criteria/instruction change so eval-log
+/// rows stay comparable and threshold drift is traceable to a question build.
+pub const QUESTION_VERSION: &str = "2026-09-23.a1";
+
 /// Verdict for a semantic answer set.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Verdict {
@@ -27,7 +31,7 @@ pub const FLAG: f64 = 0.45;
 pub fn thresholds(command: &str) -> Thresholds {
     match command {
         // Noul-heavy surfaces: still require 0.80 to treat as fact.
-        "geo" | "brief" | "audit" | "crawl" => Thresholds { act: ACT, flag: FLAG },
+        "geo" | "brief" | "audit" | "crawl" | "link" => Thresholds { act: ACT, flag: FLAG },
         // Preference / ranking noise: lower flag only; act unchanged.
         "query" | "keywords" => Thresholds { act: ACT, flag: 0.40 },
         _ => Thresholds { act: ACT, flag: FLAG },
@@ -95,6 +99,12 @@ pub fn page_audit_extras() -> serde_json::Value {
             "criteria": ["Unrelated or boilerplate", "Related but vague", "Accurate summary", "Specific summary with a reason to visit"] },
         "answer_first": { "type": "noul", "instructions": "Does the opening after any banner state plainly what this page offers or answers?",
             "criteria": {"true": "First sentences say concretely what the reader gets", "false": "Slogan, tease, date line, or preamble before the point"} },
+        "meta_verdict": { "type": "choice", "instructions": "Given `page.title`, `page.description`, and `page.text`, what should happen to this page's meta description?",
+            "criteria": {
+                "keep": "Description accurately summarizes the page with a reason to visit",
+                "rewrite": "Description is missing, vague, truncated, or mismatched to the page",
+                "missing": "No description present at all"
+            } },
         "clear_next_step": { "type": "noul", "instructions": "Does `page` invite one obvious next action that fits the page?",
             "criteria": {"true": "Concrete action: contact, buy, read next, install, try", "false": "Ends with no action or only generic nav"} },
         "importance": { "type": "score", "instructions": "How important is this page to the site owner's goals?",
@@ -182,6 +192,8 @@ pub fn needs_review(extra: &serde_json::Map<String, serde_json::Value>, command:
     let act = thresholds(command).act;
     let mut ids: Vec<String> = extra
         .iter()
+        // intent_probs is display evidence for runner-up, not a question.
+        .filter(|(k, _)| k.as_str() != "intent_probs")
         .filter(|(_, a)| {
             a.get("confidence")
                 .and_then(|c| c.as_f64())
@@ -219,6 +231,43 @@ pub fn injection_blocked(extra: &serde_json::Map<String, serde_json::Value>) -> 
         .unwrap_or(false)
 }
 
+/// Runner-up intent for Flag verdicts: "label (0.YY)". Reads the stashed
+/// intent distribution; None when missing or when the winner owns the mass.
+pub fn intent_runner_up(extra: &serde_json::Map<String, serde_json::Value>) -> Option<String> {
+    let probs = extra.get("intent_probs")?.as_object()?;
+    let mut ranked: Vec<(&String, f64)> = probs
+        .iter()
+        .filter_map(|(k, v)| v.as_f64().map(|p| (k, p)))
+        .collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    let second = ranked.get(1)?;
+    // Zero-mass runner-ups are noise, not ambiguity.
+    if second.1 <= 0.05 {
+        return None;
+    }
+    Some(format!("{} ({:.2})", second.0, second.1))
+}
+
+/// Link-target Choice over pre-filtered destinations plus a no_link escape.
+/// Candidates arrive as (option id, one-line summary); ids must be short
+/// file stems because the option key is what Jev returns.
+pub fn link_question(candidates: &[(String, String)]) -> serde_json::Value {
+    let mut criteria = serde_json::Map::new();
+    for (id, summary) in candidates {
+        criteria.insert(id.clone(), serde_json::Value::String(summary.clone()));
+    }
+    criteria.insert(
+        "no_link".into(),
+        serde_json::Value::String("No candidate is a natural contextual fit; linking would feel forced".into()),
+    );
+    serde_json::json!({
+        "link_target": {
+            "type": "choice",
+            "instructions": "Which candidate page is the most natural contextual internal-link target for the source passage?",
+            "criteria": criteria
+        }
+    })
+}
 /// Next command hint from intent. Pure routing, no inference.
 pub fn route_for_intent(intent: &str) -> &'static str {
     match intent {

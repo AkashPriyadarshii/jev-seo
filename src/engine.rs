@@ -142,6 +142,7 @@ impl JevClient {
         extra_questions: serde_json::Value,
     ) -> Result<AnalysisResult> {
         let state = truncate_state(prefilter_state(state));
+        let input_chars = state.to_string().len();
         let mut questions = json!({
                 "intent": {
                     "type": "choice",
@@ -150,7 +151,8 @@ impl JevClient {
                         "informational": "How-to, tutorial, explanation, documentation, research",
                         "commercial": "Product reviews, pricing comparisons, buying evaluation",
                         "transactional": "Immediate download, sign-up, purchase, command execution",
-                        "navigational": "Specific brand, GitHub repo, or homepage search"
+                        "navigational": "Specific brand, GitHub repo, or homepage search",
+                        "insufficient_context": "Supplied evidence is too thin to choose safely"
                     }
                 },
                 "geo_score": {
@@ -180,7 +182,8 @@ impl JevClient {
                         "generic_prose": "AI-slop, superficial fluff, empty buzzwords",
                         "no_step_by_step": "Missing practical reproduction steps or code blocks",
                         "outdated_examples": "Obsolete APIs or dead references",
-                        "none": "Satisfies user query with high information density"
+                        "none": "Satisfies user query with high information density",
+                        "insufficient_context": "Too little content to judge a weakness"
                     }
                 }
         });
@@ -202,6 +205,18 @@ impl JevClient {
         let body: serde_json::Value = resp.into_json()?;
         record_usage(&body);
         let answers = body.get("answers").context("Invalid Jev response schema")?;
+        let ts_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        crate::manifest::append_eval_log(serde_json::json!({
+            "ts_ms": ts_ms,
+            "qver": crate::policy::QUESTION_VERSION,
+            "model": MODEL,
+            "resolved_model": body.get("model").and_then(|m| m.as_str()),
+            "input_chars": input_chars,
+            "answers": answers
+        }));
 
         let intent_obj = &answers["intent"];
         let intent = intent_obj["choice"]
@@ -248,13 +263,27 @@ impl JevClient {
             extra: answers
                 .as_object()
                 .map(|m| {
-                    m.iter()
+                    let mut out: serde_json::Map<String, serde_json::Value> = m
+                        .iter()
                         .filter(|(k, _)| {
                             !["intent", "geo_score", "direct_answer", "content_gap"]
                                 .contains(&k.as_str())
                         })
                         .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect()
+                        .collect();
+                    // Keep the intent distribution: reviewers see the runner-up
+                    // on Flag verdicts instead of a bare low confidence.
+                    if let Some(probs) = answers
+                        .get("intent")
+                        .and_then(|i| i.get("probabilities"))
+                        .and_then(|p| p.as_object())
+                    {
+                        out.insert(
+                            "intent_probs".into(),
+                            serde_json::Value::Object(probs.clone()),
+                        );
+                    }
+                    out
                 })
                 .unwrap_or_default(),
         })

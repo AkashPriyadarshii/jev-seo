@@ -1179,6 +1179,27 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_link_question_has_no_link_escape() {
+        use crate::policy::link_question;
+        let q = link_question(&[("guide".into(), "Guide page".into())]);
+        assert_eq!(q["link_target"]["type"], "choice");
+        assert!(q["link_target"]["criteria"].get("guide").is_some());
+        assert!(q["link_target"]["criteria"].get("no_link").is_some());
+    }
+
+    #[test]
+    fn test_intent_runner_up_picks_second() {
+        use crate::policy::intent_runner_up;
+        let extra: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_value(serde_json::json!({
+                "intent_probs": {"informational": 0.5, "navigational": 0.4, "commercial": 0.1}
+            }))
+            .unwrap();
+        assert_eq!(intent_runner_up(&extra).as_deref(), Some("navigational (0.40)"));
+        assert!(intent_runner_up(&serde_json::Map::new()).is_none());
+    }
+
+    #[test]
     fn test_crawl_snapshot_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("t.db");

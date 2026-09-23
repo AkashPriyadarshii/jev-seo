@@ -82,6 +82,9 @@ pub struct Ledger {
     /// couple to the versioned build). Unknown when no Jev call ran.
     #[serde(default)]
     pub jev_model: String,
+    /// Question-set build that produced the scores (policy::QUESTION_VERSION).
+    #[serde(default)]
+    pub jev_question_version: String,
     pub fetch_credits_spent: u32,
     pub fetch_credit_cap: u32,
     pub paid_backends_used: Vec<String>,
@@ -102,6 +105,7 @@ impl Ledger {
             jev_budget_usd: jev_budget_usd(),
             jev_skipped_budget: jev_budget_skip_count(),
             jev_model: crate::engine::jev_model().to_string(),
+            jev_question_version: crate::policy::QUESTION_VERSION.to_string(),
             fetch_credits_spent: 0,
             fetch_credit_cap: 0,
             paid_backends_used: Vec::new(),
@@ -505,6 +509,38 @@ pub fn completeness_llms(rep: &crate::llms::LlmsReport) -> Completeness {
     Completeness {
         full: rep.info.present && rep.robots_present,
         notes,
+    }
+}
+
+/// Directory holding the local DB; the eval log lives beside it.
+fn jev_home_dir() -> Option<std::path::PathBuf> {
+    if let Ok(db) = std::env::var("JEV_SEO_DB") {
+        return std::path::Path::new(&db)
+            .parent()
+            .map(|p| p.to_path_buf())
+            .filter(|p| !p.as_os_str().is_empty());
+    }
+    std::env::var("HOME").ok().map(|h| {
+        std::path::Path::new(&h).join(".jev-seo")
+    })
+}
+
+/// Append-only eval trace: one JSON line per Jev fan-out (question version,
+/// model, input size, full answers). Powers re-evaluation and Act sampling.
+/// Best-effort: never fails a run. Rotates past 5 MB.
+pub fn append_eval_log(entry: serde_json::Value) {
+    const CAP_BYTES: u64 = 5 * 1024 * 1024;
+    let Some(dir) = jev_home_dir() else { return };
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let path = dir.join("eval.jsonl");
+    if path.metadata().map(|m| m.len() > CAP_BYTES).unwrap_or(false) {
+        let _ = std::fs::remove_file(&path);
+    }
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "{}", entry);
     }
 }
 
