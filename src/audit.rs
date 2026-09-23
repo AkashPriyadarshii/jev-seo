@@ -923,60 +923,18 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
     m
 }
 
-/// PDF twin of to_html: scorecard, pages, findings, method.
-#[allow(dead_code)] // kept for callers/tests that do not embed a narrative
+/// PDF twin of to_html: scorecard, pages, findings, optional narrative, method.
+#[allow(dead_code)] // bin always embeds a narrative; tests call the plain path
 pub fn to_pdf(rep: &DirectoryAuditReport) -> Vec<u8> {
-    let score = rep.pass_rate.round().clamp(0.0, 100.0) as u32;
-    let mut lines = vec![
-        format!("SEO audit: {}  |  score {}/100 ({})", rep.dir_path, score, crate::actions::grade(score)),
-        format!("Files: {}  Words: {}  Pass rate: {:.1}%", rep.total_files, rep.total_words, rep.pass_rate),
-        String::new(),
-        "Pages (path | words | title | checks):".to_string(),
-    ];
-    for r in &rep.reports {
-        let passed = r.checks.iter().filter(|c| c.passed).count();
-        lines.push(format!(
-            "- {} | {}w | {} | {}/{}",
-            r.file_path,
-            r.word_count,
-            r.title.as_deref().unwrap_or(""),
-            passed,
-            r.checks.len()
-        ));
-    }
-    if !rep.duplicate_titles.is_empty() {
-        lines.push(String::new());
-        lines.push(format!("Duplicate titles ({}):", rep.duplicate_titles.len()));
-        let mut titles: Vec<&String> = rep.duplicate_titles.keys().collect();
-        titles.sort();
-        for t in titles.iter().take(10) {
-            lines.push(format!("- {} ({} files)", t, rep.duplicate_titles[*t].len()));
-        }
-    }
-    if !rep.orphan_pages.is_empty() {
-        lines.push(String::new());
-        lines.push(format!("Orphan pages ({}):", rep.orphan_pages.len()));
-        for f in rep.orphan_pages.iter().take(10) {
-            lines.push(format!("- {}", f));
-        }
-    }
-    if !rep.thin_pages.is_empty() {
-        lines.push(String::new());
-        lines.push(format!("Thin pages ({}):", rep.thin_pages.len()));
-        for (f, wc) in rep.thin_pages.iter().take(10) {
-            lines.push(format!("- {} ({} words)", f, wc));
-        }
-    }
-    lines.push(String::new());
-    lines.push("Method: on-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar.".to_string());
-    lines.push("Scores rank work; they never predict rankings or traffic.".to_string());
-    lines.push("Completeness: local file walk; Jev and live crawl not in this report.".to_string());
-    lines.push("Companion files: run.json, ledger.json.".to_string());
-    pdf_lines(&format!("jev-seo audit report: {}", rep.dir_path), &lines)
+    to_pdf_opt(rep, None)
 }
 
-/// PDF twin of to_html including the narrative block when present.
+/// PDF with an embedded narrative block when present.
 pub fn to_pdf_with_narrative(rep: &DirectoryAuditReport, n: &crate::narrative::Narrative) -> Vec<u8> {
+    to_pdf_opt(rep, Some(n))
+}
+
+fn to_pdf_opt(rep: &DirectoryAuditReport, n: Option<&crate::narrative::Narrative>) -> Vec<u8> {
     let score = rep.pass_rate.round().clamp(0.0, 100.0) as u32;
     let mut lines = vec![
         format!("SEO audit: {}  |  score {}/100 ({})", rep.dir_path, score, crate::actions::grade(score)),
@@ -1018,22 +976,24 @@ pub fn to_pdf_with_narrative(rep: &DirectoryAuditReport, n: &crate::narrative::N
             lines.push(format!("- {} ({} words)", f, wc));
         }
     }
-    lines.push(String::new());
-    lines.push("Narrative:".to_string());
-    for p in &n.executive_summary {
-        lines.push(p.clone());
-    }
-    if !n.risks.is_empty() {
-        lines.push("Risks:".to_string());
-        for r in &n.risks {
-            lines.push(format!("- {}", r));
+    if let Some(n) = n {
+        lines.push(String::new());
+        lines.push("Narrative:".into());
+        for p in &n.executive_summary {
+            lines.push(p.clone());
         }
-    }
-    if !n.unverified_numbers.is_empty() {
-        lines.push(format!(
-            "Warning: numbers not in audit: {}",
-            n.unverified_numbers.join(", ")
-        ));
+        if !n.risks.is_empty() {
+            lines.push("Risks:".into());
+            for r in &n.risks {
+                lines.push(format!("- {}", r));
+            }
+        }
+        if !n.unverified_numbers.is_empty() {
+            lines.push(format!(
+                "Warning: numbers not in audit: {}",
+                n.unverified_numbers.join(", ")
+            ));
+        }
     }
     lines.push(String::new());
     lines.push("Method: on-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar.".to_string());

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pair cannibalization: expand each multi-file stem into explicit A×B conflict pairs with word-count winner; print top pairs on audit, table in Markdown, `audit --pairs-csv`.
 - MCP tools `seo_explain` and `seo_report` (score delta + actions + pairs); tools list is now 13.
 - README Command Reference and MCP matrix cover `explain`, `report`, new audit/crawl flags, and narrative.json.
-- Action tracker export: `audit --actions-csv` and `audit --actions-xls` (SpreadsheetML opens in Excel without a zip dependency); same ranked list as terminal output.
+- Action tracker export: `audit --actions-csv` (same ranked list as terminal; Excel opens CSV).
 - `jev-seo explain R19|RULE-R19`: stable rule card (area, severity, effort band, fix); unknown ids fail closed.
 - `jev-seo report --baseline`: diff two saved audit JSONs (score delta, rules cleared/new) with optional action-tracker CSV and `--json`.
 - Optional `narrative.json` beside audit exports (`references/narrative.md`): required executive_summary/strengths/risks/plan keys, hard refusal of unknown action IDs, unverified-number and plan effort-band warnings; absent file embeds an automatic evidence-only summary labeled automatic.

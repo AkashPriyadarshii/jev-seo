@@ -90,9 +90,6 @@ enum Commands {
         /// Write ranked action-tracker CSV (id, priority, effort, impact)
         #[arg(long, value_name = "PATH")]
         actions_csv: Option<String>,
-        /// Write action-tracker SpreadsheetML (.xls) Excel opens without conversion
-        #[arg(long, value_name = "PATH")]
-        actions_xls: Option<String>,
         /// Write stem×URL conflict pairs CSV (cannibalization)
         #[arg(long, value_name = "PATH")]
         pairs_csv: Option<String>,
@@ -431,7 +428,7 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, actions_csv, actions_xls, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -551,10 +548,6 @@ fn main() -> Result<()> {
             }
             if let Some(out) = &actions_csv {
                 write_actions_csv(out, &actions)?;
-            }
-            if let Some(out) = &actions_xls {
-                std::fs::write(out, actions::to_spreadsheet_xml(&actions))?;
-                println!("Action tracker SpreadsheetML written to {}", out.dimmed());
             }
 
             let texts_owned: Vec<String> = body_html
