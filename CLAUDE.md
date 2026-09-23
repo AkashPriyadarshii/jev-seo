@@ -23,7 +23,7 @@
 - Sitemap & Hreflang: `sitemap.rs` streaming XML parser with ISO region and HTTPS checks
 - Local Cache / History: `rusqlite` (bundled SQLite with WAL mode in `.jev-seo.db`)
 - CLI Framework: `clap` with derive features
-- MCP Server: Stdio JSON-RPC 2.0 protocol for agent loops (8 native tools)
+- MCP Server: Stdio JSON-RPC 2.0 protocol for agent loops (13 native tools)
 
 ## Style & Constraints
 - Maximum performance, zero runtime allocations on hot paths.

@@ -224,7 +224,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(resp.error.is_none());
         let res = resp.result.unwrap();
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
-        assert_eq!(tools.len(), 11, "All 11 agent SEO tools must be exposed");
+        assert_eq!(tools.len(), 13, "All 13 agent SEO tools must be exposed");
 
         let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(|n| n.as_str())).collect();
         assert!(names.contains(&"seo_keywords"));
@@ -238,6 +238,98 @@ Sitemap: https://example.com/sitemap.xml
         assert!(names.contains(&"seo_crawl"));
         assert!(names.contains(&"seo_llms"));
         assert!(names.contains(&"seo_extract"));
+        assert!(names.contains(&"seo_explain"));
+        assert!(names.contains(&"seo_report"));
+    }
+
+    #[test]
+    fn test_mcp_explain_and_report_tools() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        let explain = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(2)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_explain",
+                "arguments": { "id": "RULE-R19" }
+            })),
+        };
+        let resp = handle_request(&explain);
+        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        assert!(text.contains("AI slop markers"), "{text}");
+
+        let missing = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(3)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_explain",
+                "arguments": { "id": "R99" }
+            })),
+        };
+        let resp = handle_request(&missing);
+        let text = resp.result.as_ref().unwrap()["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(text.starts_with("Error:"), "{text}");
+    }
+
+    #[test]
+    fn test_cannibalization_pairs_expand() {
+        use crate::audit::{cannibalization_pairs, AuditReport, CannibalizationItem, CheckItem, DirectoryAuditReport};
+        let mk = |path: &str, wc: usize| AuditReport {
+            file_path: path.into(),
+            title: Some("Best Rust SEO".into()),
+            title_len: 14,
+            description: None,
+            description_len: 0,
+            h1_count: 1,
+            h2_count: 0,
+            h3_count: 0,
+            word_count: wc,
+            image_count: 0,
+            images_missing_alt: 0,
+            internal_links: 0,
+            external_links: 0,
+            schema_found: false,
+            canonical_found: false,
+            og_tags_found: false,
+            geo_opening_words: 0,
+            heading_skipped_levels: vec![],
+            em_dash_count: 0,
+            ai_slop_words_found: vec![],
+            internal_link_targets: vec![],
+            checks: vec![CheckItem { name: "n".into(), passed: true, message: "m".into() }],
+        };
+        let rep = DirectoryAuditReport {
+            dir_path: "d".into(),
+            total_files: 3,
+            total_words: 75,
+            avg_words_per_file: 25,
+            pass_rate: 80.0,
+            reports: vec![mk("a.md", 10), mk("b.md", 40), mk("c.md", 25)],
+            duplicate_titles: Default::default(),
+            thin_pages: vec![],
+            missing_canonicals: vec![],
+            missing_descriptions: vec![],
+            orphan_pages: vec![],
+            keyword_cannibalization: vec![CannibalizationItem {
+                keyword_stem: "best rust seo".into(),
+                colliding_files: vec!["a.md".into(), "b.md".into(), "c.md".into()],
+            }],
+            findings: vec![],
+        };
+        let pairs = cannibalization_pairs(&rep);
+        assert_eq!(pairs.len(), 3, "3 files → C(3,2)=3 pairs");
+        let ab = pairs.iter().find(|p| p.a == "a.md" && p.b == "b.md").expect("a×b");
+        assert_eq!(ab.winner, "b.md");
+        assert_eq!(ab.a_words, 10);
+        assert_eq!(ab.b_words, 40);
+        let ac = pairs.iter().find(|p| p.a == "a.md" && p.b == "c.md").expect("a×c");
+        assert_eq!(ac.winner, "c.md");
     }
 
     #[test]

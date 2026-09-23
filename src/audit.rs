@@ -487,6 +487,54 @@ pub struct CannibalizationItem {
     pub colliding_files: Vec<String>,
 }
 
+/// Two pages fighting for one stem. Winner = more words, then lower path.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CannibalizationPair {
+    pub keyword_stem: String,
+    pub a: String,
+    pub b: String,
+    pub winner: String,
+    pub a_words: usize,
+    pub b_words: usize,
+}
+
+/// Expand every multi-file stem into explicit A×B pairs for editors.
+pub fn cannibalization_pairs(rep: &DirectoryAuditReport) -> Vec<CannibalizationPair> {
+    let words_for = |path: &str| -> usize {
+        rep.reports
+            .iter()
+            .find(|r| r.file_path == path)
+            .map(|r| r.word_count)
+            .unwrap_or(0)
+    };
+    let mut out = Vec::new();
+    for item in &rep.keyword_cannibalization {
+        let files = &item.colliding_files;
+        for i in 0..files.len() {
+            for j in (i + 1)..files.len() {
+                let (a, b) = (files[i].clone(), files[j].clone());
+                let (aw, bw) = (words_for(&a), words_for(&b));
+                let winner = if aw > bw || (aw == bw && a < b) { a.clone() } else { b.clone() };
+                out.push(CannibalizationPair {
+                    keyword_stem: item.keyword_stem.clone(),
+                    a,
+                    b,
+                    winner,
+                    a_words: aw,
+                    b_words: bw,
+                });
+            }
+        }
+    }
+    out.sort_by(|x, y| {
+        x.keyword_stem
+            .cmp(&y.keyword_stem)
+            .then(x.a.cmp(&y.a))
+            .then(x.b.cmp(&y.b))
+    });
+    out
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirectoryAuditReport {
     pub dir_path: String,
@@ -857,6 +905,17 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
         m.push_str(&format!("\n## Keyword cannibalization ({})\n\n", rep.keyword_cannibalization.len()));
         for item in &rep.keyword_cannibalization {
             m.push_str(&format!("- {} ({} pages)\n", item.keyword_stem, item.colliding_files.len()));
+        }
+        let pairs = cannibalization_pairs(rep);
+        if !pairs.is_empty() {
+            m.push_str(&format!("\n### Conflict pairs ({})\n\n", pairs.len()));
+            m.push_str("| Stem | A | B | A words | B words | Keep |\n|---|---|---|---:|---:|---|\n");
+            for p in pairs.iter().take(20) {
+                m.push_str(&format!(
+                    "| {} | {} | {} | {} | {} | {} |\n",
+                    p.keyword_stem, p.a, p.b, p.a_words, p.b_words, p.winner
+                ));
+            }
         }
     }
     m.push_str("\n## Method\n\nOn-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar. Scores rank work; they never predict rankings or traffic.\n");
