@@ -76,20 +76,31 @@
 
 ### `mcp.rs` (Stdio Model Context Protocol)
 - JSON-RPC 2.0 loop over stdin/stdout.
-- Tools (11):
+- Tools (13):
   - `seo_keywords`: Autocomplete variants and search intent classification.
-  - `seo_serp_inspect`: Live SERP competitors and winning angles.
-  - `seo_audit`: Local file or directory on-page SEO scan with orphan detection.
-  - `seo_geo`: Generative Engine Optimization citation evaluation.
-  - `seo_schema`: Schema.org JSON-LD structural and deprecation validator.
-  - `seo_robots`: Live robots.txt and AI crawler permission checker.
-  - `seo_brief`: SERP-driven heading outline and content brief generator.
-  - `seo_sitemap`: XML sitemap, URL limits, HTTPS, and hreflang validator.
-  - `seo_crawl`: Live-site crawl with health score and findings.
-  - `seo_llms`: llms.txt and AI crawler readiness check.
-  - `seo_extract`: Paid URL-to-markdown extraction (key-gated).
+  - `seo_serp_inspect`: Live SERP competitor titles, snippets, URLs.
+  - `seo_audit`: Local file/directory audit under the fifty-rule engine.
+  - `seo_geo`: GEO citation score with confidence gates.
+  - `seo_schema`: JSON-LD structural and deprecation checks.
+  - `seo_robots`: Robots.txt and AI crawler permissions.
+  - `seo_brief`: SERP-driven content brief with outline.
+  - `seo_sitemap`: XML sitemap and hreflang validation.
+  - `seo_crawl`: Live-site BFS crawl with health score.
+  - `seo_llms`: llms.txt and AI crawler readiness.
+  - `seo_extract`: URL to markdown (key-gated paid path).
   - `seo_explain`: Rule card for stable R01-R50 ids.
   - `seo_report`: Diff two saved audit JSONs (score, rules, actions, pairs).
+
+### `manifest.rs` (RunManifest & spend ledger)
+- Writes `run.json` (schema 1.0) and `ledger.json` beside exports or `--manifest <DIR>`.
+- Citation gate refuses report text that cites unknown action or rule ids.
+- Completeness banners on audit/crawl/llms scores (what ran, what was skipped).
+- Process-wide `--jev-budget` hard cap checked before each Jev POST.
+
+### `narrative.rs` (Optional owner narrative)
+- Loads `narrative.json` beside exports: required executive_summary, strengths, risks, plan.
+- Hard-fails on unknown action IDs; warns on unverified numbers and effort-band mismatches.
+- Absent file embeds an automatic evidence-only summary, labeled automatic.
 
 ### `crawl.rs` (Live-Site Crawler)
 - Level-batched parallel fetch over 8 std threads, no async runtime.
