@@ -38,10 +38,12 @@ pub struct CheckItem {
     pub message: String,
 }
 
+/// Display windows match the R10/R12 rule windows exactly: a page never
+/// passes the badge while firing the rule, or vice versa.
 pub const MIN_TITLE_CHARS: usize = 30;
-pub const MAX_TITLE_CHARS: usize = 65;
-pub const MIN_DESC_CHARS: usize = 80;
-pub const MAX_DESC_CHARS: usize = 165;
+pub const MAX_TITLE_CHARS: usize = 60;
+pub const MIN_DESC_CHARS: usize = 120;
+pub const MAX_DESC_CHARS: usize = 160;
 pub const MIN_CONTENT_WORDS: usize = 300;
 pub const GEO_MIN_WORDS: usize = 100;
 pub const GEO_MAX_WORDS: usize = 200;
@@ -934,14 +936,80 @@ pub fn to_pdf_with_narrative(rep: &DirectoryAuditReport, n: &crate::narrative::N
     to_pdf_opt(rep, Some(n))
 }
 
-fn to_pdf_opt(rep: &DirectoryAuditReport, n: Option<&crate::narrative::Narrative>) -> Vec<u8> {
+/// Deck section 1: cover with score and grade.
+pub fn pdf_cover(rep: &DirectoryAuditReport) -> Vec<String> {
     let score = rep.pass_rate.round().clamp(0.0, 100.0) as u32;
-    let mut lines = vec![
-        format!("SEO audit: {}  |  score {}/100 ({})", rep.dir_path, score, crate::actions::grade(score)),
-        format!("Files: {}  Words: {}  Pass rate: {:.1}%", rep.total_files, rep.total_words, rep.pass_rate),
-        String::new(),
-        "Pages (path | words | title | checks):".to_string(),
-    ];
+    vec![
+        "jev-seo audit report".to_string(),
+        format!("Target: {}", rep.dir_path),
+        format!("Score: {}/100 ({})", score, crate::actions::grade(score)),
+        format!(
+            "Files: {}  Words: {}  Pass rate: {:.1}%",
+            rep.total_files, rep.total_words, rep.pass_rate
+        ),
+    ]
+}
+
+/// Deck section 2: scorecard totals plus ranked impact list.
+pub fn pdf_scorecard(rep: &DirectoryAuditReport) -> Vec<String> {
+    let mut lines = vec!["Scorecard:".to_string()];
+    lines.push(format!(
+        "Files walked: {}  Words: {}  Avg words/file: {}",
+        rep.total_files, rep.total_words, rep.avg_words_per_file
+    ));
+    lines.push(format!(
+        "Findings recorded: {}  Duplicate titles: {}  Orphans: {}  Thin pages: {}",
+        rep.findings.len(),
+        rep.duplicate_titles.len(),
+        rep.orphan_pages.len(),
+        rep.thin_pages.len()
+    ));
+    lines.push(String::new());
+    lines.push("Top actions by impact:".to_string());
+    let actions = crate::rules::actions_for(&rep.findings);
+    if actions.is_empty() {
+        lines.push("- none, directory is clean".to_string());
+    }
+    for a in actions.iter().take(8) {
+        lines.push(format!(
+            "- [P{}] {}  impact {}  effort {}{}",
+            a.priority,
+            a.id,
+            a.impact,
+            a.effort,
+            if a.quick_win { "  quick-win" } else { "" }
+        ));
+    }
+    lines
+}
+
+/// Deck section 3: findings grouped by area with severity.
+pub fn pdf_findings_by_area(rep: &DirectoryAuditReport) -> Vec<String> {
+    use std::collections::BTreeMap;
+    let mut lines = vec!["Findings by area:".to_string()];
+    if rep.findings.is_empty() {
+        lines.push("- none".to_string());
+        return lines;
+    }
+    let mut by_area: BTreeMap<String, Vec<&crate::rules::Finding>> = BTreeMap::new();
+    for f in &rep.findings {
+        by_area
+            .entry(crate::rules::label(&f.area).to_string())
+            .or_default()
+            .push(f);
+    }
+    for (area, list) in &by_area {
+        lines.push(format!("{} ({}):", area, list.len()));
+        for f in list.iter().take(8) {
+            lines.push(format!("- {} {:?} {}", f.rule_id, f.severity, f.scope));
+        }
+    }
+    lines
+}
+
+/// Deck section 4: page inventory with per-page check counts.
+pub fn pdf_inventory(rep: &DirectoryAuditReport) -> Vec<String> {
+    let mut lines = vec!["Page inventory (path | words | title | checks):".to_string()];
     for r in &rep.reports {
         let passed = r.checks.iter().filter(|c| c.passed).count();
         lines.push(format!(
@@ -976,30 +1044,58 @@ fn to_pdf_opt(rep: &DirectoryAuditReport, n: Option<&crate::narrative::Narrative
             lines.push(format!("- {} ({} words)", f, wc));
         }
     }
-    if let Some(n) = n {
-        lines.push(String::new());
-        lines.push("Narrative:".into());
-        for p in &n.executive_summary {
-            lines.push(p.clone());
-        }
-        if !n.risks.is_empty() {
-            lines.push("Risks:".into());
-            for r in &n.risks {
-                lines.push(format!("- {}", r));
-            }
-        }
-        if !n.unverified_numbers.is_empty() {
-            lines.push(format!(
-                "Warning: numbers not in audit: {}",
-                n.unverified_numbers.join(", ")
-            ));
+    lines
+}
+
+/// Deck section 5: narrative block when present.
+pub fn pdf_narrative(n: &crate::narrative::Narrative) -> Vec<String> {
+    let mut lines = vec!["Narrative:".to_string()];
+    if n.automatic {
+        lines.push("(automatic evidence-only summary)".to_string());
+    }
+    for p in &n.executive_summary {
+        lines.push(p.clone());
+    }
+    if !n.risks.is_empty() {
+        lines.push("Risks:".to_string());
+        for r in &n.risks {
+            lines.push(format!("- {}", r));
         }
     }
+    if !n.unverified_numbers.is_empty() {
+        lines.push(format!(
+            "Warning: numbers not in audit: {}",
+            n.unverified_numbers.join(", ")
+        ));
+    }
+    lines
+}
+
+/// Deck section 6: method appendix, same facts as the Markdown twin.
+pub fn pdf_method() -> Vec<String> {
+    vec![
+        "Method:".to_string(),
+        "On-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar.".to_string(),
+        "Scores rank work; they never predict rankings or traffic.".to_string(),
+        "Completeness: local file walk; Jev and live crawl not in this report.".to_string(),
+        "Companion files: run.json, ledger.json.".to_string(),
+    ]
+}
+
+fn to_pdf_opt(rep: &DirectoryAuditReport, n: Option<&crate::narrative::Narrative>) -> Vec<u8> {
+    let mut lines = pdf_cover(rep);
     lines.push(String::new());
-    lines.push("Method: on-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar.".to_string());
-    lines.push("Scores rank work; they never predict rankings or traffic.".to_string());
-    lines.push("Completeness: local file walk; Jev and live crawl not in this report.".to_string());
-    lines.push("Companion files: run.json, ledger.json.".to_string());
+    lines.extend(pdf_scorecard(rep));
+    lines.push(String::new());
+    lines.extend(pdf_findings_by_area(rep));
+    lines.push(String::new());
+    lines.extend(pdf_inventory(rep));
+    if let Some(n) = n {
+        lines.push(String::new());
+        lines.extend(pdf_narrative(n));
+    }
+    lines.push(String::new());
+    lines.extend(pdf_method());
     pdf_lines(&format!("jev-seo audit report: {}", rep.dir_path), &lines)
 }
 

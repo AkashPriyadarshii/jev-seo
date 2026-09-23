@@ -14,6 +14,9 @@ cargo check
 - `FIRECRAWL_API_KEY`: Optional paid JS-rendered fetch for weak pages. Parked at zero spend unless `crawl --max-credits` allows it.
 - `FIRECRAWL_API_URL`: Optional override for self-hosted Firecrawl.
 - `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`: Optional. Desktop OAuth client for `gsc` Search Console data.
+- `DATAFORSEO_USERNAME` + `DATAFORSEO_PASSWORD`: Optional paid DataForSEO live SERP for `query --provider dfs`. Parked unless explicitly requested; falls back to free scrape on error.
+- `DATAFORSEO_API_URL`: Optional override for self-hosted DataForSEO-compatible endpoint.
+- PageSpeed vitals need no key (`crawl --vitals`); keyless quota degrades to a skipped note.
 - When missing, `jev-seo` gracefully falls back to local AST checks and raw SERP tables without semantic Jev ratings.
 
 ## 3. Pre-Commit Check
@@ -26,7 +29,7 @@ git jev check
 ```
 
 ## 4. Test Harness & Diagnostics
-The test harness in `src/tests.rs` contains 72 unit and integration tests verifying:
+The test harness in `src/tests.rs` contains 81 unit and integration tests verifying:
 - Markdown and HTML on-page SEO parsers
 - Heading hierarchy skip-level detection (`H1 -> H3`)
 - Google Helpful Content and AI slop detection (em-dash density and 17 AI tells)

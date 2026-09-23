@@ -1,4 +1,4 @@
-//! Fifty-rule audit engine. Rules are data, findings are facts.
+//! Rule audit engine (R01-R53). Rules are data, findings are facts.
 //! Severity weights and reach factors turn findings into area scores;
 //! area scores blend into one overall grade. Deterministic, no model calls.
 
@@ -46,7 +46,7 @@ pub struct Finding {
     pub fix: String,
 }
 
-/// The fifty. Ids are stable API: reports, docs, and tests cite them.
+/// The registry. Ids are stable API: reports, docs, and tests cite them.
 pub const RULES: &[Rule] = &[
     // Crawl (8)
     Rule { id: "R01", area: Area::Crawl, severity: Severity::High, effort: 1, title: "Broken link", fix: "Restore the target or point the link at a live page." },
@@ -107,6 +107,10 @@ pub const RULES: &[Rule] = &[
     // Canonical (2)
     Rule { id: "R49", area: Area::Canonical, severity: Severity::Medium, effort: 1, title: "Canonical variant duplicates", fix: "One URL per page: pick slash policy and enforce it." },
     Rule { id: "R50", area: Area::Canonical, severity: Severity::Low, effort: 1, title: "Tracking-param URLs indexed", fix: "Strip marketing params from canonicals and sitemaps." },
+    // Vitals (3, PageSpeed lab unless Chrome field data exists)
+    Rule { id: "R51", area: Area::Performance, severity: Severity::Medium, effort: 2, title: "Slow LCP over 2500ms", fix: "Cut render-blocking weight above the fold; lab budget is 2.5s." },
+    Rule { id: "R52", area: Area::Performance, severity: Severity::Medium, effort: 2, title: "Layout shift over 0.100", fix: "Set image and embed dimensions; hold CLS under 0.10." },
+    Rule { id: "R53", area: Area::Performance, severity: Severity::Low, effort: 1, title: "No Chrome field data", fix: "Lab numbers only until the URL earns CrUX traffic; treat them as directional." },
 ];
 
 pub fn rule(id: &str) -> Option<&'static Rule> {
@@ -303,7 +307,11 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
     let mut out = Vec::new();
     for p in &rep.pages {
         if p.status == 0 {
-            out.push(mk("R02", p.url.clone(), "fetch failed".into()));
+            if p.hops.is_empty() {
+                out.push(mk("R02", p.url.clone(), "fetch failed".into()));
+            } else {
+                out.push(mk("R03", p.url.clone(), format!("chain exhausted after {} hops", p.hops.len())));
+            }
         } else if p.status >= 400 {
             out.push(mk("R01", p.url.clone(), format!("HTTP {}", p.status)));
         }
@@ -337,6 +345,30 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
             && crate::crawl::canonicalize(&p.final_url) == p.url
         {
             out.push(mk("R49", p.url.clone(), format!("serves variant {}", p.final_url)));
+        }
+    }
+    if let Some(v) = &rep.vitals {
+        if let Some(lcp) = v.lcp_ms {
+            if lcp > crate::vitals::LCP_MS {
+                out.push(mk("R51", rep.start_url.clone(), format!("LCP {}ms", lcp)));
+            }
+        }
+        if let Some(cls) = v.cls_milli {
+            if cls > crate::vitals::CLS_MILLI {
+                out.push(mk(
+                    "R52",
+                    rep.start_url.clone(),
+                    format!("CLS {}", crate::vitals::cls_display(cls)),
+                ));
+            }
+        }
+        if !v.field && (v.lcp_ms.is_some() || v.cls_milli.is_some() || v.inp_ms.is_some()) {
+            let inp = v.inp_ms.map(|x| format!(", INP {}ms", x)).unwrap_or_default();
+            out.push(mk(
+                "R53",
+                rep.start_url.clone(),
+                format!("lab only, no field data{}", inp),
+            ));
         }
     }
     for (from, to) in &rep.redirects {
@@ -389,7 +421,12 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
         if r.word_count < 300 {
             out.push(mk("R18", scope.clone(), format!("{} words", r.word_count)));
         }
-        if r.em_dash_count > 0 || !r.ai_slop_words_found.is_empty() {
+        // Same gate as the display check: density over 2 per 500 words
+        // with at least 2 dashes, or 3+ slop words. No single-hit noise.
+        let slop_density = r.em_dash_count >= 2
+            && r.word_count > 0
+            && (r.em_dash_count as f64 / r.word_count as f64) * 500.0 > 2.0;
+        if slop_density || r.ai_slop_words_found.len() >= 3 {
             out.push(mk(
                 "R19",
                 scope.clone(),

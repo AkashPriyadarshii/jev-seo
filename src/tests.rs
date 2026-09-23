@@ -704,7 +704,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_rules_registry_and_scoring() {        use crate::rules::{overall, score_areas, Area, Finding, Severity, RULES};
-        assert_eq!(RULES.len(), 50);
+        assert_eq!(RULES.len(), 53);
         assert!(RULES.iter().all(|r| crate::rules::rule(r.id).is_some()));
         let findings = vec![
             Finding { rule_id: "R01".into(), area: Area::Crawl, severity: Severity::High, scope: "https://x.test/a".into(), evidence: "HTTP 404".into(), fix: "Restore the target.".into() },
@@ -741,12 +741,86 @@ Sitemap: https://example.com/sitemap.xml
             seeded_from_sitemap: false,
             capped: false,
             robots_honored: false,
+            vitals: None,
         });
         assert!(rep.findings.iter().any(|f| f.rule_id == "R01"));
         assert!(rep.findings.iter().any(|f| f.rule_id == "R05"));
         assert!(rep.findings.iter().any(|f| f.rule_id == "R06"));
         assert!(!rep.actions.is_empty());
         assert!(rep.score < 100);
+    }
+
+    #[test]
+    fn test_vitals_rules_fire_on_lab_numbers() {
+        use crate::crawl::{finish_report, PageRecord, ReportParts};
+        use std::collections::HashMap;
+        let pages = vec![
+            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0 },
+        ];
+        let rep = finish_report(ReportParts {
+            start_url: "https://x.test/".into(),
+            pages,
+            redirects: vec![],
+            inbound: HashMap::new(),
+            errors: vec![],
+            seeded_from_sitemap: true,
+            capped: false,
+            robots_honored: true,
+            vitals: Some(crate::vitals::Vitals {
+                lcp_ms: Some(3100),
+                cls_milli: Some(240),
+                inp_ms: Some(120),
+                score: Some(62),
+                field: false,
+            }),
+        });
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R51"));
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R52"));
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R53"));
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R53" && f.fix.contains("directional")));
+        let clean = crate::crawl::finish_report(crate::crawl::ReportParts {
+            start_url: "https://x.test/".into(),
+            pages: vec![],
+            redirects: vec![],
+            inbound: HashMap::new(),
+            errors: vec![],
+            seeded_from_sitemap: true,
+            capped: false,
+            robots_honored: true,
+            vitals: Some(crate::vitals::Vitals {
+                lcp_ms: Some(1800),
+                cls_milli: Some(40),
+                inp_ms: Some(150),
+                score: Some(94),
+                field: true,
+            }),
+        });
+        assert!(!clean.findings.iter().any(|f| f.rule_id == "R51"));
+        assert!(!clean.findings.iter().any(|f| f.rule_id == "R52"));
+        assert!(!clean.findings.iter().any(|f| f.rule_id == "R53"));
+    }
+
+    #[test]
+    fn test_pdf_deck_sections() {
+        use crate::audit::{audit_path, pdf_cover, pdf_findings_by_area, pdf_inventory, pdf_method, pdf_scorecard, to_pdf};
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("p.md"), "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here live happily in this file with enough of them to pass depth.\n").unwrap();
+        let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
+        let cover = pdf_cover(&rep).join("\n");
+        assert!(cover.contains("jev-seo audit report") && cover.contains("Score:"));
+        let scorecard = pdf_scorecard(&rep).join("\n");
+        assert!(scorecard.contains("Scorecard:") && scorecard.contains("Top actions by impact:"));
+        let areas = pdf_findings_by_area(&rep).join("\n");
+        assert!(areas.contains("Findings by area:"));
+        let inv = pdf_inventory(&rep).join("\n");
+        assert!(inv.contains("Page inventory"));
+        let method = pdf_method().join("\n");
+        assert!(method.contains("Method:") && method.contains("never predict rankings"));
+        let pdf = to_pdf(&rep);
+        let text = String::from_utf8_lossy(&pdf);
+        for section in ["jev-seo audit report", "Scorecard:", "Findings by area:", "Page inventory", "Method:"] {
+            assert!(text.contains(section), "missing {section}");
+        }
     }
 
     #[test]
@@ -772,6 +846,7 @@ Sitemap: https://example.com/sitemap.xml
             seeded_from_sitemap: saved.seeded_from_sitemap,
             capped: saved.capped,
             robots_honored: saved.robots_honored,
+            vitals: saved.vitals,
         });
         assert!(rep.score <= 100);
     }
@@ -872,6 +947,124 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_dfs_backend_parks_without_keys() {
+        use crate::serp::{dfs_enabled, Provider};
+        let (u, p) = (
+            std::env::var("DATAFORSEO_USERNAME").ok(),
+            std::env::var("DATAFORSEO_PASSWORD").ok(),
+        );
+        std::env::remove_var("DATAFORSEO_USERNAME");
+        std::env::remove_var("DATAFORSEO_PASSWORD");
+        assert!(!dfs_enabled());
+        // Explicit Dfs stays explicit (never silently rerouted); no network here.
+        assert_eq!(crate::serp::select_provider(Provider::Dfs), Provider::Dfs);
+        if let Some(k) = u {
+            std::env::set_var("DATAFORSEO_USERNAME", k);
+        }
+        if let Some(k) = p {
+            std::env::set_var("DATAFORSEO_PASSWORD", k);
+        }
+    }
+
+    #[test]
+    fn test_base64_basic_vectors() {
+        // Standard vectors: padding 0, 1, 2.
+        assert_eq!(crate::serp::dfs_basic_for_test("Man"), "TWFu");
+        assert_eq!(crate::serp::dfs_basic_for_test("Ma"), "TWE=");
+        assert_eq!(crate::serp::dfs_basic_for_test("M"), "TQ==");
+        assert_eq!(crate::serp::dfs_basic_for_test("user:pass"), "dXNlcjpwYXNz");
+    }
+
+    #[test]
+    fn test_question_registry_snapshot() {
+        // Jev question ids and types are stable API for second-judge reruns.
+        // Wording edits must show up here as deliberate diffs, never silently.
+        use std::collections::BTreeMap;
+        let suites: &[(&str, serde_json::Value)] = &[
+            ("geo", crate::policy::geo_questions()),
+            ("page", crate::policy::page_audit_extras()),
+            ("site", crate::policy::site_extras()),
+            ("brief", crate::policy::brief_extras()),
+            ("keywords", crate::policy::keyword_value_extras(&["x".into()], 1)),
+        ];
+        let mut seen: BTreeMap<String, String> = BTreeMap::new();
+        for (suite, v) in suites {
+            let obj = v.as_object().expect("suite is an object");
+            assert!(!obj.is_empty(), "{suite} suite must not be empty");
+            for (qid, q) in obj {
+                let qtype = q.get("type").and_then(|t| t.as_str()).unwrap_or("?");
+                assert!(
+                    ["score", "choice", "noul"].contains(&qtype),
+                    "{suite}.{qid} has unknown type {qtype}"
+                );
+                assert!(
+                    q.get("instructions").and_then(|s| s.as_str()).map(|s| !s.is_empty()).unwrap_or(false),
+                    "{suite}.{qid} needs instructions"
+                );
+                seen.insert(format!("{suite}.{qid}"), qtype.to_string());
+            }
+        }
+        let ids: Vec<String> = seen.keys().cloned().collect();
+        let joined = ids.join(",");
+        for must in [
+            "geo.geo_structure",
+            "geo.geo_density",
+            "geo.geo_directness",
+            "geo.geo_statistics",
+            "geo.geo_freshness",
+        ] {
+            assert!(joined.contains(must), "missing {must} in {joined}");
+        }
+        assert!(seen.len() >= 12, "registry shrank to {}", seen.len());
+    }
+
+    #[test]
+    fn test_capped_string_truncates() {
+        // Aux-body cap: oversized responses shrink instead of OOMing.
+        let big = "x".repeat(crate::fetch::MAX_AUX_BYTES + 100);
+        assert!(big.len() > crate::fetch::MAX_AUX_BYTES);
+    }
+
+    #[test]
+    fn test_api_endpoint_override_refuses_private() {
+        assert!(crate::paths::reject_api_endpoint("http://127.0.0.1:8000/x", "TEST").is_err());
+        assert!(crate::paths::reject_api_endpoint("http://10.0.0.5/", "TEST").is_err());
+        assert!(crate::paths::reject_api_endpoint("https://api.example.com/v1", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_chain_exhaust_reports_redirect_not_fetch_failure() {
+        use crate::crawl::{finish_report, PageRecord, ReportParts};
+        use std::collections::HashMap;
+        let pages = vec![
+            PageRecord { url: "https://x.test/loop".into(), status: 0, final_url: "https://x.test/loop".into(), outlinks: 0, elapsed_ms: 5, bytes: 0, hops: vec![(301, "https://x.test/loop".into()); 6], encoding: None, source: "direct".into(), fetch_cost: 0 },
+        ];
+        let rep = finish_report(ReportParts {
+            start_url: "https://x.test/".into(),
+            pages,
+            redirects: vec![],
+            inbound: HashMap::new(),
+            errors: vec![],
+            seeded_from_sitemap: true,
+            capped: false,
+            robots_honored: true,
+            vitals: None,
+        });
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R03"));
+        assert!(!rep.findings.iter().any(|f| f.rule_id == "R02"));
+    }
+
+    #[test]
+    fn test_r19_needs_density_not_single_hit() {
+        use crate::rules::check_audit;
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("p.md"), "---\ntitle: A reasonably long page title for testing here\n---\n# Title\n\nOne delve.\n").unwrap();
+        let rep = crate::audit::audit_path(dir.path().to_str().unwrap()).unwrap();
+        let findings = check_audit(&rep);
+        assert!(!findings.iter().any(|f| f.rule_id == "R19"), "single slop word must not fire R19");
+    }
+
+    #[test]
     fn test_provider_selection_stays_explicit() {
         use crate::serp::Provider;
         assert_eq!(crate::serp::select_provider(Provider::Ddg), Provider::Ddg);
@@ -942,7 +1135,11 @@ Sitemap: https://example.com/sitemap.xml
         let text = String::from_utf8_lossy(&pdf);
         let xpos: usize = text.rsplit("startxref\n").next().unwrap().lines().next().unwrap().parse().unwrap();
         assert!(pdf[xpos..].starts_with(b"xref\n"));
-        assert!(text.contains("SEO audit"));
+        assert!(text.contains("jev-seo audit report"));
+        assert!(text.contains("Scorecard:"));
+        assert!(text.contains("Findings by area:"));
+        assert!(text.contains("Page inventory"));
+        assert!(text.contains("Method:"));
     }
 
     #[test]

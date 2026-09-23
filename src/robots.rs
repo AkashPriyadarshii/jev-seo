@@ -49,11 +49,11 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
         Ok(response) => {
             crate::paths::reject_redirect_target(response.get_url())?;
             let status_code = response.status();
-            let body = response.into_string().unwrap_or_default();
+            let body = crate::fetch::capped_string(response, crate::fetch::MAX_AUX_BYTES).unwrap_or_default();
             parse_robots_txt(&domain, &robots_url, status_code, &body)
         }
         Err(ureq::Error::Status(code, response)) => {
-            let body = response.into_string().unwrap_or_default();
+            let body = crate::fetch::capped_string(response, crate::fetch::MAX_AUX_BYTES).unwrap_or_default();
             parse_robots_txt(&domain, &robots_url, code, &body)
         }
         Err(_) => {

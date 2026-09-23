@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Designed PDF deck from one manifest: cover, scorecard with impact list, findings by area, page inventory, narrative, method appendix (`audit --pdf`).
+- PageSpeed vitals on `crawl --vitals`: keyless lab LCP/CLS/INP for the start URL with R51-R53 (slow LCP, layout shift, lab-only note); degrades cleanly offline.
+- Eval rigor: second-judge protocol, wording A/B log, and human-label sample tables in `docs/EVAL.md`; question-registry snapshot test fails on silent Jev wording edits.
+- Optional DataForSEO backend: `query --provider dfs` with `DATAFORSEO_USERNAME`/`DATAFORSEO_PASSWORD` (plus `DATAFORSEO_API_URL` override); explicit opt-in only, falls back to free scrape on error.
+- Hardening from two review passes: display windows match rule windows, R19 needs density, SSRF recheck on Jev fetch and API overrides, byte caps on aux bodies, MCP guards on crawl/report tools, chain-exhaust reports R03, citation gates on CSV exports.
 - Pair cannibalization: expand each multi-file stem into explicit A×B conflict pairs with word-count winner; print top pairs on audit, table in Markdown, `audit --pairs-csv`.
 - MCP tools `seo_explain` and `seo_report` (score delta + actions + pairs); tools list is now 13.
 - Action tracker export: `audit --actions-csv` (same ranked list as terminal; Excel opens CSV).
@@ -43,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composite five-dimension GEO score, intent routing hints, and per-command speculative fan-out.
 - SERP relevance rerank with per-section confidence gating.
 - `audit --min-pass` CI gate with a GitHub Actions workflow, GEO score trend history, and home-directory database.
-- Test harness at 72 passing unit and integration tests with zero clippy warnings.
+- Test harness at 81 passing unit and integration tests with zero clippy warnings.
 - README rewritten for launch: What's new table, full command and MCP matrices, v0.1.2 date, build-from-source path. Ships as v0.1.2 on 2026-10-22.
 
 ## [0.1.1] - 2026-09-22

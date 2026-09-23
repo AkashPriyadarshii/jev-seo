@@ -75,6 +75,8 @@ pub fn reject_private_url(raw: &str) -> anyhow::Result<url::Url> {
         return Ok(url);
     }
     // Hostname: resolve and check every addr (blocks DNS rebinding at request time).
+    // Note: std DNS has no timeout knob; callers already bound total time
+    // with per-request timeouts, so a slow resolver stalls one call, not the run.
     let port = url.port_or_known_default().unwrap_or(443);
     match (host.as_str(), port).to_socket_addrs() {
         Ok(addrs) => {
@@ -92,10 +94,34 @@ pub fn reject_private_url(raw: &str) -> anyhow::Result<url::Url> {
 fn is_private_ip(ip: std::net::IpAddr) -> bool {
     match ip {
         std::net::IpAddr::V4(v4) => {
-            v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_unspecified()
+            let o = v4.octets();
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || (o[0] == 100 && o[1] >= 64 && o[1] < 128) // CGNAT 100.64/10
+                || (o[0] == 192 && o[1] == 0 && o[2] == 0) // 192.0.0.0/24
+                || (o[0] == 198 && (o[1] == 18 || o[1] == 19)) // benchmark 198.18/15
         }
-        std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
+        std::net::IpAddr::V6(v6) => {
+            let s = v6.segments();
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || (s[0] & 0xfe00) == 0xfc00 // unique local fc00::/7
+                || (s[0] & 0xffc0) == 0xfe80 // link-local fe80::/10
+        }
     }
+}
+
+/// Validate an operator-supplied API endpoint override. Fail closed: a
+/// misconfigured override that points at private space must error loudly,
+/// never silently fall back to a different host.
+pub fn reject_api_endpoint(raw: &str, name: &str) -> anyhow::Result<String> {
+    reject_private_url(raw)
+        .map(|u| u.to_string())
+        .map_err(|e| anyhow::anyhow!("{} override refused: {}", name, e))
 }
 
 /// Re-check the final URL after fetches that follow redirects.

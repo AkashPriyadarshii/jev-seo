@@ -238,7 +238,7 @@ pub fn known_action_id(id: &str, actions: &[crate::actions::Action]) -> bool {
     actions.iter().any(|a| a.id == id)
 }
 
-/// Scan free text for citation tokens: RULE-Rxx, bare R01-R50, PREFIX-NNN.
+/// Scan free text for citation tokens: RULE-Rxx, bare R01-R53, PREFIX-NNN.
 pub fn extract_citations(text: &str) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     let bytes: Vec<char> = text.chars().collect();

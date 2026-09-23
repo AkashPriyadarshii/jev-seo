@@ -23,6 +23,7 @@ mod rules;
 mod schema;
 mod serp;
 mod sitemap;
+mod vitals;
 
 #[cfg(test)]
 mod tests;
@@ -52,7 +53,7 @@ enum Commands {
         query: String,
         #[arg(short, long, default_value_t = 10)]
         limit: usize,
-        /// Search backend: auto, ddg, or tavily (paid, needs TAVILY_API_KEY)
+        /// Search backend: auto, ddg, tavily or dfs (paid: TAVILY_API_KEY or DATAFORSEO_* keys)
         #[arg(long, default_value = "auto")]
         provider: String,
         /// Paid search depth: basic, fast, ultra-fast, advanced
@@ -191,6 +192,9 @@ enum Commands {
         /// Hard Jev spend cap in USD for this run
         #[arg(long, default_value_t = 0.25, value_name = "USD")]
         jev_budget: f64,
+        /// Fetch free PageSpeed vitals for the start URL (lab data, keyless)
+        #[arg(long)]
+        vitals: bool,
     },
     /// Check llms.txt presence and AI crawler permissions for answer-engine readiness
     Llms {
@@ -255,8 +259,15 @@ fn apply_jev_budget_from(cli: &Cli) {
 }
 
 /// Write an action-tracker CSV beside optional export path (or given path).
-fn write_actions_csv(path: &str, actions: &[actions::Action]) -> Result<()> {
-    std::fs::write(path, actions::to_csv(actions))?;
+/// Gated like every other writer: unknown citations refuse to write.
+fn write_actions_csv(
+    path: &str,
+    findings: &[rules::Finding],
+    actions: &[actions::Action],
+) -> Result<()> {
+    let body = actions::to_csv(actions);
+    manifest::gate_report(&body, findings, actions)?;
+    std::fs::write(path, body)?;
     println!("Action tracker CSV written to {}", path.dimmed());
     Ok(())
 }
@@ -344,9 +355,13 @@ fn main() -> Result<()> {
             let backend = match provider.as_str() {
                 "ddg" => serp::Provider::Ddg,
                 "tavily" => serp::Provider::Tavily,
+                "dfs" => serp::Provider::Dfs,
                 _ => serp::Provider::Auto,
             };
             let opts = serp::SearchOpts { depth, topic, answer: false };
+            if backend == serp::Provider::Dfs && !serp::dfs_enabled() {
+                eprintln!("{}", "Note: DATAFORSEO keys missing; explicit dfs falls back to free scrape.".yellow());
+            }
             eprintln!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
             let items = serp::scrape_serp_opts(&query, limit, backend, &opts)?;
 
@@ -355,7 +370,12 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{}", "Top Competitors on DuckDuckGo:".cyan().bold());
+            let source_label = match backend {
+                serp::Provider::Tavily => "Tavily",
+                serp::Provider::Dfs => "DataForSEO",
+                _ => "DuckDuckGo",
+            };
+            println!("\n{}", format!("Top Competitors on {}:", source_label).cyan().bold());
             for item in &items {
                 println!("  #{:<2} {} - {}", item.position.to_string().green().bold(), item.title, item.url.dimmed());
                 if !item.snippet.is_empty() {
@@ -547,7 +567,7 @@ fn main() -> Result<()> {
                 println!("CSV findings written to {}", out.dimmed());
             }
             if let Some(out) = &actions_csv {
-                write_actions_csv(out, &actions)?;
+                write_actions_csv(out, &dir_report.findings, &actions)?;
             }
 
             let texts_owned: Vec<String> = body_html
@@ -680,6 +700,7 @@ fn main() -> Result<()> {
                                     cell(&p.winner)
                                 ));
                             }
+                            manifest::gate_report(&s, &dir_report.findings, &actions)?;
                             std::fs::write(out, s)?;
                             println!("Cannibalization pairs CSV written to {}", out.dimmed());
                         }
@@ -1033,8 +1054,11 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest, no_jev, jev_budget: _, vitals } => {
             if let Some(path) = rescore {
+                if csv.is_some() || diff || manifest.is_some() || vitals {
+                    eprintln!("{}", "Note: --rescore rebuilds from saved pages; --csv/--diff/--manifest/--vitals are ignored.".yellow());
+                }
                 let raw = std::fs::read_to_string(&path)?;
                 let saved: crawl::CrawlReport = serde_json::from_str(&raw)?;
                 let report = crawl::finish_report(crawl::ReportParts {
@@ -1046,6 +1070,7 @@ fn main() -> Result<()> {
                     seeded_from_sitemap: saved.seeded_from_sitemap,
                     capped: saved.capped,
                     robots_honored: saved.robots_honored,
+                    vitals: saved.vitals,
                 });
                 let completeness = manifest::completeness_crawl(&report, max_pages);
                 if json {
@@ -1068,7 +1093,15 @@ fn main() -> Result<()> {
                 _ => crate::fetch::FetchMode::Auto,
             };
             let mut budget = crate::fetch::Budget { max_credits, spent: 0 };
-            let report = crawl::crawl_site(&url, max_pages, mode, &mut budget)?;
+            let mut report = crawl::crawl_site(&url, max_pages, mode, &mut budget)?;
+            if vitals {
+                eprintln!("{}", "Fetching PageSpeed vitals for start URL (free, keyless)...".dimmed());
+                let v = crate::vitals::fetch_home_vitals(&report.start_url);
+                if v.is_none() {
+                    eprintln!("{}", "Note: PageSpeed unreachable or rate-limited; vitals skipped.".yellow());
+                }
+                crate::crawl::apply_vitals(&mut report, v);
+            }
             // Max Jev: one site+GEO fan-out on the homepage before any ledger snapshot.
             let site_jev = if no_jev { None } else { judge_crawl_site(&report.start_url) };
             let mut completeness_pre = manifest::completeness_crawl(&report, max_pages);
@@ -1148,6 +1181,24 @@ fn main() -> Result<()> {
                     .join(", ")
                     .dimmed()
             );
+            match &report.vitals {
+                Some(v) => {
+                    let lcp = v.lcp_ms.map(|x| format!("{}ms", x)).unwrap_or_else(|| "-".into());
+                    let cls = v.cls_milli.map(crate::vitals::cls_display).unwrap_or_else(|| "-".into());
+                    let inp = match v.inp_ms {
+                        Some(x) if x > crate::vitals::INP_MS => format!("{}ms over", x),
+                        Some(x) => format!("{}ms", x),
+                        None => "-".into(),
+                    };
+                    let lab = if v.field { "field+lab" } else { "lab only" };
+                    println!("  Vitals:        LCP {}  CLS {}  INP {}  ({})", lcp, cls, inp, lab.dimmed());
+                }
+                None => {
+                    if vitals {
+                        println!("  Vitals:        {}", "unavailable (PageSpeed skipped)".yellow());
+                    }
+                }
+            }
             if report.broken.is_empty() {
                 println!("  Broken links:  {}", "0 (Clean)".green());
             } else {
@@ -1368,7 +1419,7 @@ fn main() -> Result<()> {
         }
         Commands::Explain { id, json } => {
             let text = rules::explain(&id)
-                .ok_or_else(|| anyhow::anyhow!("unknown rule id: {id} (try R01..R50 or RULE-R01..RULE-R50)"))?;
+                .ok_or_else(|| anyhow::anyhow!("unknown rule id: {id} (try R01..R53 or RULE-R01..RULE-R53)"))?;
             if json {
                 let bare = id.strip_prefix("RULE-").unwrap_or(&id).to_string();
                 let r = rules::rule(&bare).expect("explain found it");
@@ -1393,7 +1444,7 @@ fn main() -> Result<()> {
             let diff = diff_audit_reports(&cur, &base);
             let actions = crate::rules::actions_for(&cur.findings);
             if let Some(out) = &actions_csv {
-                write_actions_csv(out, &actions)?;
+                write_actions_csv(out, &cur.findings, &actions)?;
             }
             if json {
                 println!("{}", serde_json::to_string_pretty(&json!({
@@ -1716,13 +1767,15 @@ fn print_jev_spend_line() {
 /// Fetch homepage HTML and run one site+GEO fan-out for crawl runs.
 fn judge_crawl_site(start_url: &str) -> Option<engine::AnalysisResult> {
     let client = engine::JevClient::new()?;
-    let body = ureq::get(start_url)
+    let target = crate::paths::reject_private_url(start_url).ok()?;
+    let resp = ureq::get(target.as_str())
         .timeout(std::time::Duration::from_secs(15))
         .set("User-Agent", crawl::CRAWL_UA)
         .call()
-        .ok()?
-        .into_string()
         .ok()?;
+    let landed = resp.get_url().to_string();
+    crate::paths::reject_redirect_target(&landed).ok()?;
+    let body = crate::fetch::capped_string(resp, crate::fetch::MAX_AUX_BYTES).ok()?;
     if body.trim().is_empty() {
         return None;
     }

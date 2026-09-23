@@ -61,6 +61,9 @@ pub struct CrawlReport {
     pub seeded_from_sitemap: bool,
     pub capped: bool,
     pub robots_honored: bool,
+    /// Homepage PageSpeed vitals when `crawl --vitals` ran. Absent otherwise.
+    #[serde(default)]
+    pub vitals: Option<crate::vitals::Vitals>,
 }
 
 /// Same-host anchor hrefs resolved to absolute canonical URLs.
@@ -299,7 +302,7 @@ pub fn crawl_site(
         .call()
         .ok()
         .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
-        .and_then(|r| r.into_string().ok())
+        .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
         .unwrap_or_default();
     eprintln!("{} robots.txt {}", stamp(), if robots_body.is_empty() { "missing" } else { "ok" });
 
@@ -309,7 +312,7 @@ pub fn crawl_site(
         .call()
         .ok()
         .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
-        .and_then(|r| r.into_string().ok())
+        .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
         .map(|xml| sitemap_seed_urls(&xml))
         .unwrap_or_default();
     let seeded = !sitemap_urls.is_empty();
@@ -487,6 +490,7 @@ pub fn crawl_site(
         seeded_from_sitemap: seeded,
         capped,
         robots_honored: !robots_body.is_empty(),
+        vitals: None,
     }))
 }
 
@@ -501,6 +505,7 @@ pub struct ReportParts {
     pub seeded_from_sitemap: bool,
     pub capped: bool,
     pub robots_honored: bool,
+    pub vitals: Option<crate::vitals::Vitals>,
 }
 
 pub fn finish_report(parts: ReportParts) -> CrawlReport {
@@ -513,6 +518,7 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
         seeded_from_sitemap,
         capped,
         robots_honored,
+        vitals,
     } = parts;
     let broken: Vec<PageRecord> = pages.iter().filter(|p| p.status >= 400 || p.status == 0).cloned().collect();
     let orphans: Vec<String> = pages
@@ -537,9 +543,17 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
         seeded_from_sitemap,
         capped,
         robots_honored,
+        vitals,
     };
-    // One scoring truth: the fifty-rule engine. Totals scope reach per area.
+    // One scoring truth: the rule engine. Totals scope reach per area.
     let findings = crate::rules::check_crawl(&rep);
+    score_into(&mut rep, findings);
+    rep
+}
+
+/// Re-run the one scoring truth on a mutated report (vitals attach).
+/// Shared by finish_report and the `--vitals` post-pass.
+pub fn score_into(rep: &mut CrawlReport, findings: Vec<crate::rules::Finding>) {
     let mut totals = HashMap::new();
     for area in [
         crate::rules::Area::Crawl,
@@ -556,5 +570,13 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
     rep.areas = areas;
     rep.actions = crate::rules::actions_for(&findings);
     rep.findings = findings;
-    rep
+}
+
+/// Attach homepage vitals then rescore. No-op when vitals is None.
+pub fn apply_vitals(rep: &mut CrawlReport, vitals: Option<crate::vitals::Vitals>) {
+    rep.vitals = vitals;
+    if rep.vitals.is_some() {
+        let findings = crate::rules::check_crawl(rep);
+        score_into(rep, findings);
+    }
 }
