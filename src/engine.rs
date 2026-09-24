@@ -94,15 +94,11 @@ impl JevClient {
             Err(_) => return None,
         };
         record_usage(&body);
-        match body
-            .get("answers")
+        body.get("answers")
             .and_then(|a| a.get("unsafe_target"))
             .and_then(|u| u.get("noul"))
             .and_then(|n| n.as_f64())
-        {
-            Some(p) => Some(p >= 0.7),
-            None => None,
-        }
+            .map(|p| p >= 0.7)
     }
 
     fn post(&self, payload: serde_json::Value) -> Result<ureq::Response> {
@@ -125,7 +121,7 @@ impl JevClient {
                 .set("Content-Type", "application/json")
                 .timeout(std::time::Duration::from_secs(12))
                 .send_string(&body);
-            let retryable = matches!(&raw, Err(ureq::Error::Status(code, _)) if *code == 429 || (500..=504).contains(code));
+            let retryable = matches!(&raw, Err(ureq::Error::Status(code, _)) if *code == 429 || (500..=599).contains(code));
             let resp = raw.context("Failed to communicate with TypeSafe Jev API");
             match &resp {
                 Ok(_) => {

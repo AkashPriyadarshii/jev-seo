@@ -1,6 +1,6 @@
-//! Fetch backends raced for speed, picked by quality math.
-//! Default stays free: direct fetch races Jina reader, Firecrawl only
-//! escalates on failure with a key set. Every pick records source and cost.
+//! Fetch backends raced for speed, picked by extracted-text word count.
+//! Default stays free: direct fetch wins on real copy, Jina reader then
+//! Firecrawl escalate on thin bodies with a key set. Every pick records source and cost.
 
 use anyhow::{Context, Result};
 use std::time::{Duration, Instant};
@@ -66,25 +66,6 @@ impl Budget {
     pub fn refund(&mut self, cost: u32) {
         self.spent = self.spent.saturating_sub(cost);
     }
-}
-
-/// Quality 0.0-1.0: has body, markdown density, heading presence.
-/// Empty scores 0 so upgrades always fire on missing content.
-pub fn quality(body: &str) -> f64 {
-    if body.trim().is_empty() {
-        return 0.0;
-    }
-    let mut q = 0.2;
-    let lines: Vec<&str> = body.lines().collect();
-    let md_lines = lines.iter().filter(|l| {
-        let t = l.trim_start();
-        t.starts_with('#') || t.starts_with('-') || t.starts_with("* ") || t.starts_with("1.")
-    }).count();
-    q += 0.5 * (md_lines as f64 / lines.len().max(1) as f64).min(1.0);
-    if body.contains("# ") {
-        q += 0.3;
-    }
-    q.min(1.0)
 }
 
 /// Visible body copy for Jev state. Head-first raw markup scored markup, not

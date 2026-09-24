@@ -1146,11 +1146,7 @@ Sitemap: https://example.com/sitemap.xml
     }
     #[test]
     fn test_fetch_quality_and_budget() {
-        use crate::fetch::{quality, Budget};
-        assert_eq!(quality(""), 0.0);
-        assert_eq!(quality("   "), 0.0);
-        assert!(quality("# Title\n\n- a\n- b\n\nSome words here.") > 0.7);
-        assert!(quality("plain wall of text without any structure at all") < 0.5);
+        use crate::fetch::Budget;
         let mut b = Budget { max_credits: 1, spent: 0 };
         assert!(b.allow(1));
         assert!(!b.allow(1));

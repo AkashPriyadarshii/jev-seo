@@ -365,7 +365,7 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         let mut html_heading: Option<usize> = None;
         if !trimmed.starts_with('#') {
             if let Some(cap) = MD_HTML_H_RE.captures(trimmed) {
-                if let Some(lvl) = cap[1].parse::<usize>().ok() {
+                if let Ok(lvl) = cap[1].parse::<usize>() {
                     html_heading = Some(lvl);
                     match lvl {
                         1 => h1_count += 1,

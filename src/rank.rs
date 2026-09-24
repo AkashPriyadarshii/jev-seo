@@ -81,23 +81,6 @@ impl DbStore {
         Ok(Self { conn })
     }
 
-    /// Record one observation with provenance. Every row says who measured,
-    /// with what engine, and when: rank numbers without that are anecdotes.
-    pub fn record_observation(
-        &self,
-        keyword_id: i64,
-        position: Option<usize>,
-        serp_url: Option<&str>,
-        provider: &str,
-        engine: &str,
-    ) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO rank_observations (keyword_id, position, serp_url, provider, engine) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![keyword_id, position.map(|p| p as i64), serp_url, provider, engine],
-        )?;
-        Ok(())
-    }
-
     pub fn track_keyword(
         &mut self,
         domain: &str,
