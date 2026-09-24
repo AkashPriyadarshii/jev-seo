@@ -10,6 +10,19 @@ homepage = "https://github.com/AkashPriyadarshii/jev-seo"
 readme = "README.md"
 keywords = ["seo", "geo", "typesafe-ai", "mcp", "serp"]
 categories = ["command-line-utilities", "development-tools"]
+# The published crate ships the tool, not the workshop: no fixtures,
+# research notes, agent tooling, or binary assets.
+include = [
+    "src/**/*.rs",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "LICENSE",
+    "SKILL.md",
+    "CHANGELOG.md",
+    "examples/*.json",
+    "examples/*.md",
+]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }

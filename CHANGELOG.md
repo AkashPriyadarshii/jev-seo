@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Premortem fixes: `audit --json` prints the report before gate bails (exit code carries pass/fail), zero clippy warnings under `-D warnings`, rank observation trail in output, `--no-jev`/`--jev-budget` on `link` with empty-result notes, `Cargo.toml` crate include list, rule R37 honesty wording.
 - Wave 1 evidence foundations: finding provenance (`observed_at`, `source`, `RULE_SET_VERSION` in manifests), fact/heuristic truth tags on findings/CSV/actions/explain, `RULE-` gate truth split.
 - Wave 1 CI invariants: `audit --forbid R31,R36` and `--max-critical 0` above the class gate.
 - Wave 1 Jev depth: landing-match `query_fit` Noul, retry with backoff on 429/5xx, committed good/broken gate fixtures, example audit artifacts, question A/B log rows.

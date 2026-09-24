@@ -74,6 +74,12 @@ enum Commands {
         limit: usize,
         #[arg(long)]
         json: bool,
+        /// Skip all Jev semantic calls (lists eligible pairs only)
+        #[arg(long)]
+        no_jev: bool,
+        /// Hard Jev spend cap in USD for this run
+        #[arg(long, default_value_t = 0.25, value_name = "USD")]
+        jev_budget: f64,
     },
     /// Audit a local file or directory for on-page SEO issues, duplicate titles, and thin pages
     Audit {
@@ -474,14 +480,15 @@ fn main() -> Result<()> {
                 None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
             }
         }
-        Commands::Link { path, limit, json } => {
+        Commands::Link { path, limit, json, no_jev, jev_budget } => {
             let dir_report = audit::audit_path(&path)?;
-            let client = match engine::JevClient::new() {
-                Some(c) => c,
-                None => {
-                    eprintln!("{}", "Note: TYPESAFE_API_KEY not set, link suggestions need Jev.".yellow());
+            manifest::set_jev_budget_usd(jev_budget);
+            let client = match (no_jev, engine::JevClient::new()) {
+                (true, _) | (_, None) => {
+                    eprintln!("{}", "Note: link suggestions need Jev (unset --no-jev with TYPESAFE_API_KEY set).".yellow());
                     return Ok(());
                 }
+                (false, Some(c)) => c,
             };
             // Eligible destinations: titled pages only. Deterministic checks
             // run first (self-skip, already-linked skip); Jev only chooses.
@@ -498,6 +505,7 @@ fn main() -> Result<()> {
                     .to_string()
             };
             let mut rows: Vec<serde_json::Value> = Vec::new();
+            let mut suggested = 0usize;
             if !json {
                 println!("{}", "Internal-Link Suggestions (TypeSafe Jev):".cyan().bold());
             }
@@ -549,12 +557,15 @@ fn main() -> Result<()> {
                                 policy::marker(v)
                             );
                         }
+                        suggested += 1;
                     }
                     Err(e) => eprintln!("{}", format!("Warning: link judge failed for {} ({e:#})", src.file_path).yellow()),
                 }
             }
             if json {
                 println!("{}", serde_json::to_string_pretty(&rows)?);
+            } else if suggested == 0 {
+                println!("  {}", "no suggestions: every page answered no_link or dropped below confidence.".dimmed());
             }
             print_jev_spend_line();
         }
@@ -735,6 +746,12 @@ fn main() -> Result<()> {
                 println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
             }
 
+            // Contract first: agents parsing stdout must receive the report
+            // even when a gate below fails. Exit code carries pass/fail.
+            if json {
+                println!("{}", serde_json::to_string_pretty(&dir_report)?);
+            }
+
             if let Some(floor) = min_pass {
                 if dir_report.pass_rate < floor {
                     anyhow::bail!(
@@ -798,7 +815,6 @@ fn main() -> Result<()> {
             }
 
             if json {
-                println!("{}", serde_json::to_string_pretty(&dir_report)?);
                 return Ok(());
             }
 
@@ -1190,6 +1206,15 @@ fn main() -> Result<()> {
                 }
             } else {
                 println!("  Previous: First recorded check");
+            }
+            if let Ok(trail) = db.observation_trail(&domain, &query) {
+                for (pos, prov, eng) in trail.iter().take(5) {
+                    let at = match pos {
+                        Some(r) => format!("#{}", r),
+                        None => "miss".to_string(),
+                    };
+                    println!("  Trail:    {} via {} ({})", at.dimmed(), prov.dimmed(), eng.dimmed());
+                }
             }
         }
         Commands::Sitemap { target, json } => {

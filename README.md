@@ -140,13 +140,13 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
 
 ## Direct answer
 
-**What is jev-seo?** It is a free, open-source SEO and GEO command-line tool written in Rust. You install one binary from crates.io or a release archive. It audits local content and live sites under 50 stable rules, scores pages for AI answer-engine citation with TypeSafe AI Jev, stores rank history in local SQLite, gates CI on a pass-rate floor, and exposes 13 MCP tools so coding agents can run the same checks. The free path uses DuckDuckGo and local files only. Optional paid backends stay off until you pass a flag and key.
+**What is jev-seo?** It is a free, open-source SEO and GEO command-line tool written in Rust. You install one binary from crates.io or a release archive. It audits local content and live sites under 53 stable rules, scores pages for AI answer-engine citation with TypeSafe AI Jev, stores rank history in local SQLite, gates CI on blocking rules, and exposes 13 MCP tools so coding agents can run the same checks. The free path uses DuckDuckGo and local files only. Optional paid backends stay off until you pass a flag and key.
 
 **Who is it for?** Developers, indie hackers, technical writers, and autonomous coding agents (Claude Code, Gemini CLI, Cursor, Antigravity) who need SEO evidence without a $130/month dashboard seat.
 
 **What does it cost?** Rules, crawls, reports, rank history: free. Jev semantic calls: fractions of a cent under `--jev-budget` (default $0.25 per run).
 
-`jev-seo` is a single static Rust binary for developers who refuse a $130/month SEO seat. It audits local Markdown and HTML trees under fifty stable rules, crawls live hosts with robots.txt honored, scores pages for answer-engine citation with TypeSafe AI Jev typed primitives, tracks rank drift in a local SQLite file, and exposes the same surface as a 13-tool stdio MCP server. Free search data comes from DuckDuckGo. Semantic scores sit behind `--jev-budget` (default $0.25 per run). Paid backends never fire without an explicit flag and key.
+`jev-seo` is a single static Rust binary for developers who refuse a $130/month SEO seat. It audits local Markdown and HTML trees under 53 stable rules, crawls live hosts with robots.txt honored, scores pages for answer-engine citation with TypeSafe AI Jev typed primitives, tracks rank drift in a local SQLite file, and exposes the same surface as a 13-tool stdio MCP server. Free search data comes from DuckDuckGo. Semantic scores sit behind `--jev-budget` (default $0.25 per run). Paid backends never fire without an explicit flag and key.
 
 One command proves the pitch:
 
@@ -266,7 +266,7 @@ Measured 2026-09-22. Protocol and re-run commands: [`docs/EVAL.md`](docs/EVAL.md
 | Local audit, 4 files | ~0.2s | `jev-seo audit docs/ --json` |
 | Live crawl, 6-10 pages | 3-11s wall (server-bound) | `jev-seo crawl <url> --max-pages 10` |
 | Score repeatability, 3 crawls | Score 99 stable; findings ±2 from timing rules only | `jev-seo crawl <url> --json` ×3 |
-| Test suite | 81 green, clippy `-D warnings` clean | `cargo test` |
+| Test suite | 103 green, clippy `-D warnings` clean | `cargo test` |
 | Budget guard | `--jev-budget 0` → zero Jev POSTs | `jev-seo audit docs/ --jev-budget 0` |
 | Citation gate | Report text citing unknown `RULE-Rxx` refuses to write | Covered in unit tests |
 

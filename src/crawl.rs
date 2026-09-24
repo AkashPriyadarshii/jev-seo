@@ -461,7 +461,6 @@ pub fn crawl_site(
                                             fetch.bytes = f.body.len();
                                             fetch.body = f.body;
                                             fetch.elapsed_ms += f.elapsed_ms;
-                                            words = fw;
                                             upgraded = true;
                                         }
                                     }
