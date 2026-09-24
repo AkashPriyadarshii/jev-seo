@@ -1,4 +1,4 @@
-//! Rule audit engine (R01-R53). Rules are data, findings are facts.
+//! Rule audit engine (R01-R57). Rules are data, findings are facts.
 //! Severity weights and reach factors turn findings into area scores;
 //! area scores blend into one overall grade. Deterministic, no model calls.
 
@@ -78,7 +78,7 @@ pub fn now_ms() -> u64 {
 pub fn truth_kind(rule_id: &str) -> &'static str {
     let bare = rule_id.strip_prefix("RULE-").unwrap_or(rule_id);
     match bare.to_ascii_uppercase().as_str() {
-        "R18" | "R19" | "R20" | "R23" | "R24" | "R41" => "heuristic",
+        "R18" | "R19" | "R20" | "R23" | "R24" | "R41" | "R55" => "heuristic",
         _ => "fact",
     }
 }
@@ -98,6 +98,8 @@ pub const RULES: &[Rule] = &[
     Rule { id: "R06", area: Area::Crawl, severity: Severity::Medium, effort: 1, title: "No robots.txt", fix: "Serve robots.txt so crawler rules are discoverable." },
     Rule { id: "R07", area: Area::Crawl, severity: Severity::Low, effort: 1, title: "Crawl capped", fix: "Raise --max-pages for full coverage." },
     Rule { id: "R08", area: Area::Crawl, severity: Severity::Low, effort: 2, title: "Empty page body", fix: "Ship renderable content or noindex the shell." },
+    Rule { id: "R56", area: Area::Crawl, severity: Severity::High, effort: 1, title: "Soft 404", fix: "Return 404 for missing pages instead of 200." },
+    Rule { id: "R57", area: Area::Crawl, severity: Severity::Low, effort: 1, title: "Temporary host redirect", fix: "Use 301 for www/apex and HTTP→HTTPS moves, not 302/307." },
     // On-page (9)
     Rule { id: "R09", area: Area::OnPage, severity: Severity::High, effort: 1, title: "Missing title", fix: "Write a unique title under 60 characters." },
     Rule { id: "R10", area: Area::OnPage, severity: Severity::Medium, effort: 1, title: "Title length", fix: "Keep titles 30-60 characters so nothing truncates." },
@@ -116,6 +118,8 @@ pub const RULES: &[Rule] = &[
     Rule { id: "R22", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Duplicate descriptions", fix: "Give every page a unique summary." },
     Rule { id: "R23", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Keyword cannibalization", fix: "One winner per stem; merge or re-target the rest." },
     Rule { id: "R24", area: Area::Content, severity: Severity::Low, effort: 2, title: "No direct answer opening", fix: "Open with the answer before the background." },
+    Rule { id: "R54", area: Area::Content, severity: Severity::Medium, effort: 1, title: "Templated metadata", fix: "Write descriptions that describe the page, not echo the title with a stock CTA." },
+    Rule { id: "R55", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Uncited claims", fix: "Attach a source, study, or link within sight of every statistic." },
     // Links (6)
     Rule { id: "R25", area: Area::Links, severity: Severity::Medium, effort: 2, title: "Orphan page", fix: "Link inward from a related page." },
     Rule { id: "R26", area: Area::Links, severity: Severity::Low, effort: 1, title: "No outbound links", fix: "Cite at least one source or next step." },
@@ -174,14 +178,34 @@ pub fn gate(id: &str) -> Gate {
     let bare = id.strip_prefix("RULE-").unwrap_or(id);
     match bare.to_ascii_uppercase().as_str() {
         "R01" | "R02" | "R03" | "R04" | "R05" | "R06" | "R07" | "R08" | "R09" | "R11" | "R13"
-        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" => Gate::Blocking,
+        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" | "R54" | "R56"
+        | "R57" => Gate::Blocking,
         _ => Gate::Advisory,
     }
 }
 
 /// Blocking findings from a finding list: the only set that fails a gate.
 pub fn blocking_findings(findings: &[Finding]) -> Vec<&Finding> {
-    findings.iter().filter(|f| gate(&f.rule_id) == Gate::Blocking).collect()
+    findings.iter().filter(|f| effective_gate(&f.rule_id, &f.scope) == Gate::Blocking).collect()
+}
+
+/// Gate adjusted for file type. Description, link, schema, OG, and canonical
+/// tags on Markdown content files come from the layout template, which a
+/// local audit cannot see: firing them is honest, failing a build on them is
+/// not. HTML keeps the strict registry class.
+pub fn effective_gate(rule_id: &str, scope: &str) -> Gate {
+    if gate(rule_id) != Gate::Blocking {
+        return Gate::Advisory;
+    }
+    let lower = scope.to_ascii_lowercase();
+    let is_md = lower.ends_with(".md") || lower.ends_with(".mdx") || lower.ends_with(".markdown");
+    if is_md {
+        let bare = rule_id.strip_prefix("RULE-").unwrap_or(rule_id);
+        if matches!(bare.to_ascii_uppercase().as_str(), "R11" | "R26" | "R31" | "R35" | "R36") {
+            return Gate::Advisory;
+        }
+    }
+    Gate::Blocking
 }
 
 /// One-line explain for `jev-seo explain RULE-R19`.
@@ -363,8 +387,16 @@ fn has_tracking(url: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn mk(rule_id: &'static str, scope: String, evidence: String) -> Finding {
-    let r = rule(rule_id).expect("rule id");
+/// Probe finding from crawl pre-flight (soft-404, temp redirects).
+/// Unknown ids are dropped: probes must never invent rules.
+pub fn probe_finding(rule_id: &str, scope: String, evidence: String) -> Option<Finding> {
+    let r = rule(rule_id)?;
+    let mut f = mk(r.id, scope, evidence);
+    f.source = "live-crawl".into();
+    Some(f)
+}
+
+fn mk(rule_id: &'static str, scope: String, evidence: String) -> Finding {    let r = rule(rule_id).expect("rule id");
     Finding {
         rule_id: rule_id.to_string(),
         area: r.area,
@@ -541,6 +573,28 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
             out.push(mk("R24", scope.clone(), format!("opening {} words", r.geo_opening_words)));
         } else if r.geo_opening_words > crate::audit::GEO_MAX_WORDS {
             out.push(mk("R41", scope.clone(), format!("opening {} words", r.geo_opening_words)));
+        }
+        if r.uncited_claims > 0 {
+            out.push(mk("R55", scope.clone(), format!("{} statistics without a nearby source", r.uncited_claims)));
+        }
+        if let (Some(t), Some(d)) = (&r.title, &r.description) {
+            let tl = t.to_lowercase();
+            let dl = d.to_lowercase();
+            let mut signals = Vec::new();
+            if tl.len() >= 10 && dl == tl {
+                signals.push("description duplicates title");
+            } else if tl.len() >= 10 && dl.starts_with(&tl) {
+                signals.push("description opens with title");
+            }
+            for cta in ["learn more", "contact us", "read more", "click here", "shop now", "sign up"] {
+                if dl.ends_with(cta) {
+                    signals.push("stock CTA close");
+                    break;
+                }
+            }
+            if !signals.is_empty() {
+                out.push(mk("R54", scope.clone(), signals.join("; ")));
+            }
         }
     }
     for (title, files) in &rep.duplicate_titles {

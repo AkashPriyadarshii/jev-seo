@@ -19,6 +19,11 @@ pub const DEFAULT_JEV_BUDGET_USD: f64 = 0.25;
 pub static JEV_REQUESTS: AtomicU32 = AtomicU32::new(0);
 pub static JEV_INPUT_TOKENS: AtomicU64 = AtomicU64::new(0);
 pub static JEV_FAILED: AtomicU32 = AtomicU32::new(0);
+/// Tokens reserved by in-flight calls. Spend accounting sees committed +
+/// reserved together, so parallel calls cannot jointly overshoot the cap.
+static JEV_RESERVED_TOKENS: AtomicU64 = AtomicU64::new(0);
+/// Responses that arrived without a usage block, charged at estimate.
+static JEV_ESTIMATED_TOKENS: AtomicU64 = AtomicU64::new(0);
 /// Budget in micro-USD (u64) so we can compare without floats in the hot path.
 static JEV_BUDGET_MICROUSD: AtomicU64 = AtomicU64::new((DEFAULT_JEV_BUDGET_USD * 1_000_000.0) as u64);
 static JEV_SKIPPED_BUDGET: AtomicU32 = AtomicU32::new(0);
@@ -35,9 +40,41 @@ pub fn jev_budget_usd() -> f64 {
 /// True when posting `est_tokens` more would exceed the hard USD cap.
 /// Spent tokens so far + reservation estimate, at list price.
 pub fn jev_budget_exhausted(est_tokens: u64) -> bool {
-    let spent = JEV_INPUT_TOKENS.load(Ordering::Relaxed) + est_tokens;
+    let spent = JEV_INPUT_TOKENS.load(Ordering::Relaxed)
+        + JEV_RESERVED_TOKENS.load(Ordering::Relaxed)
+        + est_tokens;
     let micro = (spent as f64 / 1_000_000.0 * JEV_USD_PER_MTOK * 1_000_000.0).ceil() as u64;
     micro > JEV_BUDGET_MICROUSD.load(Ordering::Relaxed)
+}
+
+/// Reserve `est_tokens` before dispatch. False (plus a skip note) when the
+/// reservation would breach the cap: the call never happens and spends nothing.
+pub fn reserve_jev_tokens(est_tokens: u64) -> bool {
+    if jev_budget_exhausted(est_tokens) {
+        note_budget_skip();
+        return false;
+    }
+    JEV_RESERVED_TOKENS.fetch_add(est_tokens, Ordering::Relaxed);
+    true
+}
+
+/// Drop a reservation without charging: transport failures spent nothing.
+pub fn release_jev_tokens(est_tokens: u64) {
+    JEV_RESERVED_TOKENS.fetch_sub(est_tokens.min(JEV_RESERVED_TOKENS.load(Ordering::Relaxed)), Ordering::Relaxed);
+}
+
+/// Release a reservation after the real usage landed. When the response
+/// carried no usage block, the estimate stands as the charge instead of zero.
+pub fn settle_jev_tokens(est_tokens: u64, actual_tokens: Option<u64>) {    JEV_RESERVED_TOKENS.fetch_sub(est_tokens.min(JEV_RESERVED_TOKENS.load(Ordering::Relaxed)), Ordering::Relaxed);
+    match actual_tokens {
+        Some(t) => {
+            JEV_INPUT_TOKENS.fetch_add(t, Ordering::Relaxed);
+        }
+        None => {
+            JEV_INPUT_TOKENS.fetch_add(est_tokens, Ordering::Relaxed);
+            JEV_ESTIMATED_TOKENS.fetch_add(est_tokens, Ordering::Relaxed);
+        }
+    }
 }
 
 pub fn note_budget_skip() {
@@ -126,16 +163,6 @@ impl Ledger {
     }
 }
 
-/// IDs and facts that exist in this run. Writers and narratives cite only these.
-#[derive(Debug, Clone, Default)]
-#[allow(dead_code)]
-pub struct CitationSet {
-    pub action_ids: BTreeSet<String>,
-    pub rule_ids: BTreeSet<String>,
-    pub scores: BTreeSet<i64>,
-    pub counts: BTreeSet<i64>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunManifest {
     pub schema_version: String,
@@ -206,12 +233,6 @@ fn now_unix_ms() -> u128 {
         .unwrap_or(0)
 }
 
-/// Every action id produced by the rule engine for these findings.
-#[allow(dead_code)]
-pub fn action_ids_for(findings: &[crate::rules::Finding]) -> Vec<String> {
-    crate::rules::actions_for(findings).into_iter().map(|a| a.id).collect()
-}
-
 /// Well-formed action ids only (RULE-R01, LLMS-001, CRAWL-001, ...).
 pub fn action_id_shape_ok(id: &str) -> bool {
     if id.is_empty() || id.len() > 40 {
@@ -244,12 +265,7 @@ pub fn known_rule_id(id: &str) -> bool {
     crate::rules::rule(id).is_some()
 }
 
-#[allow(dead_code)]
-pub fn known_action_id(id: &str, actions: &[crate::actions::Action]) -> bool {
-    actions.iter().any(|a| a.id == id)
-}
-
-/// Scan free text for citation tokens: RULE-Rxx, bare R01-R53, PREFIX-NNN.
+/// Scan free text for citation tokens: RULE-Rxx, bare R01-R57, PREFIX-NNN.
 pub fn extract_citations(text: &str) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     let bytes: Vec<char> = text.chars().collect();
@@ -441,15 +457,24 @@ fn export_dir(path: &Path) -> PathBuf {
 }
 
 /// Write run.json and ledger.json next to an export (or into `dir`).
+/// Atomic via temp file plus rename: a crash mid-write never leaves a
+/// half-written ledger that a later run trusts.
 pub fn write_pair(dir: &Path, manifest: &RunManifest) -> Result<(PathBuf, PathBuf)> {
     std::fs::create_dir_all(dir)?;
-    let run_path = dir.join("run.json");
-    let ledger_path = dir.join("ledger.json");
     let run_json = serde_json::to_string_pretty(manifest).context("serialize run.json")?;
     let ledger_json = serde_json::to_string_pretty(&manifest.ledger).context("serialize ledger.json")?;
-    std::fs::write(&run_path, run_json)?;
-    std::fs::write(&ledger_path, ledger_json)?;
+    let run_path = dir.join("run.json");
+    let ledger_path = dir.join("ledger.json");
+    atomic_write(&run_path, run_json.as_bytes())?;
+    atomic_write(&ledger_path, ledger_json.as_bytes())?;
     Ok((run_path, ledger_path))
+}
+
+fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, bytes)?;
+    std::fs::rename(&tmp, path)?;
+    Ok(())
 }
 
 /// Derive companion manifest paths from the first export the user asked for.

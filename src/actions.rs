@@ -66,7 +66,7 @@ pub fn top(actions: &[Action], n: usize) -> &[Action] {
     &actions[..actions.len().min(n)]
 }
 
-fn effort_label(e: u8) -> &'static str {
+pub fn effort_label(e: u8) -> &'static str {
     match e {
         1 => "hours",
         2 => "about a day",
@@ -82,7 +82,7 @@ pub fn to_csv(actions: &[Action]) -> String {
     let mut s = String::from("id,priority,effort_band,impact,quick_win,gate,title,evidence\n");
     for a in actions {
         let cell = |v: &str| format!("\"{}\"", v.replace('"', "\"\""));
-        let gate = action_gate(&a.id);
+        let gate = action_gate(a);
         s.push_str(&format!(
             "{},{},{},{},{},{},{},{}\n",
             a.id,
@@ -98,13 +98,15 @@ pub fn to_csv(actions: &[Action]) -> String {
     s
 }
 
-fn action_gate(action_id: &str) -> &'static str {
-    let bare = action_id.strip_prefix("RULE-").unwrap_or(action_id);
-    match crate::rules::rule(bare) {
-        Some(_) => match crate::rules::gate(bare) {
-            crate::rules::Gate::Blocking => "blocking",
-            crate::rules::Gate::Advisory => "advisory",
-        },
-        None => "advisory",
+fn action_gate(action: &Action) -> &'static str {
+    let bare = action.id.strip_prefix("RULE-").unwrap_or(&action.id);
+    if crate::rules::rule(bare).is_none() {
+        return "advisory";
+    }
+    // Same scope-aware class the gate honors: first evidence scope decides.
+    let scope = action.evidence.split(',').next().unwrap_or("").trim();
+    match crate::rules::effective_gate(bare, scope) {
+        crate::rules::Gate::Blocking => "blocking",
+        crate::rules::Gate::Advisory => "advisory",
     }
 }

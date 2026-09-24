@@ -309,8 +309,8 @@ fn diff_audit_reports(current: &audit::DirectoryAuditReport, base: &audit::Direc
     };
     let cur = rules(current);
     let old = rules(base);
-    let fixed: Vec<String> = old.difference(&cloned_set(&cur)).cloned().collect();
-    let new: Vec<String> = cur.difference(&cloned_set(&old)).cloned().collect();
+    let fixed: Vec<String> = old.difference(&cur).cloned().collect();
+    let new: Vec<String> = cur.difference(&old).cloned().collect();
     let sc_now = score(current);
     let sc_old = score(base);
     json!({
@@ -325,10 +325,6 @@ fn diff_audit_reports(current: &audit::DirectoryAuditReport, base: &audit::Direc
         "files_baseline": base.total_files,
         "files_current": current.total_files,
     })
-}
-
-fn cloned_set(s: &std::collections::BTreeSet<String>) -> std::collections::BTreeSet<String> {
-    s.clone()
 }
 
 /// Shared by CLI `report` and MCP `seo_report`.
@@ -919,10 +915,7 @@ fn main() -> Result<()> {
                 if actions.is_empty() {
                     println!("  Actions:       {}", "none, directory is clean".green());
                 } else {
-                    println!("\n{}", "Top Actions:".cyan().bold());
-                    for a in crate::actions::top(&actions, 5) {
-                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
-                    }
+                    print_top_actions(&actions);
                 }
             } else if let Some(report) = dir_report.reports.first() {
                 println!("\n{} {}", "On-Page SEO Audit:".cyan().bold(), report.file_path);
@@ -952,10 +945,7 @@ fn main() -> Result<()> {
                     .collect();
                 let failed = crate::rules::actions_for(&file_findings);
                 if !failed.is_empty() {
-                    println!("\n{}", "Top Actions:".cyan().bold());
-                    for a in crate::actions::top(&failed, 5) {
-                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
-                    }
+                    print_top_actions(&failed);
                 }
 
                 if let Some(query) = target_query {
@@ -996,15 +986,18 @@ fn main() -> Result<()> {
             };
             // HTML files score body copy, never head markup. Plain text and
             // markdown are already clean; both cap at 6k chars of signal.
+            // Answer-first judgments read the opening after the H1, not nav.
             let lower = target.to_ascii_lowercase();
-            let text = if lower.ends_with(".html") || lower.ends_with(".htm") {
+            let is_html = lower.ends_with(".html") || lower.ends_with(".htm");
+            let text = if is_html {
                 crate::fetch::readable_text(&raw, 6000)
             } else {
                 raw.chars().take(6000).collect::<String>()
             };
+            let opening = is_html.then(|| crate::fetch::opening_after_h1(&raw, 500));
             if let Some(client) = engine::JevClient::new() {
                 let wc = text.split_whitespace().count();
-                let state = engine::page_state(&query, Some(target.clone()), None, text, wc);
+                let state = engine::page_state(&query, Some(target.clone()), None, text, wc, opening);
                 match client.judge_page(state) {
                     Ok(eval) => {
                         if policy::injection_blocked(&eval.extra) {
@@ -1278,6 +1271,7 @@ fn main() -> Result<()> {
                     capped: saved.capped,
                     robots_honored: saved.robots_honored,
                     vitals: saved.vitals,
+                    probes: vec![],
                 });
                 let completeness = manifest::completeness_crawl(&report, max_pages);
                 if json {
@@ -1448,10 +1442,7 @@ fn main() -> Result<()> {
             if report.actions.is_empty() {
                 println!("  Actions:       {}", "none, site is clean".green());
             } else {
-                println!("\n{}", "Top Actions:".cyan().bold());
-                for a in crate::actions::top(&report.actions, 5) {
-                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
-                }
+                print_top_actions(&report.actions);
             }
             if diff {
                 match rank::DbStore::open()?.record_crawl_snapshot(
@@ -1576,10 +1567,7 @@ fn main() -> Result<()> {
             if report.actions.is_empty() {
                 println!("  Actions:       {}", "none, ready".green());
             } else {
-                println!("\n{}", "Top Actions:".cyan().bold());
-                for a in crate::actions::top(&report.actions, 5) {
-                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
-                }
+                print_top_actions(&report.actions);
             }
             let completeness = manifest::completeness_llms(&report);
             manifest::print_banner(&completeness);
@@ -1614,7 +1602,7 @@ fn main() -> Result<()> {
         }
         Commands::Explain { id, json } => {
             let text = rules::explain(&id)
-                .ok_or_else(|| anyhow::anyhow!("unknown rule id: {id} (try R01..R53 or RULE-R01..RULE-R53)"))?;
+                .ok_or_else(|| anyhow::anyhow!("unknown rule id: {id} (try R01..R57 or RULE-R01..RULE-R57)"))?;
             if json {
                 let bare = id.strip_prefix("RULE-").unwrap_or(&id).to_string();
                 let r = rules::rule(&bare).expect("explain found it");
@@ -1747,13 +1735,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Run a Jev eval gated by policy. Returns None on low confidence or API
-/// failure, after telling the user the output is local-only. Never silent.
-#[allow(dead_code)]
-fn gated_eval(command: &str, state: serde_json::Value) -> Option<(engine::AnalysisResult, policy::Verdict)> {
-    gated_eval_with(command, state, serde_json::json!({}))
-}
-
 fn gated_eval_with(
     command: &str,
     state: serde_json::Value,
@@ -1808,22 +1789,9 @@ fn excerpt_local(path: &str) -> String {
 /// Markdown body without the frontmatter block. Frontmatter keys are metadata
 /// for Jev state, not evidence; the audit report already carries them.
 fn gray_matter_strip(cleaned: &str) -> String {
-    let mut lines = cleaned.lines();
-    if lines.next().is_some_and(|l| l.trim() == "---") {
-        let mut rest = Vec::new();
-        let mut closed = false;
-        for l in lines.by_ref() {
-            if l.trim() == "---" {
-                closed = true;
-                break;
-            }
-        }
-        if closed {
-            rest.extend(lines.map(|l| l.to_string()));
-            return rest.join("\n");
-        }
-    }
-    cleaned.to_string()
+    gray_matter::Matter::<gray_matter::engine::YAML>::new()
+        .parse(cleaned)
+        .content
 }
 
 /// Speculative Jev page suite on the largest audit files. One fan-out per page.
@@ -1861,6 +1829,7 @@ fn judge_audit_sample(
             report.description.clone(),
             content,
             report.word_count,
+            None,
         );
         if let Some(obj) = state.as_object_mut() {
             obj.insert("checks".into(), serde_json::to_value(&report.checks).unwrap_or_default());
@@ -1944,29 +1913,30 @@ fn paid_backend_sources(pages: &[crawl::PageRecord]) -> Vec<String> {
         .collect()
 }
 
-/// Truth-class tag: RULE- ids resolve fact/heuristic against the registry.
-/// Bespoke ids stay untagged. Jev semantic judgments never become actions;
-/// they print with model + confidence in the suite lines.
-fn action_kind_tag(action_id: &str) -> &'static str {
-    let bare = action_id.strip_prefix("RULE-").unwrap_or(action_id);
-    if rules::rule(bare).is_none() {
-        return "";
+/// One Top Actions renderer for every surface. Gate tag, truth kind,
+// quick-win flag, then id, title, evidence: same contract everywhere.
+fn print_top_actions(actions: &[crate::actions::Action]) {
+    println!("\n{}", "Top Actions:".cyan().bold());
+    for a in crate::actions::top(actions, 5) {
+        println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_tags(a), a.id.bold(), a.title, a.evidence.dimmed());
     }
-    rules::truth_kind(bare)
 }
 
-/// Gate tag for action lines: RULE- ids resolve against the registry,
-/// bespoke ids (CRAWL-001) default advisory, never blocking on unknown.
-fn action_gate_tag(action_id: &str) -> String {
-    let bare = action_id.strip_prefix("RULE-").unwrap_or(action_id);
-    let is_rule = rules::rule(bare).is_some();
-    if !is_rule {
-        return String::new();
-    }
-    match rules::gate(bare) {
+/// Gate tag plus truth kind for one action. RULE- ids resolve against the
+/// registry with the evidence scope applied, so a Markdown R11 shows the same
+/// advisory tag the gate itself honors. Bespoke ids stay untagged.
+fn action_tags(action: &crate::actions::Action) -> String {
+    let bare = action.id.strip_prefix("RULE-").unwrap_or(&action.id);
+    let r = match rules::rule(bare) {
+        Some(r) => r,
+        None => return String::new(),
+    };
+    let scope = action.evidence.split(',').next().unwrap_or("").trim();
+    let gate = match rules::effective_gate(bare, scope) {
         rules::Gate::Blocking => "BLOCK".red().bold().to_string(),
         rules::Gate::Advisory => "warn".yellow().to_string(),
-    }
+    };
+    format!("{} {}", gate, rules::truth_kind(r.id))
 }
 
 fn runner_up_suffix(extra: &serde_json::Map<String, serde_json::Value>, v: policy::Verdict) -> String {
@@ -2088,6 +2058,7 @@ fn judge_crawl_site(start_url: &str) -> Option<engine::AnalysisResult> {
         report.as_ref().and_then(|r| r.description.clone()),
         text,
         report.as_ref().map(|r| r.word_count).unwrap_or(wc),
+        Some(crate::fetch::opening_after_h1(&body, 500)),
     );
     match client.judge_site(state) {
         Ok(eval) => Some(eval),

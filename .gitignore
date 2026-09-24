@@ -46,3 +46,6 @@ crawl.json
 !examples/**/ledger.json
 !examples/**/crawl.json
 !examples/narrative.example.json
+
+# Dropped research notes (local only, never commit)
+Research.md

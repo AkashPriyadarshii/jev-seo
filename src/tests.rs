@@ -316,6 +316,7 @@ Sitemap: https://example.com/sitemap.xml
             em_dash_count: 0,
             ai_slop_words_found: vec![],
             internal_link_targets: vec![],
+            uncited_claims: 0,
             checks: vec![CheckItem { name: "n".into(), passed: true, message: "m".into() }],
         };
         let rep = DirectoryAuditReport {
@@ -718,7 +719,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_rules_registry_and_scoring() {        use crate::rules::{overall, score_areas, Area, Finding, Severity, RULES};
-        assert_eq!(RULES.len(), 53);
+        assert_eq!(RULES.len(), 57);
         assert!(RULES.iter().all(|r| crate::rules::rule(r.id).is_some()));
         let findings = vec![
             Finding { rule_id: "R01".into(), area: Area::Crawl, severity: Severity::High, scope: "https://x.test/a".into(), evidence: "HTTP 404".into(), fix: "Restore the target.".into(), kind: "fact".into(), observed_at: 1, source: "t".into() },
@@ -756,6 +757,7 @@ Sitemap: https://example.com/sitemap.xml
             capped: false,
             robots_honored: false,
             vitals: None,
+            probes: vec![],
         });
         assert!(rep.findings.iter().any(|f| f.rule_id == "R01"));
         assert!(rep.findings.iter().any(|f| f.rule_id == "R05"));
@@ -787,6 +789,7 @@ Sitemap: https://example.com/sitemap.xml
                 score: Some(62),
                 field: false,
             }),
+            probes: vec![],
         });
         assert!(rep.findings.iter().any(|f| f.rule_id == "R51"));
         assert!(rep.findings.iter().any(|f| f.rule_id == "R52"));
@@ -808,6 +811,7 @@ Sitemap: https://example.com/sitemap.xml
                 score: Some(94),
                 field: true,
             }),
+            probes: vec![],
         });
         assert!(!clean.findings.iter().any(|f| f.rule_id == "R51"));
         assert!(!clean.findings.iter().any(|f| f.rule_id == "R52"));
@@ -816,7 +820,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_pdf_deck_sections() {
-        use crate::audit::{audit_path, pdf_cover, pdf_findings_by_area, pdf_inventory, pdf_method, pdf_scorecard, to_pdf};
+        use crate::audit::{audit_path, pdf_cover, pdf_findings_by_area, pdf_inventory, pdf_method, pdf_scorecard};
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("p.md"), "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here live happily in this file with enough of them to pass depth.\n").unwrap();
         let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
@@ -830,7 +834,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(inv.contains("Page inventory"));
         let method = pdf_method().join("\n");
         assert!(method.contains("Method:") && method.contains("never predict rankings"));
-        let pdf = to_pdf(&rep);
+        let pdf = crate::audit::to_pdf_opt(&rep, None);
         let text = String::from_utf8_lossy(&pdf);
         for section in ["jev-seo audit report", "Scorecard:", "Findings by area:", "Page inventory", "Method:"] {
             assert!(text.contains(section), "missing {section}");
@@ -865,6 +869,7 @@ Sitemap: https://example.com/sitemap.xml
             capped: saved.capped,
             robots_honored: saved.robots_honored,
             vitals: saved.vitals,
+            probes: vec![],
         });
         assert!(rep.score <= 100);
     }
@@ -901,13 +906,13 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_gate_split_covers_registry() {
         use crate::rules::{gate, Gate, RULES};
-        assert_eq!(RULES.len(), 53);
+        assert_eq!(RULES.len(), 57);
         let blocking: Vec<&&str> = RULES
             .iter()
             .filter(|r| gate(r.id) == Gate::Blocking)
             .map(|r| &r.id)
             .collect();
-        assert_eq!(blocking.len(), 20, "blocking set changed: {:?}", blocking);
+        assert_eq!(blocking.len(), 23, "blocking set changed: {:?}", blocking);
         for id in ["R01", "R09", "R11", "R33", "R36", "R47", "RULE-R02"] {
             assert_eq!(gate(id), Gate::Blocking, "{id}");
         }
@@ -1111,6 +1116,7 @@ Sitemap: https://example.com/sitemap.xml
             capped: false,
             robots_honored: true,
             vitals: None,
+            probes: vec![],
         });
         assert!(rep.findings.iter().any(|f| f.rule_id == "R03"));
         assert!(!rep.findings.iter().any(|f| f.rule_id == "R02"));
@@ -1175,7 +1181,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_audit_to_pdf_structure() {
-        use crate::audit::{audit_path, to_pdf};
+        use crate::audit::audit_path;
         let dir = tempfile::tempdir().unwrap();
         for name in ["a.md", "b.md", "c.md"] {
             std::fs::write(
@@ -1185,7 +1191,7 @@ Sitemap: https://example.com/sitemap.xml
             .unwrap();
         }
         let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
-        let pdf = to_pdf(&rep);
+        let pdf = crate::audit::to_pdf_opt(&rep, None);
         assert!(pdf.starts_with(b"%PDF-1.4\n"));
         assert!(pdf.ends_with(b"%%EOF"));
         assert!(pdf.windows(9).any(|w| w == b"endstream"));
@@ -1353,6 +1359,7 @@ Sitemap: https://example.com/sitemap.xml
             capped: false,
             robots_honored: true,
             vitals: None,
+            probes: vec![],
         });
         assert_eq!(rep.orphans, vec!["https://x.test/orph".to_string()]);
         assert!(rep.findings.iter().any(|f| f.rule_id == "R25"), "orphans must emit R25");
@@ -1374,7 +1381,86 @@ Sitemap: https://example.com/sitemap.xml
         let bad = crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/broken").unwrap());
         let blocked = crate::rules::blocking_findings(&bad.findings);
         assert!(blocked.iter().any(|f| f.rule_id == "R09"), "broken fixture must fire R09");
-        assert!(blocked.iter().any(|f| f.rule_id == "R11"), "broken fixture must fire R11");
+        // Template-owned tags stay findings on Markdown but never block it.
+        assert!(bad.findings.iter().any(|f| f.rule_id == "R11"));
+        assert!(!blocked.iter().any(|f| f.rule_id == "R11"), "R11 must not block Markdown");
+    }
+
+    #[test]
+    fn test_score_side_reads_heavier_half() {
+        use crate::policy::score_side;
+        let ans = serde_json::json!({
+            "score": 3.0,
+            "legend": {"0": "low", "4": "high"},
+            "probabilities": {"0": 0.1, "3": 0.35, "4": 0.55}
+        });
+        assert_eq!(score_side(&ans), Some(0.9));
+        let split = serde_json::json!({
+            "score": 2.0,
+            "legend": {"0": "low", "4": "high"},
+            "probabilities": {"0": 0.5, "4": 0.5}
+        });
+        assert_eq!(score_side(&split), Some(0.5));
+        assert!(score_side(&serde_json::json!({"score": 1.0})).is_none());
+    }
+
+    #[test]
+    fn test_reserve_settle_roundtrip() {
+        use crate::manifest::{
+            reserve_jev_tokens, settle_jev_tokens, set_jev_budget_usd, DEFAULT_JEV_BUDGET_USD,
+            JEV_INPUT_TOKENS,
+        };
+        use std::sync::atomic::Ordering;
+        set_jev_budget_usd(0.0);
+        assert!(!reserve_jev_tokens(1));
+        set_jev_budget_usd(DEFAULT_JEV_BUDGET_USD);
+        assert!(reserve_jev_tokens(100));
+        let before = JEV_INPUT_TOKENS.load(Ordering::Relaxed);
+        settle_jev_tokens(100, Some(60));
+        assert_eq!(JEV_INPUT_TOKENS.load(Ordering::Relaxed), before + 60);
+        settle_jev_tokens(100, None);
+        assert_eq!(JEV_INPUT_TOKENS.load(Ordering::Relaxed), before + 160);
+        JEV_INPUT_TOKENS.fetch_sub(160, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn test_registry_invariants() {
+        use crate::rules::{gate, truth_kind, Gate, RULES};
+        assert_eq!(RULES.len(), 57);
+        let mut ids: Vec<&str> = RULES.iter().map(|r| r.id).collect();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), 57, "rule ids must be unique");
+        for r in RULES {
+            assert!(!r.title.is_empty() && !r.fix.is_empty(), "{}", r.id);
+            assert!(r.effort >= 1 && r.effort <= 3, "{}", r.id);
+            // gate() and truth_kind() must total-cover the registry: no rule
+            // falls through to a default it was never assigned.
+            let _ = gate(r.id);
+            let _ = truth_kind(r.id);
+            assert!(matches!(gate(r.id), Gate::Blocking | Gate::Advisory));
+            assert!(r.id.starts_with('R'));
+        }
+        // Heuristic set is exactly the threshold-guess rules.
+        let heu: Vec<&&str> = RULES
+            .iter()
+            .filter(|r| truth_kind(r.id) == "heuristic")
+            .map(|r| &r.id)
+            .collect();
+        assert_eq!(heu, vec![&"R18", &"R19", &"R20", &"R23", &"R24", &"R55", &"R41"]);
+    }
+
+    #[test]
+    fn test_effective_gate_downgrades_template_tags_on_markdown() {
+        use crate::rules::{effective_gate, Gate};
+        for id in ["R11", "R26", "R31", "R36"] {
+            assert_eq!(effective_gate(id, "docs/page.md"), Gate::Advisory, "{id}");
+            assert_eq!(effective_gate(id, "docs/page.html"), Gate::Blocking, "{id}");
+        }
+        // R35 is advisory everywhere already; R09 stays blocking on Markdown.
+        assert_eq!(effective_gate("R35", "docs/page.md"), Gate::Advisory);
+        assert_eq!(effective_gate("R09", "docs/page.md"), Gate::Blocking);
+        assert_eq!(effective_gate("R19", "docs/page.md"), Gate::Advisory);
     }
 
     #[test]
@@ -1417,7 +1503,7 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_page_state_has_single_text_field() {
         use crate::engine::page_state;
-        let state = page_state("q", Some("t".into()), None, "body copy".into(), 2);
+        let state = page_state("q", Some("t".into()), None, "body copy".into(), 2, None);
         assert!(state.get("content").is_none(), "duplicated content key: {state}");
         assert_eq!(state["page"]["text"], "body copy");
         assert_eq!(state["query"], "q");

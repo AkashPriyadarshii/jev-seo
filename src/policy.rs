@@ -270,6 +270,31 @@ pub fn link_question(candidates: &[(String, String)]) -> serde_json::Value {
         }
     })
 }
+/// Side-of-midpoint decisiveness for Score answers: sum the level
+/// probabilities on each side of the scale midpoint, take the heavier side.
+/// A 4-1 split at 0.55/0.45 on the same side is decisive; confidence alone
+/// misses that. Decisive at >= 0.80 by blind-judge agreement evidence.
+pub fn score_side(answer: &serde_json::Value) -> Option<f64> {
+    let legend = answer.get("legend")?.as_object()?;
+    let probs = answer.get("probabilities")?.as_object()?;
+    let top = legend
+        .keys()
+        .filter_map(|k| k.parse::<f64>().ok())
+        .fold(0.0f64, f64::max);
+    if top <= 0.0 {
+        return None;
+    }
+    let mut upper = 0.0;
+    for (k, v) in probs {
+        if let (Ok(level), Some(p)) = (k.parse::<f64>(), v.as_f64()) {
+            if level / top >= 0.5 {
+                upper += p;
+            }
+        }
+    }
+    Some(upper.max(1.0 - upper))
+}
+
 /// Next command hint from intent. Pure routing, no inference.
 pub fn route_for_intent(intent: &str) -> &'static str {
     match intent {

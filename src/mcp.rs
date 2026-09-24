@@ -319,13 +319,15 @@ fn execute_tool(name: &str, args: &serde_json::Value) -> String {
             };
             if let Some(client) = crate::engine::JevClient::new() {
                 let lower = target.to_ascii_lowercase();
-                let text = if lower.ends_with(".html") || lower.ends_with(".htm") {
+                let is_html = lower.ends_with(".html") || lower.ends_with(".htm");
+                let text = if is_html {
                     crate::fetch::readable_text(&content, 6000)
                 } else {
                     content.chars().take(6000).collect::<String>()
                 };
+                let opening = is_html.then(|| crate::fetch::opening_after_h1(&content, 500));
                 let wc = text.split_whitespace().count();
-                let state = crate::engine::page_state(query, Some(target.to_string()), None, text, wc);
+                let state = crate::engine::page_state(query, Some(target.to_string()), None, text, wc, opening);
                 match client.judge_page(state) {
                     Ok(eval) => {
                         if crate::policy::injection_blocked(&eval.extra) {

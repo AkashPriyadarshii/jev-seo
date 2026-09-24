@@ -17,6 +17,26 @@ static MD_HTML_H_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?i)<h([1-6])\b[^>]*>"#).expect("md html heading regex"));
 static MD_FENCE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)```.*?```").expect("fence regex"));
+static CLAIM_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\b\d+(?:\.\d+)?%?|\b(?:19|20)\d{2}\b").expect("claim regex")
+});
+static CITE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)https?://|source|study|studies|research|according to|figure|fig\.|report|survey|data shows|\[\d+\]").expect("cite regex")
+});
+
+/// Claims (statistics, quantities, years) with no citation signal within
+/// 200 chars either side: the cheapest trust gap a rule can measure.
+pub fn count_uncited_claims(text: &str) -> usize {
+    let mut n = 0;
+    for m in CLAIM_RE.find_iter(text) {
+        let lo = text.floor_char_boundary(m.start().saturating_sub(200));
+        let hi = text.floor_char_boundary((m.end() + 200).min(text.len()));
+        if hi > lo && !CITE_RE.is_match(&text[lo..hi]) {
+            n += 1;
+        }
+    }
+    n
+}
 static MD_LINK_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"!\[([^\]]*)\]\([^)]+\)|\[([^\]]*)\]\([^)]+\)").expect("md link regex"));
 
@@ -49,6 +69,10 @@ fn slop_hits(text: &str) -> Vec<String> {
 /// Markdown body stripped of fences, code spans, and link markup for honest
 /// word counts: syntax characters are not prose.
 pub fn md_plain_text(body: &str) -> String {
+    md_prose_words(body).0
+}
+
+fn md_prose_words(body: &str) -> (String, usize) {
     let no_fence = MD_FENCE_RE.replace_all(body, " ");
     let no_links = MD_LINK_RE.replace_all(&no_fence, "$1$2");
     let no_code: String = no_links
@@ -58,18 +82,15 @@ pub fn md_plain_text(body: &str) -> String {
         .map(|(_, s)| s)
         .collect::<Vec<_>>()
         .join(" ");
-    no_code
+    let words: Vec<&str> = no_code
         .split_whitespace()
         .filter(|w| {
             let t = w.trim_matches(|c: char| c == '#' || c == '*' || c == '_' || c == '-' || c == '>' || c == '|');
             !t.is_empty()
         })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn md_prose_words(body: &str) -> usize {
-    md_plain_text(body).split_whitespace().count()
+        .collect();
+    let n = words.len();
+    (words.join(" "), n)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,6 +116,9 @@ pub struct AuditReport {
     pub em_dash_count: usize,
     pub ai_slop_words_found: Vec<String>,
     pub internal_link_targets: Vec<String>,
+    /// Statistics/quantities with no citation signal within 200 chars.
+    #[serde(default)]
+    pub uncited_claims: usize,
     /// False only when an ld+json block failed to parse. Defaults true so
     /// reports saved before validation existed do not newly fail R33.
     #[serde(default = "schema_valid_default")]
@@ -434,8 +458,7 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         }
     }
 
-    let word_count = md_prose_words(&body);
-
+    let word_count = md_prose_words(&body).1;
     let title_len = title.as_ref().map(|s| s.chars().count()).unwrap_or(0);
     let description_len = description.as_ref().map(|s| s.chars().count()).unwrap_or(0);
 
@@ -479,6 +502,7 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         em_dash_count,
         ai_slop_words_found,
         internal_link_targets,
+        uncited_claims: count_uncited_claims(&body),
         checks,
     })
 }
@@ -639,6 +663,7 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
         em_dash_count,
         ai_slop_words_found,
         internal_link_targets,
+        uncited_claims: count_uncited_claims(&plain_text),
         checks,
     })
 }
@@ -1081,14 +1106,9 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
         }
     }
     m.push_str("\n## Method\n\nOn-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar. Scores rank work; they never predict rankings or traffic.\n");
+    m.push_str("\n## How to read this report\n\nFindings marked fact were measured directly (status codes, missing tags, counts). Findings marked heuristic are threshold guesses that can fire on healthy pages: re-check those by hand before acting. Any Jev semantic lines carry their model and confidence; below-confidence answers print as notes, not scores. A recommendation failed when its evidence is missing: that is the falsifiability test. Rule set version rides `run.json`.\n");
     m.push_str("\n## Completeness\n\nLocal file walk only. Jev and live crawl are not part of this report unless run separately. Companion artifacts: `run.json`, `ledger.json`.\n");
     m
-}
-
-/// PDF twin of to_html: scorecard, pages, findings, optional narrative, method.
-#[allow(dead_code)] // bin always embeds a narrative; tests call the plain path
-pub fn to_pdf(rep: &DirectoryAuditReport) -> Vec<u8> {
-    to_pdf_opt(rep, None)
 }
 
 /// PDF with an embedded narrative block when present.
@@ -1242,7 +1262,7 @@ pub fn pdf_method() -> Vec<String> {
     ]
 }
 
-fn to_pdf_opt(rep: &DirectoryAuditReport, n: Option<&crate::narrative::Narrative>) -> Vec<u8> {
+pub(crate) fn to_pdf_opt(rep: &DirectoryAuditReport, n: Option<&crate::narrative::Narrative>) -> Vec<u8> {
     let mut lines = pdf_cover(rep);
     lines.push(String::new());
     lines.extend(pdf_scorecard(rep));

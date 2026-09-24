@@ -37,13 +37,12 @@ pub fn capped_string(resp: ureq::Response, cap: usize) -> anyhow::Result<String>
     resp.into_reader()
         .take(cap as u64 + 1)
         .read_to_end(&mut buf)?;
-    if buf.len() > cap {
-        buf.truncate(cap);
-        while !buf.is_empty() && std::str::from_utf8(&buf).is_err() {
-            buf.pop();
-        }
+    let s = String::from_utf8_lossy(&buf);
+    if s.len() <= cap {
+        return Ok(s.into_owned());
     }
-    Ok(String::from_utf8_lossy(&buf).into_owned())
+    let end = s.floor_char_boundary(cap);
+    Ok(s[..end].to_string())
 }
 
 #[derive(Debug, Clone, Default)]
@@ -66,6 +65,49 @@ impl Budget {
     pub fn refund(&mut self, cost: u32) {
         self.spent = self.spent.saturating_sub(cost);
     }
+}
+
+/// Opening passage: collapsed text right after the first H1, capped at
+/// `limit` chars. Answer-first and next-step judgments must read what follows
+/// the heading, not nav and banner copy above it. Falls back to plain
+/// readable text when no H1 exists.
+pub fn opening_after_h1(html: &str, limit: usize) -> String {
+    let lower = html.to_ascii_lowercase();
+    let start = lower.find("</h1>").map(|i| i + "</h1>".len());
+    let src = match start {
+        Some(i) => &html[i.min(html.len())..],
+        None => return readable_text(html, limit),
+    };
+    let mut text = String::with_capacity(src.len().min(limit * 2));
+    let mut in_tag = false;
+    let mut script = false;
+    let chars: Vec<char> = src.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '<' {
+            let tag: String = chars[i..].iter().take_while(|&&x| x != '>').collect();
+            let tl = tag.to_ascii_lowercase();
+            if tl.starts_with("<script") || tl.starts_with("<style") {
+                script = true;
+            } else if tl.starts_with("</script") || tl.starts_with("</style") {
+                script = false;
+            }
+            in_tag = true;
+        } else if c == '>' {
+            in_tag = false;
+            text.push(' ');
+        } else if !in_tag && !script {
+            text.push(c);
+        }
+        i += 1;
+    }
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(limit)
+        .collect()
 }
 
 /// Visible body copy for Jev state. Head-first raw markup scored markup, not
