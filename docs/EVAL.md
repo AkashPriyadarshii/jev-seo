@@ -39,9 +39,11 @@ Run these after a rules or scoring change; record date, git SHA, and machine.
    test two phrasings on the same 5 pages. Keep the phrasing with the wider
    decisive spread. Log every trial here; never swap wording without a row.
 
-   | Date | Question id | Phrasing A | Phrasing B | Winner | Spread A/B |
-   |---|---|---|---|---|---|
-   | _none yet_ | | | | | |
+    | Date | Question id | Phrasing A | Phrasing B | Winner | Spread A/B |
+    |---|---|---|---|---|---|
+    | 2026-09-24 | query_fit | Does `page` deliver what the target query promises, or does a visitor land on the wrong intent? | _pending trial_ | A (shipped) | trial queued |
+    | 2026-09-24 | meta_verdict | keep/rewrite/missing Choice over title+description+text | _pending trial_ | A (shipped) | trial queued |
+    | 2026-09-24 | link_target | most natural contextual target + no_link escape | _pending trial_ | A (shipped) | trial queued |
 
 6. **Human-label sample (W8)**  
    Hand-check 20 rule findings against `audit --csv` evidence with shell

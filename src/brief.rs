@@ -111,7 +111,7 @@ pub fn generate_brief_with(topic: &str, limit: usize, provider: serp::Provider) 
     ];
 
     let geo_opening_prescription = format!(
-        "Draft the opening 134-167 words as a self-contained, fact-dense direct answer defining '{}', stating its primary utility, and giving a 1-line copy-paste quickstart. Do not use filler throat-clearers ('In today's fast-paced world...').",
+        "Draft the opening 134-167 words as a self-contained, fact-dense direct answer defining '{}', stating its primary utility, and giving a 1-line copy-paste quickstart. Do not use filler throat-clearers ('In today's fast-paced world...'). Replicated citation lift comes from three moves only: cite authoritative sources with links, add statistics with dates and origins, and quote named experts with titles.",
         clean_topic
     );
 

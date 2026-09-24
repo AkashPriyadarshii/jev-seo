@@ -1,0 +1,224 @@
+{
+  "dir_path": "tests/fixtures/good",
+  "total_files": 2,
+  "total_words": 111,
+  "avg_words_per_file": 55,
+  "pass_rate": 81.81818181818183,
+  "reports": [
+    {
+      "file_path": "tests/fixtures/good/other.md",
+      "title": "Gate Fixture Other Page Title For Length Checks",
+      "title_len": 47,
+      "description": "Another description long enough to satisfy the one hundred twenty character minimum window for meta descriptions yes indeed ok.",
+      "description_len": 127,
+      "h1_count": 1,
+      "h2_count": 0,
+      "h3_count": 0,
+      "word_count": 27,
+      "image_count": 0,
+      "images_missing_alt": 0,
+      "internal_links": 1,
+      "external_links": 0,
+      "schema_found": true,
+      "canonical_found": true,
+      "og_tags_found": true,
+      "geo_opening_words": 19,
+      "heading_skipped_levels": [],
+      "em_dash_count": 0,
+      "ai_slop_words_found": [],
+      "internal_link_targets": [
+        "./page.md"
+      ],
+      "schema_json_valid": true,
+      "checks": [
+        {
+          "name": "Title Tag Length",
+          "passed": true,
+          "message": "Length: 47 chars (Optimal: 30-60 chars)"
+        },
+        {
+          "name": "Meta Description",
+          "passed": true,
+          "message": "Length: 127 chars (Optimal: 120-160 chars)"
+        },
+        {
+          "name": "H1 Uniqueness",
+          "passed": true,
+          "message": "Found 1 H1 headings (Expected: exactly 1)"
+        },
+        {
+          "name": "Heading Hierarchy",
+          "passed": true,
+          "message": "Logical heading progression (no skipped levels)"
+        },
+        {
+          "name": "Content Depth",
+          "passed": false,
+          "message": "Word count: 27 (Recommended min: 300 words)"
+        },
+        {
+          "name": "Image Alt Tags",
+          "passed": true,
+          "message": "Images: 0, Missing Alt: 0"
+        },
+        {
+          "name": "GEO Citation Density",
+          "passed": false,
+          "message": "Opening passage: 19 words (Optimal AI citation block: 134-167 words)"
+        },
+        {
+          "name": "Helpful Content (AI Slop)",
+          "passed": true,
+          "message": "Natural writing tone (0 em-dashes, 0 AI crutches)"
+        },
+        {
+          "name": "Schema Markup",
+          "passed": true,
+          "message": "Structured data present"
+        },
+        {
+          "name": "Canonical Reference",
+          "passed": true,
+          "message": "Canonical tag configured"
+        },
+        {
+          "name": "OpenGraph Metadata",
+          "passed": true,
+          "message": "OpenGraph meta tags found"
+        }
+      ]
+    },
+    {
+      "file_path": "tests/fixtures/good/page.md",
+      "title": "Gate Fixture Good Page Title For Length Checks",
+      "title_len": 46,
+      "description": "A description precisely long enough to satisfy the one hundred twenty character minimum window for meta descriptions yes indeed ok.",
+      "description_len": 131,
+      "h1_count": 1,
+      "h2_count": 1,
+      "h3_count": 0,
+      "word_count": 84,
+      "image_count": 0,
+      "images_missing_alt": 0,
+      "internal_links": 1,
+      "external_links": 0,
+      "schema_found": true,
+      "canonical_found": true,
+      "og_tags_found": true,
+      "geo_opening_words": 50,
+      "heading_skipped_levels": [],
+      "em_dash_count": 0,
+      "ai_slop_words_found": [],
+      "internal_link_targets": [
+        "./other.md"
+      ],
+      "schema_json_valid": true,
+      "checks": [
+        {
+          "name": "Title Tag Length",
+          "passed": true,
+          "message": "Length: 46 chars (Optimal: 30-60 chars)"
+        },
+        {
+          "name": "Meta Description",
+          "passed": true,
+          "message": "Length: 131 chars (Optimal: 120-160 chars)"
+        },
+        {
+          "name": "H1 Uniqueness",
+          "passed": true,
+          "message": "Found 1 H1 headings (Expected: exactly 1)"
+        },
+        {
+          "name": "Heading Hierarchy",
+          "passed": true,
+          "message": "Logical heading progression (no skipped levels)"
+        },
+        {
+          "name": "Content Depth",
+          "passed": false,
+          "message": "Word count: 84 (Recommended min: 300 words)"
+        },
+        {
+          "name": "Image Alt Tags",
+          "passed": true,
+          "message": "Images: 0, Missing Alt: 0"
+        },
+        {
+          "name": "GEO Citation Density",
+          "passed": false,
+          "message": "Opening passage: 50 words (Optimal AI citation block: 134-167 words)"
+        },
+        {
+          "name": "Helpful Content (AI Slop)",
+          "passed": true,
+          "message": "Natural writing tone (0 em-dashes, 0 AI crutches)"
+        },
+        {
+          "name": "Schema Markup",
+          "passed": true,
+          "message": "Structured data present"
+        },
+        {
+          "name": "Canonical Reference",
+          "passed": true,
+          "message": "Canonical tag configured"
+        },
+        {
+          "name": "OpenGraph Metadata",
+          "passed": true,
+          "message": "OpenGraph meta tags found"
+        }
+      ]
+    }
+  ],
+  "duplicate_titles": {},
+  "thin_pages": [
+    [
+      "tests/fixtures/good/other.md",
+      27
+    ],
+    [
+      "tests/fixtures/good/page.md",
+      84
+    ]
+  ],
+  "missing_canonicals": [],
+  "missing_descriptions": [],
+  "orphan_pages": [],
+  "keyword_cannibalization": [],
+  "findings": [
+    {
+      "rule_id": "R18",
+      "area": "Content",
+      "severity": "Medium",
+      "scope": "tests/fixtures/good/other.md",
+      "evidence": "27 words",
+      "fix": "Expand past 300 words or merge into a parent."
+    },
+    {
+      "rule_id": "R24",
+      "area": "Content",
+      "severity": "Low",
+      "scope": "tests/fixtures/good/other.md",
+      "evidence": "opening 19 words",
+      "fix": "Open with the answer before the background."
+    },
+    {
+      "rule_id": "R18",
+      "area": "Content",
+      "severity": "Medium",
+      "scope": "tests/fixtures/good/page.md",
+      "evidence": "84 words",
+      "fix": "Expand past 300 words or merge into a parent."
+    },
+    {
+      "rule_id": "R24",
+      "area": "Content",
+      "severity": "Low",
+      "scope": "tests/fixtures/good/page.md",
+      "evidence": "opening 50 words",
+      "fix": "Open with the answer before the background."
+    }
+  ]
+}

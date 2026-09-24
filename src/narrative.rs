@@ -417,6 +417,9 @@ mod tests {
             scope: "s".into(),
             evidence: "12 hits".into(),
             fix: "f".into(),
+            kind: "fact".into(),
+            observed_at: 1,
+            source: "t".into(),
         }
     }
 

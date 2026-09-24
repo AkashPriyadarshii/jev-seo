@@ -105,12 +105,25 @@ mod tests {
     #[test]
     fn test_sqlite_rank_drift() {
         let mut db = DbStore::open().unwrap();
-        let delta1 = db.track_keyword("example.com", "best rust framework", Some(5), Some("https://example.com/rust")).unwrap();
+        let delta1 = db.track_keyword("example.com", "best rust framework", Some(5), Some("https://example.com/rust"), "ddg", "duckduckgo-html").unwrap();
         assert_eq!(delta1.curr_rank, Some(5));
 
-        let delta2 = db.track_keyword("example.com", "best rust framework", Some(3), Some("https://example.com/rust")).unwrap();
+        let delta2 = db.track_keyword("example.com", "best rust framework", Some(3), Some("https://example.com/rust"), "ddg", "duckduckgo-html").unwrap();
         assert_eq!(delta2.prev_rank, Some(5));
         assert_eq!(delta2.curr_rank, Some(3));
+    }
+
+    #[test]
+    fn test_rank_observations_carry_provenance() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("prov.db");
+        let mut db = DbStore::open_at(db_path.to_str().unwrap()).unwrap();
+        db.track_keyword("x.test", "q", Some(4), Some("https://x.test/"), "tavily", "tavily-search").unwrap();
+        db.track_keyword("x.test", "q", None, None, "ddg", "duckduckgo-html").unwrap();
+        let trail = db.observation_trail("x.test", "q").unwrap();
+        assert_eq!(trail.len(), 2);
+        assert_eq!(trail[0], (None, "ddg".into(), "duckduckgo-html".into()));
+        assert_eq!(trail[1], (Some(4), "tavily".into(), "tavily-search".into()));
     }
 
     #[test]
@@ -708,8 +721,8 @@ Sitemap: https://example.com/sitemap.xml
         assert_eq!(RULES.len(), 53);
         assert!(RULES.iter().all(|r| crate::rules::rule(r.id).is_some()));
         let findings = vec![
-            Finding { rule_id: "R01".into(), area: Area::Crawl, severity: Severity::High, scope: "https://x.test/a".into(), evidence: "HTTP 404".into(), fix: "Restore the target.".into() },
-            Finding { rule_id: "R42".into(), area: Area::Performance, severity: Severity::Medium, scope: "https://x.test/a".into(), evidence: "900ms".into(), fix: "Cut server time.".into() },
+            Finding { rule_id: "R01".into(), area: Area::Crawl, severity: Severity::High, scope: "https://x.test/a".into(), evidence: "HTTP 404".into(), fix: "Restore the target.".into(), kind: "fact".into(), observed_at: 1, source: "t".into() },
+            Finding { rule_id: "R42".into(), area: Area::Performance, severity: Severity::Medium, scope: "https://x.test/a".into(), evidence: "900ms".into(), fix: "Cut server time.".into(), kind: "fact".into(), observed_at: 1, source: "t".into() },
         ];
         let mut totals = std::collections::HashMap::new();
         totals.insert(Area::Crawl, 10);
@@ -830,8 +843,12 @@ Sitemap: https://example.com/sitemap.xml
         std::fs::write(dir.path().join("p.md"), "# T\n\nshort\n").unwrap();
         let rep = crate::audit::with_findings(crate::audit::audit_path(dir.path().to_str().unwrap()).unwrap());
         assert!(rep.findings.iter().any(|f| f.rule_id == "R18"));
+        let thin = rep.findings.iter().find(|f| f.rule_id == "R18").unwrap();
+        assert_eq!(thin.kind, "heuristic");
+        assert_eq!(thin.source, "local-audit");
+        assert!(thin.observed_at > 0);
         let csv = crate::rules::to_csv(&rep.findings);
-        assert!(csv.starts_with("rule,area,severity,scope,evidence\n"));
+        assert!(csv.starts_with("rule,area,severity,kind,observed_at,source,scope,evidence\n"));
     }
 
     #[test]
@@ -910,6 +927,9 @@ Sitemap: https://example.com/sitemap.xml
             scope: "s".into(),
             evidence: "e".into(),
             fix: "f".into(),
+            kind: "fact".into(),
+            observed_at: 1,
+            source: "t".into(),
         };
         let findings = vec![mk("R19"), mk("R09"), mk("R42")];
         let blocked = blocking_findings(&findings);
@@ -952,6 +972,9 @@ Sitemap: https://example.com/sitemap.xml
                 scope: "x.html".into(),
                 evidence: "e".into(),
                 fix: "f".into(),
+                kind: "fact".into(),
+                observed_at: 1,
+                source: "t".into(),
             }],
         };
         let base = mk(50.0, "R09");
@@ -1339,6 +1362,23 @@ Sitemap: https://example.com/sitemap.xml
         assert!(rep.findings.iter().any(|f| f.rule_id == "R25"), "orphans must emit R25");
         assert!(rep.areas.iter().any(|a| a.area == crate::rules::Area::Links), "Links must score when R25 fires");
         assert!(!rep.areas.iter().any(|a| a.area == crate::rules::Area::OnPage), "phantom OnPage must stay out");
+    }
+
+    #[test]
+    fn test_gate_fixtures_good_passes_broken_fails() {
+        let good = crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/good").unwrap());
+        assert!(
+            crate::rules::blocking_findings(&good.findings).is_empty(),
+            "good fixture must have zero blocking findings: {:?}",
+            crate::rules::blocking_findings(&good.findings)
+                .iter()
+                .map(|f| f.rule_id.clone())
+                .collect::<Vec<_>>()
+        );
+        let bad = crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/broken").unwrap());
+        let blocked = crate::rules::blocking_findings(&bad.findings);
+        assert!(blocked.iter().any(|f| f.rule_id == "R09"), "broken fixture must fire R09");
+        assert!(blocked.iter().any(|f| f.rule_id == "R11"), "broken fixture must fire R11");
     }
 
     #[test]

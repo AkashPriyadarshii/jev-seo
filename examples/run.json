@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "tool": {
+    "name": "jev-seo",
+    "version": "0.1.1"
+  },
+  "run": {
+    "finished_at_unix_ms": 1790219441246
+  },
+  "target": "tests/fixtures/good",
+  "command": "audit",
+  "score": {
+    "score": 82,
+    "grade": "B",
+    "kind": "pass-rate"
+  },
+  "completeness": {
+    "full": false,
+    "notes": [
+      "Jev not assessed (no TYPESAFE_API_KEY or not requested)",
+      "2 files walked"
+    ]
+  },
+  "citations": {
+    "action_ids": [
+      "RULE-R18",
+      "RULE-R24"
+    ],
+    "rule_ids": [
+      "R18",
+      "R24"
+    ]
+  },
+  "ledger": {
+    "schema_version": "1.0",
+    "command": "audit",
+    "target": "tests/fixtures/good",
+    "jev_key_present": true,
+    "jev_requests": 0,
+    "jev_input_tokens": 0,
+    "jev_failed": 0,
+    "jev_cost_usd": 0.0,
+    "jev_budget_usd": 0.25,
+    "jev_skipped_budget": 0,
+    "jev_model": "unknown",
+    "jev_question_version": "2026-09-23.a1",
+    "fetch_credits_spent": 0,
+    "fetch_credit_cap": 0,
+    "paid_backends_used": [],
+    "notes": []
+  },
+  "validation": {
+    "ok": true,
+    "unknown_action_ids": [],
+    "unknown_rule_ids": [],
+    "unknown_citations_in_text": [],
+    "checked_texts": 1
+  }
+}
