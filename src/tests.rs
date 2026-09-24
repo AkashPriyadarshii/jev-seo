@@ -875,9 +875,46 @@ Sitemap: https://example.com/sitemap.xml
         use crate::actions::{to_csv, Action};
         let a = vec![Action::new("RULE-R19", 2, 2, "AI slop markers (2 hits)", "index.html, about.html".into())];
         let csv = to_csv(&a);
-        assert!(csv.starts_with("id,priority,effort_band,impact,quick_win,title,evidence\n"));
+        assert!(csv.starts_with("id,priority,effort_band,impact,quick_win,gate,title,evidence\n"));
         assert!(csv.contains("RULE-R19"));
         assert!(csv.contains("about a day"));
+        assert!(csv.contains(",advisory,"));
+    }
+
+    #[test]
+    fn test_gate_split_covers_registry() {
+        use crate::rules::{gate, Gate, RULES};
+        assert_eq!(RULES.len(), 53);
+        let blocking: Vec<&&str> = RULES
+            .iter()
+            .filter(|r| gate(r.id) == Gate::Blocking)
+            .map(|r| &r.id)
+            .collect();
+        assert_eq!(blocking.len(), 20, "blocking set changed: {:?}", blocking);
+        for id in ["R01", "R09", "R11", "R33", "R36", "R47", "RULE-R02"] {
+            assert_eq!(gate(id), Gate::Blocking, "{id}");
+        }
+        for id in ["R10", "R19", "R20", "R24", "R41", "R42", "R51", "R99", "CRAWL-001"] {
+            assert_eq!(gate(id), Gate::Advisory, "{id}");
+        }
+    }
+
+    #[test]
+    fn test_blocking_findings_selects_only_blockers() {
+        use crate::rules::{blocking_findings, Finding};
+        use crate::rules::{Area, Severity};
+        let mk = |id: &str| Finding {
+            rule_id: id.into(),
+            area: Area::Content,
+            severity: Severity::Medium,
+            scope: "s".into(),
+            evidence: "e".into(),
+            fix: "f".into(),
+        };
+        let findings = vec![mk("R19"), mk("R09"), mk("R42")];
+        let blocked = blocking_findings(&findings);
+        assert_eq!(blocked.len(), 1);
+        assert_eq!(blocked[0].rule_id, "R09");
     }
 
     #[test]

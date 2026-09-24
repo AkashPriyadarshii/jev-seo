@@ -414,7 +414,7 @@ jev-seo audit docs/ --min-pass 40
 jev-seo audit docs/ --no-jev --jev-budget 0
 ```
 
-Nonzero exit under your floor. `--no-jev` and `--jev-budget 0` keep CI offline for semantics. Workflow: `.github/workflows/seo-gate.yml`.
+Two gates, different jobs. `--min-pass` exits nonzero under your score floor. `--fail-on` (default `blocking`) exits nonzero only on deterministic blocking findings: missing titles, broken links, invalid JSON-LD, missing canonicals. Judgment calls (slop markers, length windows, lab vitals) print as `warn` and never fail the build alone, so a rule Google quietly changes cannot become the flaky test everyone bypasses. `--fail-on all` restores fail-on-anything. `--no-jev` and `--jev-budget 0` keep CI offline for semantics. Workflow: `.github/workflows/seo-gate.yml`. The full blocking list lives in `src/rules.rs` (`gate()`); every action line, CSV row, and `explain` card carries its class.
 
 ### 8. XML sitemap and hreflang
 
@@ -463,7 +463,7 @@ Drop `narrative.json` next to exports (or in `--manifest`). Required keys: `exec
 |---|---|---|
 | `keywords <query>` | Autocomplete discovery and Jev intent classification | `--json` |
 | `query <query>` | Live SERP scrape, Jev relevance rerank, gap analysis | `--limit <n>`, `--provider auto\|ddg\|tavily\|dfs`, `--depth`, `--topic`, `--json` |
-| `audit <path>` | Directory or file audit under 53 rules; orphans, thin, cannibalization | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--actions-csv <path>`, `--pairs-csv <path>`, `--rescore <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>` |
+| `audit <path>` | Directory or file audit under 53 rules; orphans, thin, cannibalization | `--target-query <query>`, `--json`, `--min-pass <pct>`, `--fail-on blocking\|all`, `--html <path>`, `--pdf <path>`, `--md <path>`, `--csv <path>`, `--actions-csv <path>`, `--pairs-csv <path>`, `--rescore <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>` |
 | `geo <target>` | GEO citation score 1-10, five-dimension composite, trend | `--query <query>`, `--json`, `--jev-budget <usd>` |
 | `schema <target>` | JSON-LD structural and deprecation validator | `--json` |
 | `robots <domain>` | Robots.txt and AI crawler permission auditor | `--json` |
@@ -487,6 +487,7 @@ Usage: jev-seo.exe audit [OPTIONS] <PATH>
 Options:
       --json
       --min-pass <MIN_PASS>       Exit nonzero when pass rate falls below this percent (CI gate)
+      --fail-on <FAIL_ON>         Which findings fail the build: blocking or all [default: blocking]
       --html <PATH>               Write a single-file HTML report to this path
       --pdf <PATH>                Write a PDF report to this path
       --md <PATH>                 Write a Markdown report to this path
@@ -560,7 +561,7 @@ Real output in the repo, not mockups:
 
 **Which pages does a crawl check?** Up to `--max-pages` (default 50), seeded from `/sitemap.xml` when present, robots.txt honored.
 
-**Can CI fail on it?** Yes. `audit --min-pass` exits nonzero under your floor. `crawl --diff` reports drift against the last SQLite snapshot.
+**Can CI fail on it?** Yes. `audit --min-pass` exits nonzero under your floor, and `--fail-on blocking` (the default) fails only on deterministic rules. `crawl --diff` reports drift against the last SQLite snapshot.
 
 **Do I need paid APIs?** No. Paid backends are opt-in per flag. Free DuckDuckGo paths never call them.
 

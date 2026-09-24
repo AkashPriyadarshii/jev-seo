@@ -30,7 +30,7 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 
 1. Crawl before judging. Never score pages the crawl has not fetched.
 2. Quote the completeness line alongside any score.
-3. Gate deploys with `audit --min-pass` or crawl health deltas via `--diff`, not vibes.
+3. Gate deploys with `audit --min-pass` or crawl health deltas via `--diff`, not vibes. `--fail-on blocking` (default) fails only on deterministic rules; judgment calls warn.
 4. Export findings with `--csv` for spreadsheets; rebuild past runs with `--rescore`, no spend.
 4. Jev needs `TYPESAFE_API_KEY`. Without it the tool still runs; semantic sections report local-only output.
 5. Keep crawls polite: default 50 pages, 8 workers, robots.txt honored. Raise `--max-pages` deliberately.
