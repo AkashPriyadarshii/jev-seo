@@ -107,6 +107,8 @@ pub fn page_audit_extras() -> serde_json::Value {
             } },
         "clear_next_step": { "type": "noul", "instructions": "Does `page` invite one obvious next action that fits the page?",
             "criteria": {"true": "Concrete action: contact, buy, read next, install, try", "false": "Ends with no action or only generic nav"} },
+        "query_fit": { "type": "noul", "instructions": "Does `page` deliver what the target query promises, or does a visitor land on the wrong intent?",
+            "criteria": {"true": "Page content matches the query's promise", "false": "Mismatch: ad or result promised something else"} },
         "importance": { "type": "score", "instructions": "How important is this page to the site owner's goals?",
             "criteria": ["Utility or legal page with no customer role", "Supporting page that helps a little", "Useful page that informs or reassures buyers", "Core page that earns leads or sales"] }
     })

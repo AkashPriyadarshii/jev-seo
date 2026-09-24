@@ -62,11 +62,40 @@ impl DbStore {
                    broken INTEGER NOT NULL,
                    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
                );
-               CREATE INDEX IF NOT EXISTS idx_rank_history_keyword ON rank_history(keyword_id);
-               CREATE INDEX IF NOT EXISTS idx_geo_history_target ON geo_history(target, term);
-               CREATE INDEX IF NOT EXISTS idx_crawl_snapshots_url ON crawl_snapshots(start_url);",
+                -- Provenance per observation: a Tavily top-20 and a DDG top-30
+                -- must never merge into one bare number.
+                CREATE TABLE IF NOT EXISTS rank_observations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    keyword_id INTEGER NOT NULL REFERENCES keywords(id),
+                    position INTEGER,
+                    serp_url TEXT,
+                    provider TEXT NOT NULL DEFAULT 'ddg',
+                    engine TEXT NOT NULL DEFAULT 'duckduckgo-html',
+                    observed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_rank_history_keyword ON rank_history(keyword_id);
+                CREATE INDEX IF NOT EXISTS idx_geo_history_target ON geo_history(target, term);
+                CREATE INDEX IF NOT EXISTS idx_crawl_snapshots_url ON crawl_snapshots(start_url);
+                CREATE INDEX IF NOT EXISTS idx_rank_obs_keyword ON rank_observations(keyword_id);",
         )?;
         Ok(Self { conn })
+    }
+
+    /// Record one observation with provenance. Every row says who measured,
+    /// with what engine, and when: rank numbers without that are anecdotes.
+    pub fn record_observation(
+        &self,
+        keyword_id: i64,
+        position: Option<usize>,
+        serp_url: Option<&str>,
+        provider: &str,
+        engine: &str,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO rank_observations (keyword_id, position, serp_url, provider, engine) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![keyword_id, position.map(|p| p as i64), serp_url, provider, engine],
+        )?;
+        Ok(())
     }
 
     pub fn track_keyword(
@@ -75,6 +104,8 @@ impl DbStore {
         term: &str,
         curr_rank: Option<usize>,
         serp_url: Option<&str>,
+        provider: &str,
+        engine: &str,
     ) -> Result<RankDelta> {
         let tx = self.conn.transaction()?;
         tx.execute(
@@ -104,6 +135,10 @@ impl DbStore {
             "INSERT INTO rank_history (keyword_id, position, serp_url) VALUES (?1, ?2, ?3)",
             params![keyword_id, curr_pos_i64, serp_url],
         )?;
+        tx.execute(
+            "INSERT INTO rank_observations (keyword_id, position, serp_url, provider, engine) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![keyword_id, curr_pos_i64, serp_url, provider, engine],
+        )?;
         tx.commit()?;
 
         Ok(RankDelta {
@@ -113,6 +148,23 @@ impl DbStore {
             curr_rank,
             serp_url: serp_url.map(|s| s.to_string()),
         })
+    }
+
+    /// Provenance trail for a tracked term, newest first: position, provider,
+    /// engine. Powers per-engine drift views without touching rank_history.
+    pub fn observation_trail(&self, domain: &str, term: &str) -> Result<Vec<(Option<usize>, String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT o.position, o.provider, o.engine FROM rank_observations o
+             JOIN keywords k ON k.id = o.keyword_id
+             WHERE k.domain = ?1 AND k.term = ?2 ORDER BY o.id DESC",
+        )?;
+        let rows = stmt.query_map(params![domain, term], |row| {
+            let pos: Option<i64> = row.get(0)?;
+            let provider: String = row.get(1)?;
+            let engine: String = row.get(2)?;
+            Ok((pos.map(|p| p as usize), provider, engine))
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(anyhow::Error::from)
     }
 
     /// Record a GEO score, returning the previous score for the delta line.

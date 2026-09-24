@@ -70,15 +70,26 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
     }
 }
 
+/// Tracked AI crawlers: (user-agent, purpose). Training bots feed model
+/// weights; search bots drive citations and answers. Blocking GPTBot does NOT
+/// block ChatGPT Search (OAI-SearchBot), and Google-Extended never affected
+/// AI Overviews: the categories below keep that distinction visible.
 pub const TRACKED_AI_BOTS: &[(&str, &str)] = &[
-    ("GPTBot", "OpenAI model training foundation data"),
-    ("ChatGPT-User", "ChatGPT real-time browsing"),
-    ("ClaudeBot", "Anthropic Claude model training"),
-    ("anthropic-ai", "Anthropic search & web indexing"),
-    ("PerplexityBot", "Perplexity generative search citation indexer"),
-    ("Google-Extended", "Google Gemini & Vertex AI training data"),
-    ("Bytespider", "ByteDance AI & TikTok search crawler"),
-    ("CCBot", "Common Crawl open foundation training set"),
+    ("GPTBot", "training: OpenAI model training foundation data"),
+    ("OAI-SearchBot", "search: ChatGPT search retrieval"),
+    ("ChatGPT-User", "search: ChatGPT real-time browsing"),
+    ("ClaudeBot", "training: Anthropic Claude model training"),
+    ("Claude-SearchBot", "search: Claude search retrieval"),
+    ("anthropic-ai", "search: Anthropic search and web indexing"),
+    ("PerplexityBot", "search: Perplexity generative search citation indexer"),
+    ("Google-Extended", "training: Gemini and Vertex AI training data token"),
+    ("Googlebot", "search: Google Search crawling (includes AI Overviews grounding)"),
+    ("Google-CloudVertexBot", "search: Vertex AI agent fetch"),
+    ("Applebot", "search: Apple Search and Siri retrieval"),
+    ("Applebot-Extended", "training: Apple intelligence training data token"),
+    ("Amazonbot", "search: Alexa and Amazon retrieval"),
+    ("Bytespider", "training: ByteDance AI and TikTok search crawler"),
+    ("CCBot", "training: Common Crawl open foundation training set"),
 ];
 
 #[derive(Debug, Clone, Default)]

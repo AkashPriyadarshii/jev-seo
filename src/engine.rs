@@ -116,22 +116,36 @@ impl JevClient {
                 crate::manifest::jev_budget_usd()
             ));
         }
-        let resp = ureq::post(&self.endpoint)
-            .set("Authorization", &format!("Bearer {}", self.api_key))
-            .set("Content-Type", "application/json")
-            .timeout(std::time::Duration::from_secs(12))
-            .send_string(&body)
-            .context("Failed to communicate with TypeSafe Jev API");
-        match &resp {
-            Ok(_) => {
-                crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
+        // Transient 429/5xx get two more tries with backoff. Every attempt
+        // counts as a request: the ledger bills attempts, not wishes.
+        let waits = [500u64, 1500u64];
+        for attempt in 0..=waits.len() {
+            let raw = ureq::post(&self.endpoint)
+                .set("Authorization", &format!("Bearer {}", self.api_key))
+                .set("Content-Type", "application/json")
+                .timeout(std::time::Duration::from_secs(12))
+                .send_string(&body);
+            let retryable = matches!(&raw, Err(ureq::Error::Status(code, _)) if *code == 429 || (500..=504).contains(code));
+            let resp = raw.context("Failed to communicate with TypeSafe Jev API");
+            match &resp {
+                Ok(_) => {
+                    crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
+                    return resp;
+                }
+                Err(_) => {
+                    crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
+                    crate::manifest::JEV_FAILED.fetch_add(1, Ordering::Relaxed);
+                }
             }
-            Err(_) => {
-                crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
-                crate::manifest::JEV_FAILED.fetch_add(1, Ordering::Relaxed);
+            if retryable {
+                if let Some(ms) = waits.get(attempt) {
+                    std::thread::sleep(std::time::Duration::from_millis(*ms));
+                    continue;
+                }
             }
+            return resp;
         }
-        resp
+        unreachable!("retry loop always returns")
     }
     /// Same as fanout_eval plus command-specific questions merged into the one
     /// request. Answers land in `extra` for code to consume.

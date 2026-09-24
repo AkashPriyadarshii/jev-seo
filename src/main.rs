@@ -89,6 +89,12 @@ enum Commands {
         /// Which findings fail the build: blocking (deterministic, default) or all
         #[arg(long, default_value = "blocking")]
         fail_on: String,
+        /// Comma-separated rule ids that always fail (e.g. R31,R36), any gate mode
+        #[arg(long)]
+        forbid: Option<String>,
+        /// Fail when more than N Critical-severity findings fire
+        #[arg(long)]
+        max_critical: Option<usize>,
         /// Write a single-file HTML report to this path
         #[arg(long, value_name = "PATH")]
         html: Option<String>,
@@ -552,7 +558,7 @@ fn main() -> Result<()> {
             }
             print_jev_spend_line();
         }
-        Commands::Audit { path, target_query, json, min_pass, fail_on, html, pdf, md, csv, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Audit { path, target_query, json, min_pass, fail_on, forbid, max_critical, html, pdf, md, csv, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -762,6 +768,35 @@ fn main() -> Result<()> {
                 other => anyhow::bail!("unknown --fail-on '{other}' (blocking, all)"),
             }
 
+            // Invariant engine: explicit forbids and a critical cap sit above
+            // the class gate, so deploys can name their non-negotiables.
+            if let Some(list) = forbid.as_deref() {
+                let wanted: Vec<String> = list
+                    .split(',')
+                    .map(|s| s.trim().trim_start_matches("RULE-").to_ascii_uppercase())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                let hit: Vec<String> = dir_report
+                    .findings
+                    .iter()
+                    .filter(|f| wanted.iter().any(|w| f.rule_id.to_ascii_uppercase() == *w))
+                    .map(|f| format!("{} ({})", f.rule_id, f.scope))
+                    .collect();
+                if !hit.is_empty() {
+                    anyhow::bail!("forbidden findings fired: {}", hit.join(", "));
+                }
+            }
+            if let Some(max) = max_critical {
+                let n = dir_report
+                    .findings
+                    .iter()
+                    .filter(|f| f.severity == rules::Severity::Critical)
+                    .count();
+                if n > max {
+                    anyhow::bail!("{n} critical findings exceed --max-critical {max}");
+                }
+            }
+
             if json {
                 println!("{}", serde_json::to_string_pretty(&dir_report)?);
                 return Ok(());
@@ -870,7 +905,7 @@ fn main() -> Result<()> {
                 } else {
                     println!("\n{}", "Top Actions:".cyan().bold());
                     for a in crate::actions::top(&actions, 5) {
-                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
+                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                     }
                 }
             } else if let Some(report) = dir_report.reports.first() {
@@ -903,7 +938,7 @@ fn main() -> Result<()> {
                 if !failed.is_empty() {
                     println!("\n{}", "Top Actions:".cyan().bold());
                     for a in crate::actions::top(&failed, 5) {
-                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
+                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                     }
                 }
 
@@ -1125,7 +1160,12 @@ fn main() -> Result<()> {
             let target_url = position.and_then(|p| items.get(p - 1)).map(|i| i.url.as_str());
 
             let mut db = rank::DbStore::open()?;
-            let delta = db.track_keyword(&domain, &query, position, target_url)?;
+            let (prov_name, engine_name) = match served {
+                serp::Provider::Tavily => ("tavily", "tavily-search"),
+                serp::Provider::Dfs => ("dfs", "dataforseo-serp"),
+                _ => ("ddg", "duckduckgo-html"),
+            };
+            let delta = db.track_keyword(&domain, &query, position, target_url, prov_name, engine_name)?;
 
             println!("\n{}", "Rank Tracking Result:".cyan().bold());
             println!("  Domain:   {}", delta.domain);
@@ -1385,7 +1425,7 @@ fn main() -> Result<()> {
             } else {
                 println!("\n{}", "Top Actions:".cyan().bold());
                 for a in crate::actions::top(&report.actions, 5) {
-                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
+                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                 }
             }
             if diff {
@@ -1513,11 +1553,12 @@ fn main() -> Result<()> {
             } else {
                 println!("\n{}", "Top Actions:".cyan().bold());
                 for a in crate::actions::top(&report.actions, 5) {
-                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
+                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), action_kind_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                 }
             }
             let completeness = manifest::completeness_llms(&report);
             manifest::print_banner(&completeness);
+            println!("  {}", "Scores plumbing for ChatGPT, Perplexity, and Claude. Google Search ignores llms.txt.".dimmed());
             println!("\n{}", "Checks:".bold());
             for c in &report.checks {
                 let badge = if c.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
@@ -1878,6 +1919,17 @@ fn paid_backend_sources(pages: &[crawl::PageRecord]) -> Vec<String> {
         .collect()
 }
 
+/// Truth-class tag: RULE- ids resolve fact/heuristic against the registry.
+/// Bespoke ids stay untagged. Jev semantic judgments never become actions;
+/// they print with model + confidence in the suite lines.
+fn action_kind_tag(action_id: &str) -> &'static str {
+    let bare = action_id.strip_prefix("RULE-").unwrap_or(action_id);
+    if rules::rule(bare).is_none() {
+        return "";
+    }
+    rules::truth_kind(bare)
+}
+
 /// Gate tag for action lines: RULE- ids resolve against the registry,
 /// bespoke ids (CRAWL-001) default advisory, never blocking on unknown.
 fn action_gate_tag(action_id: &str) -> String {
@@ -1914,6 +1966,7 @@ fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {    le
         "geo_directness",
         "answer_first",
         "clear_next_step",
+        "query_fit",
         "entity_clarity",
         "injection_risk",
     ];

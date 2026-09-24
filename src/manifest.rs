@@ -139,6 +139,8 @@ pub struct CitationSet {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunManifest {
     pub schema_version: String,
+    #[serde(default)]
+    pub rule_set_version: String,
     pub tool: ToolMeta,
     pub run: RunMeta,
     pub target: String,
@@ -405,6 +407,7 @@ impl<'a> ManifestInput<'a> {
         let validation = validate_report(self.findings, self.actions, self.texts);
         RunManifest {
             schema_version: SCHEMA_VERSION.into(),
+            rule_set_version: crate::rules::RULE_SET_VERSION.into(),
             tool: ToolMeta {
                 name: "jev-seo".into(),
                 version: env!("CARGO_PKG_VERSION").into(),
@@ -563,6 +566,9 @@ mod manifest_tests {
             scope: "s".into(),
             evidence: "e".into(),
             fix: r.fix.into(),
+            kind: "fact".into(),
+            observed_at: 1,
+            source: "t".into(),
         }
     }
 
@@ -624,6 +630,9 @@ mod manifest_tests {
             scope: "x".into(),
             evidence: "y".into(),
             fix: "z".into(),
+            kind: "fact".into(),
+            observed_at: 1,
+            source: "t".into(),
         }];
         let actions = vec![];
         assert!(validate(&findings, &actions, &[]).is_err());

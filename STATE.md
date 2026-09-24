@@ -12,7 +12,8 @@
 - [x] Phase A-addition (`6f12e54`): escapes, question versioning, eval log, runner-up flags, `link`, meta verdict
 - [x] Phase B truthfulness (`98c7bfb`): upgrade math, spend truth, rank labels, audit precision, provider honesty, R25/R33/R24/R41
 - [x] Blocking vs advisory gates: 20 rules fail CI, 33 warn; `--fail-on`, tagged actions/CSV/explain
-- [x] 99 tests green, clippy clean
+- [x] Wave 1 (`wave-1`): provenance, truth tags, llms honesty, 15-bot registry, rank provenance, forbid/max-critical, query_fit, retry, fixtures, examples, integrations doc, Princeton trio
+- [x] 103 tests green, clippy clean
 
 ### Shipped on master (local + pushed docs)
 - [x] Phase 0-4 skeleton, modules, crawl, llms, doctor, HTML reports (v0.1.1 on crates.io)
@@ -24,7 +25,7 @@
 - [x] W4 pair cannibalization A×B, MCP `seo_explain`/`seo_report` (13 tools), README matrices
 - [x] W5 single PDF builder, drop SpreadsheetML, drop launch DESIGN.md, reword session commits
 - [x] README launch rewrite (What's new, full matrices, 22 Oct date, build-from-source)
-- [x] 99 tests green, clippy clean
+- [x] 103 tests green, clippy clean
 
 ### Review fixes (two subagent passes, same session)
 - [x] Aligned display windows to rule windows (title 30-60, desc 120-160)

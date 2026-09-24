@@ -44,7 +44,48 @@ pub struct Finding {
     pub scope: String,
     pub evidence: String,
     pub fix: String,
+    /// fact = directly measured, heuristic = threshold guess. Jev semantic
+    /// judgments never become Findings; they print with model + confidence.
+    #[serde(default = "fact_kind")]
+    pub kind: String,
+    /// Unix ms when the finding was produced.
+    #[serde(default)]
+    pub observed_at: u64,
+    /// Pipeline that produced it: rule-engine default, stamped local-audit
+    /// or live-crawl by the check entry points.
+    #[serde(default = "engine_source")]
+    pub source: String,
 }
+
+fn fact_kind() -> String {
+    "fact".into()
+}
+
+fn engine_source() -> String {
+    "rule-engine".into()
+}
+
+pub fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Truth class per rule: heuristic = threshold or similarity guess that can
+/// be wrong on healthy pages (thin, slop, stems, openings). Everything else
+/// is a directly measured fact.
+pub fn truth_kind(rule_id: &str) -> &'static str {
+    let bare = rule_id.strip_prefix("RULE-").unwrap_or(rule_id);
+    match bare.to_ascii_uppercase().as_str() {
+        "R18" | "R19" | "R20" | "R23" | "R24" | "R41" => "heuristic",
+        _ => "fact",
+    }
+}
+
+/// Rule-set build. Bump on ANY registry change (new rule, reworded fix,
+/// reclassified gate) so audits months apart stay comparable.
+pub const RULE_SET_VERSION: &str = "2026.09";
 
 /// The registry. Ids are stable API: reports, docs, and tests cite them.
 pub const RULES: &[Rule] = &[
@@ -90,7 +131,7 @@ pub const RULES: &[Rule] = &[
     Rule { id: "R35", area: Area::Structured, severity: Severity::Low, effort: 1, title: "Missing Open Graph tags", fix: "Add og:title, description, and image." },
     Rule { id: "R36", area: Area::Canonical, severity: Severity::Low, effort: 1, title: "Missing canonical", fix: "Point every page at its canonical URL." },
     // AI access (5)
-    Rule { id: "R37", area: Area::AiAccess, severity: Severity::Medium, effort: 1, title: "No llms.txt", fix: "Ship /llms.txt so answer engines can read the site." },
+    Rule { id: "R37", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "No llms.txt", fix: "Ship /llms.txt for ChatGPT/Perplexity/Claude plumbing; Google Search ignores the file." },
     Rule { id: "R38", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "AI crawlers unnamed", fix: "Name AI crawlers explicitly in robots.txt." },
     Rule { id: "R39", area: Area::AiAccess, severity: Severity::High, effort: 1, title: "AI training blocked", fix: "Allow the crawlers whose citations are wanted." },
     Rule { id: "R40", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "Sitemap not advertised", fix: "Add the Sitemap line to robots.txt." },
@@ -278,14 +319,17 @@ pub fn actions_for(findings: &[Finding]) -> Vec<crate::actions::Action> {    let
 
 /// Spreadsheet-ready export. Opens in Excel as the action tracker.
 pub fn to_csv(findings: &[Finding]) -> String {
-    let mut s = String::from("rule,area,severity,scope,evidence\n");
+    let mut s = String::from("rule,area,severity,kind,observed_at,source,scope,evidence\n");
     for f in findings {
         let cell = |v: &str| format!("\"{}\"", v.replace('"', "\"\""));
         s.push_str(&format!(
-            "{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{}\n",
             f.rule_id,
             label(&f.area),
             format!("{:?}", f.severity).to_lowercase(),
+            f.kind,
+            f.observed_at,
+            f.source,
             cell(&f.scope),
             cell(&f.evidence)
         ));
@@ -328,6 +372,9 @@ fn mk(rule_id: &'static str, scope: String, evidence: String) -> Finding {
         scope,
         evidence,
         fix: r.fix.to_string(),
+        kind: truth_kind(rule_id).to_string(),
+        observed_at: now_ms(),
+        source: engine_source(),
     }
 }
 
@@ -415,6 +462,9 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
     }
     if rep.capped {
         out.push(mk("R07", rep.start_url.clone(), format!("capped at {} pages", rep.pages_crawled)));
+    }
+    for f in &mut out {
+        f.source = "live-crawl".into();
     }
     out
 }
@@ -516,6 +566,9 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
     }
     for f in &rep.orphan_pages {
         out.push(mk("R25", f.clone(), "0 inbound links".into()));
+    }
+    for f in &mut out {
+        f.source = "local-audit".into();
     }
     out
 }
