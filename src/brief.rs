@@ -33,7 +33,34 @@ pub fn generate_brief(topic: &str, limit: usize) -> Result<ContentBrief> {
 pub fn generate_brief_with(topic: &str, limit: usize, provider: serp::Provider) -> Result<ContentBrief> {
     let (competitors, _) = serp::scrape_serp_with(topic, limit, provider)?;
 
-    let competitor_benchmarks: Vec<CompetitorBenchmark> = competitors
+    // Excluded domains: encyclopedias, social feeds, marketplaces, job boards,
+    // and tool pages teach nothing about beating real editorial competitors.
+    // Filtering them keeps gap scoring honest.
+    const EXCLUDED: &[&str] = &[
+        "wikipedia.org",
+        "facebook.com",
+        "twitter.com",
+        "x.com",
+        "instagram.com",
+        "linkedin.com",
+        "reddit.com",
+        "youtube.com",
+        "amazon.",
+        "ebay.com",
+        "indeed.com",
+        "glassdoor.com",
+        "g2.com",
+        "capterra.com",
+    ];
+    let kept: Vec<&serp::SerpItem> = competitors
+        .iter()
+        .filter(|c| {
+            let u = c.url.to_ascii_lowercase();
+            !EXCLUDED.iter().any(|d| u.contains(d))
+        })
+        .collect();
+
+    let competitor_benchmarks: Vec<CompetitorBenchmark> = kept
         .iter()
         .map(|c| CompetitorBenchmark {
             rank: c.position,
@@ -111,7 +138,7 @@ pub fn generate_brief_with(topic: &str, limit: usize, provider: serp::Provider) 
     ];
 
     let geo_opening_prescription = format!(
-        "Draft the opening 134-167 words as a self-contained, fact-dense direct answer defining '{}', stating its primary utility, and giving a 1-line copy-paste quickstart. Do not use filler throat-clearers ('In today's fast-paced world...'). Replicated citation lift comes from three moves only: cite authoritative sources with links, add statistics with dates and origins, and quote named experts with titles.",
+        "Draft the opening 134-167 words as a self-contained, fact-dense direct answer defining '{}', stating its primary utility, and giving a 1-line copy-paste quickstart. Do not use filler throat-clearers ('In today's fast-paced world...'). Replicated citation lift comes from three moves only: cite authoritative sources with links, add statistics with dates and origins, and quote named experts with titles. Place the primary keyword in title, H1, slug, meta description, first 100 words, and one image alt; use 5-8 secondary and 10-15 semantic variants naturally. No density quotas.",
         clean_topic
     );
 

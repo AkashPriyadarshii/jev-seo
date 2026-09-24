@@ -42,6 +42,7 @@ pub fn page_state(
     description: Option<String>,
     text: String,
     word_count: usize,
+    opening: Option<String>,
 ) -> serde_json::Value {
     json!({
         "query": query,
@@ -49,7 +50,8 @@ pub fn page_state(
             "title": title,
             "description": description,
             "text": text,
-            "word_count": word_count
+            "word_count": word_count,
+            "opening": opening
         }
     })
 }
@@ -64,11 +66,6 @@ impl JevClient {
             api_key: key,
             endpoint: "https://api.typesafe.ai/v1/systemone".to_string(),
         })
-    }
-
-    #[allow(dead_code)]
-    pub fn fanout_eval(&self, state: serde_json::Value) -> Result<AnalysisResult> {
-        self.fanout_eval_with(state, serde_json::json!({}))
     }
 
     /// Pre-execution safety classifier for agent-driven file/URL tools.
@@ -88,12 +85,18 @@ impl JevClient {
         });
         let body: serde_json::Value = match self
             .post(payload)
-            .and_then(|r| r.into_json().map_err(anyhow::Error::from))
+            .and_then(|(r, est)| {
+                r.into_json()
+                    .map_err(anyhow::Error::from)
+                    .map(|b| (b, est))
+            })
         {
-            Ok(b) => b,
+            Ok((b, est)) => {
+                record_usage(&b, est);
+                b
+            }
             Err(_) => return None,
         };
-        record_usage(&body);
         body.get("answers")
             .and_then(|a| a.get("unsafe_target"))
             .and_then(|u| u.get("noul"))
@@ -101,12 +104,13 @@ impl JevClient {
             .map(|p| p >= 0.7)
     }
 
-    fn post(&self, payload: serde_json::Value) -> Result<ureq::Response> {
+    fn post(&self, payload: serde_json::Value) -> Result<(ureq::Response, u64)> {
         let body = payload.to_string();
-        // Hard spend cap before dispatch: estimate tokens from request size.
+        // Reserve before dispatch: parallel calls see each other's estimates
+        // and cannot jointly overshoot the cap. Released on transport failure,
+        // settled against real usage by the caller.
         let est_tokens = (body.len() / 3) as u64;
-        if crate::manifest::jev_budget_exhausted(est_tokens) {
-            crate::manifest::note_budget_skip();
+        if !crate::manifest::reserve_jev_tokens(est_tokens) {
             return Err(anyhow::anyhow!(
                 "Jev budget cap reached (${:.4}); raise --jev-budget to continue",
                 crate::manifest::jev_budget_usd()
@@ -123,23 +127,24 @@ impl JevClient {
                 .send_string(&body);
             let retryable = matches!(&raw, Err(ureq::Error::Status(code, _)) if *code == 429 || (500..=599).contains(code));
             let resp = raw.context("Failed to communicate with TypeSafe Jev API");
-            match &resp {
-                Ok(_) => {
+            match resp {
+                Ok(r) => {
                     crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
-                    return resp;
+                    return Ok((r, est_tokens));
                 }
-                Err(_) => {
+                Err(e) => {
                     crate::manifest::JEV_REQUESTS.fetch_add(1, Ordering::Relaxed);
                     crate::manifest::JEV_FAILED.fetch_add(1, Ordering::Relaxed);
+                    if retryable {
+                        if let Some(ms) = waits.get(attempt) {
+                            std::thread::sleep(std::time::Duration::from_millis(*ms));
+                            continue;
+                        }
+                    }
+                    crate::manifest::release_jev_tokens(est_tokens);
+                    return Err(e);
                 }
             }
-            if retryable {
-                if let Some(ms) = waits.get(attempt) {
-                    std::thread::sleep(std::time::Duration::from_millis(*ms));
-                    continue;
-                }
-            }
-            return resp;
         }
         unreachable!("retry loop always returns")
     }
@@ -210,10 +215,10 @@ impl JevClient {
             "questions": questions
         });
 
-        let resp = self.post(payload)?;
+        let (resp, est) = self.post(payload)?;
 
         let body: serde_json::Value = resp.into_json()?;
-        record_usage(&body);
+        record_usage(&body, est);
         let answers = body.get("answers").context("Invalid Jev response schema")?;
         let ts_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -241,10 +246,13 @@ impl JevClient {
         let geo_val = geo_obj["score"]
             .as_f64()
             .context("Jev response missing answers.geo_score.score")?;
-        // Score/Choice always carry confidence per the API; a missing value is
-        // unknown, not zero. 0.5 lands in Flag so it prints [verify] and
-        // needs_review surfaces it, instead of forcing a Drop.
-        let geo_confidence = geo_obj["confidence"].as_f64().unwrap_or(0.5);
+        // Score decisiveness comes from the side-of-midpoint probability mass,
+        // not the confidence scalar: a 4-1 split on one side is decisive even
+        // at modest confidence. Falls back to API confidence when the answer
+        // carries no legend/probabilities.
+        let geo_confidence = crate::policy::score_side(geo_obj)
+            .or_else(|| geo_obj["confidence"].as_f64())
+            .unwrap_or(0.5);
         let geo_score = ((geo_val / 4.0 * 9.0) + 1.0).round().clamp(1.0, 10.0) as u32;
 
         let direct_obj = &answers["direct_answer"];
@@ -307,8 +315,9 @@ impl JevClient {
             "state": truncate_state(prefilter_state(state.clone())),
             "questions": crate::policy::injection_question()
         });
-        let body: serde_json::Value = self.post(payload)?.into_json()?;
-        record_usage(&body);
+        let (resp, est) = self.post(payload)?;
+        let body: serde_json::Value = resp.into_json()?;
+        record_usage(&body, est);
         let p = body
             .pointer("/answers/injection_risk/noul")
             .or_else(|| body.pointer("/answers/injection_risk/probability"))
@@ -348,6 +357,38 @@ impl JevClient {
         if let (Some(dst), Some(src)) = (extras.as_object_mut(), page.as_object()) {
             for (k, v) in src {
                 dst.insert(k.clone(), v.clone());
+            }
+        }
+        // Conditional inclusion: never ask about fields the state does not
+        // have. A missing title cannot fit, a missing description cannot match.
+        let has_title = state
+            .pointer("/page/title")
+            .and_then(|t| t.as_str())
+            .is_some_and(|t| !t.trim().is_empty());
+        let has_desc = state
+            .pointer("/page/description")
+            .and_then(|d| d.as_str())
+            .is_some_and(|d| !d.trim().is_empty());
+        if let Some(dst) = extras.as_object_mut() {
+            if !has_title {
+                dst.remove("title_fit");
+            }
+            if !has_desc {
+                dst.remove("meta_fit");
+                dst.remove("meta_verdict");
+            }
+            // Policy pages (privacy, terms, contact) get content and trust
+            // judgments they can never pass: expertise signals do not belong
+            // on legal boilerplate, and asking wastes money.
+            let query = state.get("query").and_then(|q| q.as_str()).unwrap_or("");
+            let stem = query.rsplit(['/', '\\']).next().unwrap_or(query);
+            let stem = stem.split('.').next().unwrap_or(stem).to_ascii_lowercase();
+            if ["privacy", "terms", "terms-of-service", "contact", "legal", "cookies", "cookie-policy", "disclaimer"]
+                .contains(&stem.as_str())
+            {
+                for id in ["page_helpfulness", "page_trust", "page_specificity", "geo_density", "geo_statistics"] {
+                    dst.remove(id);
+                }
             }
         }
         self.fanout_eval_with(state, extras)
@@ -426,6 +467,8 @@ fn prefilter_state(value: serde_json::Value) -> serde_json::Value {
 }
 
 /// Fold API usage into the run ledger (input tokens drive cost at list price).
+/// Settles the pre-dispatch reservation: missing usage blocks charge the
+/// estimate instead of vanishing to zero.
 /// Also pins the resolved model version: thresholds couple to one model's
 /// distribution, so the ledger records which build actually served.
 pub static JEV_MODEL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
@@ -434,14 +477,13 @@ pub fn jev_model() -> &'static str {
     JEV_MODEL.get().map(String::as_str).unwrap_or("unknown")
 }
 
-fn record_usage(body: &serde_json::Value) {
-    let usage = match body.get("usage") {
-        Some(u) if u.is_object() => u.clone(),
-        _ => return,
-    };
-    if let Some(t) = usage.get("input_tokens").and_then(|t| t.as_u64()) {
-        crate::manifest::JEV_INPUT_TOKENS.fetch_add(t, Ordering::Relaxed);
-    }
+fn record_usage(body: &serde_json::Value, est_tokens: u64) {
+    let actual = body
+        .get("usage")
+        .and_then(|u| u.as_object())
+        .and_then(|u| u.get("input_tokens"))
+        .and_then(|t| t.as_u64());
+    crate::manifest::settle_jev_tokens(est_tokens, actual);
     if let Some(m) = body.get("model").and_then(|m| m.as_str()) {
         let _ = JEV_MODEL.set(m.to_string());
     }

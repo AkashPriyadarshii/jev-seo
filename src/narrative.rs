@@ -14,12 +14,7 @@ pub const REQUIRED_KEYS: &[&str] = &["executive_summary", "strengths", "risks", 
 
 /// Action effort 1..4 as shown on plan lines (must match actions::Action.effort).
 pub fn effort_band(effort: u8) -> &'static str {
-    match effort {
-        1 => "hours",
-        2 => "about a day",
-        3 => "several days",
-        _ => "a project",
-    }
+    crate::actions::effort_label(effort)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

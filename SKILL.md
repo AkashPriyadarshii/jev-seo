@@ -19,7 +19,7 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 ## Reading output
 
 - `Health`, `Score`, and `Grade` lines are deterministic 0-100 values with A-F grades.
-- `Top Actions` are ranked by impact with effort bands; ids like `RULE-R01` map to the rule registry (R01-R53) in `src/rules.rs`.
+- `Top Actions` are ranked by impact with effort bands; ids like `RULE-R01` map to the rule registry (R01-R57) in `src/rules.rs`.
 - New since v0.1.1: `explain` any rule id, `report --baseline` diffs, `crawl --vitals` PageSpeed checks, `query --provider dfs` opt-in DataForSEO.
 - Jev contract: Choices offer `insufficient_context`, Flags print the runner-up, every fan-out appends to `~/.jev-seo/eval.jsonl`. Question version rides the spend line.
 - `Completeness` says what was skipped (caps, missing sitemap, missing robots). A capped crawl is a sample, not a verdict.

@@ -334,6 +334,55 @@ pub fn crawl_site(
         .map(|xml| sitemap_seed_urls(&xml))
         .unwrap_or_default();
     let seeded = !sitemap_urls.is_empty();
+    // Pre-flight probes: three cheap fetches that catch what page crawling
+    // cannot. Soft-404 expects non-200 on a junk URL; temp-redirect expects
+    // 301/308 (not 302/307) on scheme and www/apex variants.
+    let mut probes: Vec<(String, String, String)> = Vec::new();
+    let nohop: ureq::Agent = ureq::AgentBuilder::new().redirects(0).build();
+    let junk = format!("{}://{}/jev-seo-{}-not-found", start.scheme(), host, std::process::id());
+    if let Ok(r) = nohop
+        .get(&junk)
+        .timeout(Duration::from_secs(8))
+        .set("User-Agent", CRAWL_UA)
+        .call()
+    {
+        if r.status() == 200 {
+            probes.push(("R56".into(), junk, "missing page returns 200".into()));
+        }
+    }
+    if start.scheme() == "https" {
+        let http_url = format!("http://{}/", host);
+        if let Err(ureq::Error::Status(code, _)) = nohop
+            .get(&http_url)
+            .timeout(Duration::from_secs(8))
+            .set("User-Agent", CRAWL_UA)
+            .call()
+        {
+            if code == 302 || code == 307 {
+                probes.push(("R57".into(), http_url, format!("HTTP→HTTPS uses temporary {}", code)));
+            }
+        }
+    }
+    let alt_host = if let Some(bare) = host.strip_prefix("www.") {
+        bare.to_string()
+    } else {
+        format!("www.{}", host)
+    };
+    let alt_url = format!("{}://{}/", start.scheme(), alt_host);
+    match nohop
+        .get(&alt_url)
+        .timeout(Duration::from_secs(8))
+        .set("User-Agent", CRAWL_UA)
+        .call()
+    {
+        Err(ureq::Error::Status(code, _)) if code == 302 || code == 307 => {
+            probes.push(("R57".into(), alt_url, format!("host variant uses temporary {}", code)));
+        }
+        Ok(r) if r.status() == 200 => {
+            probes.push(("R57".into(), alt_url, "both hosts serve 200 without redirect".into()));
+        }
+        _ => {}
+    }
     let mut seeds: Vec<String> = sitemap_urls
         .into_iter()
         .map(|u| canonicalize(&u))
@@ -534,6 +583,7 @@ pub fn crawl_site(
         capped,
         robots_honored: !robots_body.is_empty(),
         vitals: None,
+        probes,
     }))
 }
 
@@ -549,6 +599,8 @@ pub struct ReportParts {
     pub capped: bool,
     pub robots_honored: bool,
     pub vitals: Option<crate::vitals::Vitals>,
+    /// Pre-flight probe findings (soft-404, temp redirects): rule id, scope, evidence.
+    pub probes: Vec<(String, String, String)>,
 }
 
 pub fn finish_report(parts: ReportParts) -> CrawlReport {
@@ -562,8 +614,18 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
         capped,
         robots_honored,
         vitals,
+        probes,
     } = parts;
-    let broken: Vec<PageRecord> = pages.iter().filter(|p| p.status >= 400 || p.status == 0).cloned().collect();
+    let mut broken: Vec<PageRecord> = Vec::new();
+    for p in pages.iter().filter(|p| p.status >= 400 || p.status == 0).cloned() {
+        // Auth, rate-limit, and block shapes are not broken pages: 401/403
+        // need credentials, 429/999 need patience, and robots-blocked targets
+        // are unknown, never broken.
+        if matches!(p.status, 401 | 403 | 429 | 999) {
+            continue;
+        }
+        broken.push(p);
+    }
     let orphans: Vec<String> = pages
         .iter()
         .filter(|p| p.status == 200 && p.url != start_url && inbound.get(&p.url).copied().unwrap_or(0) == 0)
@@ -589,7 +651,12 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
         vitals,
     };
     // One scoring truth: the rule engine. Totals scope reach per area.
-    let findings = crate::rules::check_crawl(&rep);
+    let mut findings = crate::rules::check_crawl(&rep);
+    for (id, scope, evidence) in &probes {
+        if let Some(f) = crate::rules::probe_finding(id, scope.clone(), evidence.clone()) {
+            findings.push(f);
+        }
+    }
     score_into(&mut rep, findings);
     rep
 }
@@ -623,7 +690,15 @@ pub fn score_into(rep: &mut CrawlReport, findings: Vec<crate::rules::Finding>) {
                 | crate::rules::Area::Canonical
         ) || with_findings.contains(&a.area)
     });
-    let score = crate::rules::overall(&areas);
+    let mut score = crate::rules::overall(&areas);
+    // Caps, not deductions: without robots.txt indexability is unverifiable,
+    // and plain-HTTP serving caps trust no matter how clean the rest reads.
+    if !rep.robots_honored {
+        score = score.min(60);
+    }
+    if rep.start_url.starts_with("http://") {
+        score = score.min(60);
+    }
     rep.score = score;
     rep.grade = crate::actions::grade(score).to_string();
     rep.areas = areas;
