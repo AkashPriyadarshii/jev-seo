@@ -60,3 +60,4 @@
 - [ ] GSC actionable errors (expired grant hints), INP rule, R03/R49 dedup
 - [ ] Audit/crawl scoring parity, MCP schema bounds and error framing, brief outline upgrades
 - [ ] Eval-log sampler command, `link` MCP tool
+- [ ] Topical share (Phase C feature, Semrush Topical Gravity model): topic file holds query sets + brand domains + competitors; `jev-seo topic --file topics.json` runs existing SERP checks per query and aggregates brand share per topic vs competitors; free DDG default, DFS LLM-mention endpoints opt-in only, never claim local ChatGPT/Gemini measurement; trends over runs from rank DB; adjacent-topic suggestions via `query_fit`; MCP `seo_topic` tool; share metric carries repeat-run drift note in EVAL.md, no rank prediction claims
