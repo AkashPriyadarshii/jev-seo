@@ -11,6 +11,7 @@
 - [x] Phase A security (`d6dc533`): MCP path guards, fail-closed safety/SSRF, bounded reads, stderr spend
 - [x] Phase A-addition (`6f12e54`): escapes, question versioning, eval log, runner-up flags, `link`, meta verdict
 - [x] Phase B truthfulness (`98c7bfb`): upgrade math, spend truth, rank labels, audit precision, provider honesty, R25/R33/R24/R41
+- [x] Blocking vs advisory gates: 20 rules fail CI, 33 warn; `--fail-on`, tagged actions/CSV/explain
 - [x] 99 tests green, clippy clean
 
 ### Shipped on master (local + pushed docs)

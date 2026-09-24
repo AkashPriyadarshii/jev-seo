@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Blocking vs advisory CI gates: 20 deterministic rules fail the build, 33 judgment calls print as warnings; `audit --fail-on blocking|all`, gate class on every action line, CSV row, and `explain` card.
 - `link` command: Jev Choice internal-link suggestions per audited page over pre-filtered destinations, with a `no_link` escape hatch.
 - Jev contract hardening: `insufficient_context` escape on intent and gap Choices, `QUESTION_VERSION` pinned in spend lines and the ledger, every fan-out appended to `~/.jev-seo/eval.jsonl` for re-evaluation, runner-up intent printed on Flag verdicts, closed `keep`/`rewrite`/`missing` meta-description verdict in the page suite.
 - GEO scoring fix: HTML inputs now score extracted body copy instead of head markup, one deduped state field, geo display gates on geo confidence only, resolved model build pinned in ledger and spend line.

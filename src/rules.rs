@@ -118,14 +118,44 @@ pub fn rule(id: &str) -> Option<&'static Rule> {
     RULES.iter().find(|r| r.id.eq_ignore_ascii_case(bare))
 }
 
+/// CI gate class per rule. Blocking = deterministic, spec-grounded, near-zero
+/// false positives (missing title, broken canonical): safe to hard-fail a
+/// build on. Advisory = judgment calls or Google-side drift risk (slop
+/// markers, length windows, lab vitals): warnings that never fail alone.
+/// Unknown ids default advisory: never block on what the registry cannot name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gate {
+    Blocking,
+    Advisory,
+}
+
+pub fn gate(id: &str) -> Gate {
+    let bare = id.strip_prefix("RULE-").unwrap_or(id);
+    match bare.to_ascii_uppercase().as_str() {
+        "R01" | "R02" | "R03" | "R04" | "R05" | "R06" | "R07" | "R08" | "R09" | "R11" | "R13"
+        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" => Gate::Blocking,
+        _ => Gate::Advisory,
+    }
+}
+
+/// Blocking findings from a finding list: the only set that fails a gate.
+pub fn blocking_findings(findings: &[Finding]) -> Vec<&Finding> {
+    findings.iter().filter(|f| gate(&f.rule_id) == Gate::Blocking).collect()
+}
+
 /// One-line explain for `jev-seo explain RULE-R19`.
 pub fn explain(id: &str) -> Option<String> {
     let r = rule(id)?;
+    let gate_label = match gate(r.id) {
+        Gate::Blocking => "blocking (fails CI gates)",
+        Gate::Advisory => "advisory (warning only)",
+    };
     Some(format!(
-        "{} | {} | {:?} | effort {} ({})\n  title: {}\n  fix:   {}",
+        "{} | {} | {:?} | {} | effort {} ({})\n  title: {}\n  fix:   {}",
         r.id,
         label(&r.area),
         r.severity,
+        gate_label,
         r.effort,
         match r.effort {
             1 => "hours",

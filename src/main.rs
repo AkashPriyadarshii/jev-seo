@@ -86,6 +86,9 @@ enum Commands {
         /// Exit nonzero when pass rate falls below this percent (CI gate)
         #[arg(long)]
         min_pass: Option<f64>,
+        /// Which findings fail the build: blocking (deterministic, default) or all
+        #[arg(long, default_value = "blocking")]
+        fail_on: String,
         /// Write a single-file HTML report to this path
         #[arg(long, value_name = "PATH")]
         html: Option<String>,
@@ -549,7 +552,7 @@ fn main() -> Result<()> {
             }
             print_jev_spend_line();
         }
-        Commands::Audit { path, target_query, json, min_pass, html, pdf, md, csv, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Audit { path, target_query, json, min_pass, fail_on, html, pdf, md, csv, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -736,6 +739,29 @@ fn main() -> Result<()> {
                 }
             }
 
+            // Rule-class gate: only deterministic blocking findings fail the
+            // build by default. Judgment calls print as warnings so a rule
+            // Google quietly changed never becomes the flaky test everyone
+            // bypasses. --fail-on all restores fail-on-anything.
+            match fail_on.as_str() {
+                "blocking" => {
+                    let blocked = rules::blocking_findings(&dir_report.findings);
+                    if !blocked.is_empty() {
+                        let ids: Vec<String> = blocked
+                            .iter()
+                            .map(|f| format!("{} ({})", f.rule_id, f.scope))
+                            .collect();
+                        anyhow::bail!("blocking findings fail the gate: {}", ids.join(", "));
+                    }
+                }
+                "all" => {
+                    if !dir_report.findings.is_empty() {
+                        anyhow::bail!("{} findings fail the gate (--fail-on all)", dir_report.findings.len());
+                    }
+                }
+                other => anyhow::bail!("unknown --fail-on '{other}' (blocking, all)"),
+            }
+
             if json {
                 println!("{}", serde_json::to_string_pretty(&dir_report)?);
                 return Ok(());
@@ -844,7 +870,7 @@ fn main() -> Result<()> {
                 } else {
                     println!("\n{}", "Top Actions:".cyan().bold());
                     for a in crate::actions::top(&actions, 5) {
-                        println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                     }
                 }
             } else if let Some(report) = dir_report.reports.first() {
@@ -877,7 +903,7 @@ fn main() -> Result<()> {
                 if !failed.is_empty() {
                     println!("\n{}", "Top Actions:".cyan().bold());
                     for a in crate::actions::top(&failed, 5) {
-                        println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                        println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                     }
                 }
 
@@ -1359,7 +1385,7 @@ fn main() -> Result<()> {
             } else {
                 println!("\n{}", "Top Actions:".cyan().bold());
                 for a in crate::actions::top(&report.actions, 5) {
-                    println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                 }
             }
             if diff {
@@ -1487,7 +1513,7 @@ fn main() -> Result<()> {
             } else {
                 println!("\n{}", "Top Actions:".cyan().bold());
                 for a in crate::actions::top(&report.actions, 5) {
-                    println!("  [P{}|e{}|i{:>3}] {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, a.id.bold(), a.title, a.evidence.dimmed());
+                    println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_gate_tag(&a.id), a.id.bold(), a.title, a.evidence.dimmed());
                 }
             }
             let completeness = manifest::completeness_llms(&report);
@@ -1532,6 +1558,10 @@ fn main() -> Result<()> {
                         "id": r.id,
                         "area": rules::label(&r.area),
                         "severity": format!("{:?}", r.severity),
+                        "gate": match rules::gate(r.id) {
+                            rules::Gate::Blocking => "blocking",
+                            rules::Gate::Advisory => "advisory",
+                        },
                         "effort": r.effort,
                         "title": r.title,
                         "fix": r.fix,
@@ -1846,6 +1876,20 @@ fn paid_backend_sources(pages: &[crawl::PageRecord]) -> Vec<String> {
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
+}
+
+/// Gate tag for action lines: RULE- ids resolve against the registry,
+/// bespoke ids (CRAWL-001) default advisory, never blocking on unknown.
+fn action_gate_tag(action_id: &str) -> String {
+    let bare = action_id.strip_prefix("RULE-").unwrap_or(action_id);
+    let is_rule = rules::rule(bare).is_some();
+    if !is_rule {
+        return String::new();
+    }
+    match rules::gate(bare) {
+        rules::Gate::Blocking => "BLOCK".red().bold().to_string(),
+        rules::Gate::Advisory => "warn".yellow().to_string(),
+    }
 }
 
 fn runner_up_suffix(extra: &serde_json::Map<String, serde_json::Value>, v: policy::Verdict) -> String {

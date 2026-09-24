@@ -76,20 +76,35 @@ fn effort_label(e: u8) -> &'static str {
 }
 
 /// Spreadsheet-ready action tracker (CSV). Same shape every command ranks.
+/// The gate column resolves RULE- ids against the registry; bespoke ids
+/// default advisory so exports never imply a block the registry cannot name.
 pub fn to_csv(actions: &[Action]) -> String {
-    let mut s = String::from("id,priority,effort_band,impact,quick_win,title,evidence\n");
+    let mut s = String::from("id,priority,effort_band,impact,quick_win,gate,title,evidence\n");
     for a in actions {
         let cell = |v: &str| format!("\"{}\"", v.replace('"', "\"\""));
+        let gate = action_gate(&a.id);
         s.push_str(&format!(
-            "{},{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{}\n",
             a.id,
             a.priority,
             effort_label(a.effort),
             a.impact,
             a.quick_win,
+            gate,
             cell(&a.title),
             cell(&a.evidence)
         ));
     }
     s
+}
+
+fn action_gate(action_id: &str) -> &'static str {
+    let bare = action_id.strip_prefix("RULE-").unwrap_or(action_id);
+    match crate::rules::rule(bare) {
+        Some(_) => match crate::rules::gate(bare) {
+            crate::rules::Gate::Blocking => "blocking",
+            crate::rules::Gate::Advisory => "advisory",
+        },
+        None => "advisory",
+    }
 }
