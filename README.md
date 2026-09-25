@@ -137,8 +137,6 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
     <a href="https://github.com/AkashPriyadarshii/jev-seo/stargazers"><img src="https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars" alt="stars" /></a>
   </p>
   <img src="docs/assets/banner.png" alt="jev-seo banner: free Rust SEO and GEO CLI with 57 rules, 13 MCP tools, 107 tests" width="100%">
-*Fuel the next build:* 
-
 </div>
 
 ---
