@@ -1,4 +1,6 @@
 ---
+
+**Support:** fuel the next build — [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
 title: "jev-seo: Free Rust SEO & GEO CLI + MCP for Devs and Agents"
 description: "MIT Semrush alternative in one Rust binary: 57-rule SEO audits, live site crawls, GEO citation scores, rank drift, CI gates, 13-tool MCP for coding agents. Free path costs zero; Jev spend is hard-capped. No seat, no DataForSEO card."
 canonical: "https://github.com/AkashPriyadarshii/jev-seo"
@@ -134,7 +136,7 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
     <a href="https://github.com/AkashPriyadarshii/jev-seo/stargazers"><img src="https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars" alt="stars" /></a>
   </p>
   <img src="docs/assets/banner.png" alt="jev-seo banner: free Rust SEO and GEO CLI with 57 rules, 13 MCP tools, 107 tests" width="100%">
-*Fuel the next build:* [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
+*Fuel the next build:* 
 
 </div>
 
