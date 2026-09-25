@@ -1,6 +1,5 @@
 ---
 
-**Support:** fuel the next build — [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
 title: "jev-seo: Free Rust SEO & GEO CLI + MCP for Devs and Agents"
 description: "MIT Semrush alternative in one Rust binary: 57-rule SEO audits, live site crawls, GEO citation scores, rank drift, CI gates, 13-tool MCP for coding agents. Free path costs zero; Jev spend is hard-capped. No seat, no DataForSEO card."
 canonical: "https://github.com/AkashPriyadarshii/jev-seo"
@@ -85,6 +84,8 @@ keywords:
   - local seo tools
   - no subscription seo
 ---
+
+**Support:** fuel the next build — [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
 
 <!--
 SEO / GEO crawler block (do not strip)
