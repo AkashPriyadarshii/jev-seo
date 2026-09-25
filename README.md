@@ -121,6 +121,7 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
   <p>By <strong>Akash Priyadarshi</strong> · MIT · Rust 2021 · zero runtime services</p>
   <p>
     <a href="#why-it-earns-a-slot">Why</a> ·
+    <a href="#direct-answer">Answer</a> ·
     <a href="#quickstart">Quickstart</a> ·
     <a href="#what-runs-where-and-what-it-costs">Cost</a> ·
     <a href="#how-far-to-trust-it">Trust</a> ·
@@ -128,7 +129,10 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
     <a href="#workflows">Workflows</a> ·
     <a href="#command-reference">Commands</a> ·
     <a href="#native-mcp-server-13-tools">MCP</a> ·
+    <a href="#examples-from-real-runs">Examples</a> ·
+    <a href="#faq">FAQ</a> ·
     <a href="#architecture">Layout</a> ·
+    <a href="#limits-and-non-goals">Limits</a> ·
     <a href="#ecosystem">Ecosystem</a>
   </p>
   <p>
