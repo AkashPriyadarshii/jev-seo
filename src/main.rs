@@ -36,6 +36,15 @@ mod tests;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+    /// Extra request header sent to audited sites, repeatable ("Name: value")
+    #[arg(long, global = true, value_name = "NAME: value")]
+    header: Vec<String>,
+    /// Basic-auth user for sites behind a login wall
+    #[arg(long, global = true)]
+    user: Option<String>,
+    /// Basic-auth password for sites behind a login wall
+    #[arg(long, global = true)]
+    password: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -346,6 +355,7 @@ pub(crate) fn main_shim_diff(
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    fetch::set_extra_headers(cli.user.as_deref(), cli.password.as_deref(), &cli.header);
     apply_jev_budget_from(&cli);
 
     match cli.command {
@@ -591,8 +601,8 @@ fn main() -> Result<()> {
             } else {
                 Vec::new()
             };
-            let jev_used = !jev_pages.is_empty() || (target_query.is_some() && manifest::jev_key_present());
-            let mut completeness = manifest::completeness_audit(dir_report.total_files, false, !jev_pages.is_empty() || target_query.is_some());
+            let jev_used = !jev_pages.is_empty() || (!no_jev && target_query.is_some() && manifest::jev_key_present());
+            let mut completeness = manifest::completeness_audit(dir_report.total_files, false, !jev_pages.is_empty() || (!no_jev && target_query.is_some()));
             if !jev_pages.is_empty() {
                 completeness.notes.push(format!("Jev judged {} pages (sample)", jev_pages.len()));
                 completeness.full = false;
@@ -949,7 +959,9 @@ fn main() -> Result<()> {
                 }
 
                 if let Some(query) = target_query {
-                    let state = json!({
+                    if no_jev {
+                        // rules-only run: never post to Jev for the single-file gate.
+                    } else if let Some((eval, v)) = gated_eval_with("audit", json!({
                         "target_query": query,
                         "page_title": report.title,
                         "description": report.description,
@@ -960,8 +972,7 @@ fn main() -> Result<()> {
                             "text": excerpt_local(&report.file_path),
                             "word_count": report.word_count
                         }
-                    });
-                    if let Some((eval, v)) = gated_eval_with("audit", state, merge_extras(policy::geo_questions(), policy::page_audit_extras())) {
+                    }), merge_extras(policy::geo_questions(), policy::page_audit_extras())) {
                         println!("\n{}", "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold());
                         println!("  GEO Score:       {}/10{}", eval.geo_score, policy::marker(v));
                         if let Some((comp, cconf)) = policy::composite_geo(&eval.extra) {
@@ -2035,11 +2046,13 @@ fn print_jev_spend_line() {
 fn judge_crawl_site(start_url: &str) -> Option<engine::AnalysisResult> {
     let client = engine::JevClient::new()?;
     let target = crate::paths::reject_private_url(start_url).ok()?;
-    let resp = ureq::get(target.as_str())
-        .timeout(std::time::Duration::from_secs(15))
-        .set("User-Agent", crawl::CRAWL_UA)
-        .call()
-        .ok()?;
+    let resp = crate::fetch::with_extra_headers(
+        ureq::get(target.as_str())
+            .timeout(std::time::Duration::from_secs(15))
+            .set("User-Agent", crawl::CRAWL_UA),
+    )
+    .call()
+    .ok()?;
     let landed = resp.get_url().to_string();
     crate::paths::reject_redirect_target(&landed).ok()?;
     let body = crate::fetch::capped_string(resp, crate::fetch::MAX_AUX_BYTES).ok()?;

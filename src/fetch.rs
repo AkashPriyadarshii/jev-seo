@@ -3,9 +3,45 @@
 //! Firecrawl escalate on thin bodies with a key set. Every pick records source and cost.
 
 use anyhow::{Context, Result};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 pub const JINA_ENDPOINT: &str = "https://r.jina.ai/";
+
+/// Extra request headers applied to target-site fetches (crawl, robots,
+/// sitemap, llms, site-scoring). Filled once from CLI flags early in main;
+/// staging sites behind basic auth become auditable before launch.
+static EXTRA_HEADERS: OnceLock<Vec<(String, String)>> = OnceLock::new();
+
+/// Register extra headers from CLI flags. Called once at startup; later
+/// callers (CLI and MCP) share the same set for the run.
+pub fn set_extra_headers(user: Option<&str>, password: Option<&str>, raw: &[String]) {
+    let mut headers: Vec<(String, String)> = Vec::new();
+    if let (Some(u), Some(p)) = (user, password) {
+        let token = crate::serp::base64_basic(&format!("{}:{}", u, p));
+        headers.push(("Authorization".to_string(), format!("Basic {}", token)));
+    }
+    for r in raw {
+        if let Some((k, v)) = r.split_once(':') {
+            let k = k.trim();
+            let v = v.trim();
+            if !k.is_empty() && !v.is_empty() {
+                headers.push((k.to_string(), v.to_string()));
+            }
+        }
+    }
+    let _ = EXTRA_HEADERS.set(headers);
+}
+
+/// Apply the run's extra headers to a request builder. No-op when none set.
+pub fn with_extra_headers(mut req: ureq::Request) -> ureq::Request {
+    if let Some(headers) = EXTRA_HEADERS.get() {
+        for (k, v) in headers {
+            req = req.set(k, v);
+        }
+    }
+    req
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FetchMode {

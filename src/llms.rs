@@ -60,10 +60,12 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     let domain = base.host_str().unwrap_or(target).to_string();
     let llms_url = format!("{}://{}/llms.txt", base.scheme(), domain);
 
-    let (status, body) = match ureq::get(&llms_url)
-        .timeout(Duration::from_secs(8))
-        .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Agent Readiness Check)"))
-        .call()
+    let (status, body) = match crate::fetch::with_extra_headers(
+        ureq::get(&llms_url)
+            .timeout(Duration::from_secs(8))
+            .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Agent Readiness Check)")),
+    )
+    .call()
     {
         Ok(r) => (r.status(), crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default()),
         Err(ureq::Error::Status(code, r)) => (code, crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default()),

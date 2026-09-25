@@ -24,11 +24,13 @@ pub const MAX_SITEMAP_URLS: usize = 50_000;
 pub fn audit_sitemap(target: &str) -> Result<SitemapReport> {
     let xml_content = if target.starts_with("http://") || target.starts_with("https://") {
         crate::paths::reject_private_url(target)?;
-        let resp = ureq::get(target)
-            .timeout(Duration::from_secs(10))
-            .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev XML Sitemap Inspector)"))
-            .call()
-            .with_context(|| format!("Failed to fetch remote sitemap: {}", target))?;
+        let resp = crate::fetch::with_extra_headers(
+            ureq::get(target)
+                .timeout(Duration::from_secs(10))
+                .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev XML Sitemap Inspector)")),
+        )
+        .call()
+        .with_context(|| format!("Failed to fetch remote sitemap: {}", target))?;
         crate::paths::reject_redirect_target(resp.get_url())?;
         crate::fetch::capped_string(resp, crate::fetch::MAX_AUX_BYTES)
             .with_context(|| format!("Failed to read sitemap body from {}", target))?
