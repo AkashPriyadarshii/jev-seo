@@ -263,7 +263,7 @@ pub fn dfs_basic_for_test(s: &str) -> String {
 }
 
 /// Basic-auth helper without a new dependency: standard base64 alphabet.
-fn base64_basic(s: &str) -> String {
+pub(crate) fn base64_basic(s: &str) -> String {
     const ALPHA: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let bytes = s.as_bytes();
     let mut out = String::new();
@@ -297,6 +297,9 @@ pub fn tavily_extract(urls: &[String], query: &str) -> Result<String> {
     }
     if urls.len() > MAX_URLS {
         anyhow::bail!("extract takes at most {MAX_URLS} URLs (got {})", urls.len());
+    }
+    for u in urls {
+        crate::paths::reject_private_url(u)?;
     }
     let key = std::env::var("TAVILY_API_KEY")
         .ok()

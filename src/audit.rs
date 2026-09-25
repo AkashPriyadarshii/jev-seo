@@ -116,6 +116,14 @@ pub struct AuditReport {
     pub em_dash_count: usize,
     pub ai_slop_words_found: Vec<String>,
     pub internal_link_targets: Vec<String>,
+    /// Right-hand side alternates: (hreflang code, href target) pairs parsed
+    /// from `<link rel="alternate" hreflang=...>` head markup.
+    #[serde(default)]
+    pub hreflang_alternates: Vec<(String, String)>,
+    /// Page self-declares noindex via meta robots. hreflang pointing at such
+    /// a page is a silent multilingual failure (R58).
+    #[serde(default)]
+    pub noindex: bool,
     /// Statistics/quantities with no citation signal within 200 chars.
     #[serde(default)]
     pub uncited_claims: usize,
@@ -339,11 +347,17 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
     // Inline HTML in markdown bodies counts: layout tags the author wrote
     // by hand satisfy canonical/schema/OG the same as frontmatter keys.
     let mut schema_json_valid = true;
+    let mut hreflang_alternates: Vec<(String, String)> = Vec::new();
+    let mut noindex = false;
     {
         let link_tag_re = Regex::new(r#"(?is)<link\b[^>]*>"#)?;
         for cap in link_tag_re.captures_iter(&body) {
-            if tag_attr(&cap[0], "rel").is_some_and(|v| v.eq_ignore_ascii_case("canonical")) {
+            let tag = &cap[0];
+            if tag_attr(tag, "rel").is_some_and(|v| v.eq_ignore_ascii_case("canonical")) {
                 canonical_found = true;
+            }
+            if let (Some(lang), Some(href)) = (tag_attr(tag, "hreflang"), tag_attr(tag, "href")) {
+                hreflang_alternates.push((lang.to_ascii_lowercase(), href));
             }
         }
         let script_re = Regex::new(r#"(?is)<script\b[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
@@ -356,10 +370,18 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         let meta_tag_re = Regex::new(r#"(?is)<meta\b[^>]*>"#)?;
         let mut og_seen = std::collections::BTreeSet::new();
         for cap in meta_tag_re.captures_iter(&body) {
-            if let Some(prop) = tag_attr(&cap[0], "property") {
+            let tag = &cap[0];
+            if let Some(prop) = tag_attr(tag, "property") {
                 let p = prop.to_ascii_lowercase();
                 if p == "og:title" || p == "og:description" || p == "og:image" {
                     og_seen.insert(p);
+                }
+            }
+            if tag_attr(tag, "name").is_some_and(|n| n.eq_ignore_ascii_case("robots")) {
+                if let Some(robots) = tag_attr(tag, "content") {
+                    if robots.to_ascii_lowercase().contains("noindex") {
+                        noindex = true;
+                    }
                 }
             }
         }
@@ -502,6 +524,8 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         em_dash_count,
         ai_slop_words_found,
         internal_link_targets,
+        hreflang_alternates,
+        noindex,
         uncited_claims: count_uncited_claims(&body),
         checks,
     })
@@ -522,6 +546,8 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
     let mut description: Option<String> = None;
     let mut canonical_found = false;
     let mut og_seen = std::collections::BTreeSet::new();
+    let mut hreflang_alternates: Vec<(String, String)> = Vec::new();
+    let mut noindex = false;
     for cap in tag_re.captures_iter(content) {
         let tag = &cap[0];
         let is_meta = cap[1].eq_ignore_ascii_case("meta");
@@ -530,6 +556,13 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
                 if name.eq_ignore_ascii_case("description") && description.is_none() {
                     description = tag_attr(tag, "content").map(|s| s.trim().to_string());
                 }
+                if name.eq_ignore_ascii_case("robots") {
+                    if let Some(robots) = tag_attr(tag, "content") {
+                        if robots.to_ascii_lowercase().contains("noindex") {
+                            noindex = true;
+                        }
+                    }
+                }
             }
             if let Some(prop) = tag_attr(tag, "property") {
                 let p = prop.to_ascii_lowercase();
@@ -537,8 +570,18 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
                     og_seen.insert(p);
                 }
             }
-        } else if tag_attr(tag, "rel").is_some_and(|v| v.eq_ignore_ascii_case("canonical")) {
-            canonical_found = true;
+        } else if tag_attr(tag, "rel").is_some_and(|v| {
+            if v.eq_ignore_ascii_case("canonical") {
+                true
+            } else {
+                tag_attr(tag, "hreflang").is_some()
+            }
+        }) {
+            if let (Some(lang), Some(href)) = (tag_attr(tag, "hreflang"), tag_attr(tag, "href")) {
+                hreflang_alternates.push((lang.to_ascii_lowercase(), href));
+            } else {
+                canonical_found = true;
+            }
         }
     }
     // All three OG tags required: one of three passing hid partial markup.
@@ -663,6 +706,8 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
         em_dash_count,
         ai_slop_words_found,
         internal_link_targets,
+        hreflang_alternates,
+        noindex,
         uncited_claims: count_uncited_claims(&plain_text),
         checks,
     })

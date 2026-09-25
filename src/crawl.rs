@@ -253,11 +253,13 @@ fn fetch_page(url: &str) -> Fetch {
         Fetch { status, final_url, body, elapsed_ms: start.elapsed().as_millis(), bytes, hops, encoding }
     };
     for _ in 0..6 {
-        let resp = agent
-            .get(&current)
-            .timeout(Duration::from_secs(10))
-            .set("User-Agent", CRAWL_UA)
-            .call();
+        let resp = crate::fetch::with_extra_headers(
+            agent
+                .get(&current)
+                .timeout(Duration::from_secs(10))
+                .set("User-Agent", CRAWL_UA),
+        )
+        .call();
         match resp {
             Ok(r) => {
                 let final_url = r.get_url().to_string();
@@ -314,21 +316,25 @@ pub fn crawl_site(
         format!("[jev-seo {:>02}:{:>02}]", s / 60, s % 60)
     };
     let host = start.host_str().unwrap_or("").to_string();
-    let robots_body = ureq::get(&format!("{}://{}/robots.txt", start.scheme(), host))
-        .timeout(Duration::from_secs(8))
-        .set("User-Agent", CRAWL_UA)
-        .call()
-        .ok()
+    let robots_body = crate::fetch::with_extra_headers(
+        ureq::get(&format!("{}://{}/robots.txt", start.scheme(), host))
+            .timeout(Duration::from_secs(8))
+            .set("User-Agent", CRAWL_UA),
+    )
+    .call()
+    .ok()
         .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
         .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
         .unwrap_or_default();
     eprintln!("{} robots.txt {}", stamp(), if robots_body.is_empty() { "missing" } else { "ok" });
 
-    let sitemap_urls: Vec<String> = ureq::get(&format!("{}://{}/sitemap.xml", start.scheme(), host))
-        .timeout(Duration::from_secs(10))
-        .set("User-Agent", CRAWL_UA)
-        .call()
-        .ok()
+    let sitemap_urls: Vec<String> = crate::fetch::with_extra_headers(
+        ureq::get(&format!("{}://{}/sitemap.xml", start.scheme(), host))
+            .timeout(Duration::from_secs(10))
+            .set("User-Agent", CRAWL_UA),
+    )
+    .call()
+    .ok()
         .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
         .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
         .map(|xml| sitemap_seed_urls(&xml))
@@ -340,11 +346,13 @@ pub fn crawl_site(
     let mut probes: Vec<(String, String, String)> = Vec::new();
     let nohop: ureq::Agent = ureq::AgentBuilder::new().redirects(0).build();
     let junk = format!("{}://{}/jev-seo-{}-not-found", start.scheme(), host, std::process::id());
-    if let Ok(r) = nohop
-        .get(&junk)
-        .timeout(Duration::from_secs(8))
-        .set("User-Agent", CRAWL_UA)
-        .call()
+    if let Ok(r) = crate::fetch::with_extra_headers(
+        nohop
+            .get(&junk)
+            .timeout(Duration::from_secs(8))
+            .set("User-Agent", CRAWL_UA),
+    )
+    .call()
     {
         if r.status() == 200 {
             probes.push(("R56".into(), junk, "missing page returns 200".into()));
@@ -352,11 +360,13 @@ pub fn crawl_site(
     }
     if start.scheme() == "https" {
         let http_url = format!("http://{}/", host);
-        if let Err(ureq::Error::Status(code, _)) = nohop
-            .get(&http_url)
-            .timeout(Duration::from_secs(8))
-            .set("User-Agent", CRAWL_UA)
-            .call()
+        if let Err(ureq::Error::Status(code, _)) = crate::fetch::with_extra_headers(
+            nohop
+                .get(&http_url)
+                .timeout(Duration::from_secs(8))
+                .set("User-Agent", CRAWL_UA),
+        )
+        .call()
         {
             if code == 302 || code == 307 {
                 probes.push(("R57".into(), http_url, format!("HTTP→HTTPS uses temporary {}", code)));
@@ -369,11 +379,13 @@ pub fn crawl_site(
         format!("www.{}", host)
     };
     let alt_url = format!("{}://{}/", start.scheme(), alt_host);
-    match nohop
-        .get(&alt_url)
-        .timeout(Duration::from_secs(8))
-        .set("User-Agent", CRAWL_UA)
-        .call()
+    match crate::fetch::with_extra_headers(
+        nohop
+            .get(&alt_url)
+            .timeout(Duration::from_secs(8))
+            .set("User-Agent", CRAWL_UA),
+    )
+    .call()
     {
         Err(ureq::Error::Status(code, _)) if code == 302 || code == 307 => {
             probes.push(("R57".into(), alt_url, format!("host variant uses temporary {}", code)));

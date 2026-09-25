@@ -40,10 +40,12 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
     let domain = base_url.host_str().unwrap_or(target).to_string();
     let robots_url = format!("{}://{}/robots.txt", base_url.scheme(), domain);
 
-    let resp = ureq::get(&robots_url)
-        .timeout(Duration::from_secs(8))
-        .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Search Radar; +https://github.com/AkashPriyadarshii/jev-seo)"))
-        .call();
+    let resp = crate::fetch::with_extra_headers(
+        ureq::get(&robots_url)
+            .timeout(Duration::from_secs(8))
+            .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Search Radar; +https://github.com/AkashPriyadarshii/jev-seo)")),
+    )
+    .call();
 
     match resp {
         Ok(response) => {

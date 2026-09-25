@@ -316,6 +316,8 @@ Sitemap: https://example.com/sitemap.xml
             em_dash_count: 0,
             ai_slop_words_found: vec![],
             internal_link_targets: vec![],
+            hreflang_alternates: vec![],
+            noindex: false,
             uncited_claims: 0,
             checks: vec![CheckItem { name: "n".into(), passed: true, message: "m".into() }],
         };
@@ -719,7 +721,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_rules_registry_and_scoring() {        use crate::rules::{overall, score_areas, Area, Finding, Severity, RULES};
-        assert_eq!(RULES.len(), 57);
+        assert_eq!(RULES.len(), 58);
         assert!(RULES.iter().all(|r| crate::rules::rule(r.id).is_some()));
         let findings = vec![
             Finding { rule_id: "R01".into(), area: Area::Crawl, severity: Severity::High, scope: "https://x.test/a".into(), evidence: "HTTP 404".into(), fix: "Restore the target.".into(), kind: "fact".into(), observed_at: 1, source: "t".into() },
@@ -906,13 +908,13 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_gate_split_covers_registry() {
         use crate::rules::{gate, Gate, RULES};
-        assert_eq!(RULES.len(), 57);
+        assert_eq!(RULES.len(), 58);
         let blocking: Vec<&&str> = RULES
             .iter()
             .filter(|r| gate(r.id) == Gate::Blocking)
             .map(|r| &r.id)
             .collect();
-        assert_eq!(blocking.len(), 23, "blocking set changed: {:?}", blocking);
+        assert_eq!(blocking.len(), 22, "blocking set changed: {:?}", blocking);
         for id in ["R01", "R09", "R11", "R33", "R36", "R47", "RULE-R02"] {
             assert_eq!(gate(id), Gate::Blocking, "{id}");
         }
@@ -1123,6 +1125,88 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_single_hop_redirect_is_not_r03_chain() {
+        use crate::crawl::{finish_report, PageRecord, ReportParts};
+        use std::collections::HashMap;
+        // Normal http->https 301, one hop: must NOT surface as R03 chain.
+        let pages = vec![
+            PageRecord { url: "http://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 10, bytes: 500, hops: vec![(301, "http://x.test/".into())], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
+        ];
+        let rep = finish_report(ReportParts {
+            start_url: "http://x.test/".into(),
+            pages,
+            redirects: vec![],
+            inbound: HashMap::new(),
+            errors: vec![],
+            seeded_from_sitemap: true,
+            capped: false,
+            robots_honored: true,
+            vitals: None,
+            probes: vec![],
+        });
+        assert!(!rep.findings.iter().any(|f| f.rule_id == "R03"));
+        // Two real hops form a chain: R03 fires.
+        let pages = vec![
+            PageRecord { url: "https://x.test/a".into(), status: 200, final_url: "https://x.test/b".into(), outlinks: 0, elapsed_ms: 10, bytes: 500, hops: vec![(301, "https://x.test/a".into()), (302, "https://x.test/a2".into())], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
+        ];
+        let rep = finish_report(ReportParts {
+            start_url: "https://x.test/a".into(),
+            pages,
+            redirects: vec![],
+            inbound: HashMap::new(),
+            errors: vec![],
+            seeded_from_sitemap: true,
+            capped: false,
+            robots_honored: true,
+            vitals: None,
+            probes: vec![],
+        });
+        assert!(rep.findings.iter().any(|f| f.rule_id == "R03"));
+    }
+
+    #[test]
+    fn test_r58_hreflang_flags_noindexed_target() {
+        use crate::audit::{audit_path, with_findings};
+        let dir = tempfile::tempdir().unwrap();
+        // en page points hreflang at the es page; es page is noindexed.
+        std::fs::write(
+            dir.path().join("en.html"),
+            "<html><head><title>A Fine English Page That Has A Useful Title</title>\n\
+             <meta name=\"description\" content=\"A reasonably sized meta description for search consoles everywhere.\">\n\
+             <link rel=\"alternate\" hreflang=\"es\" href=\"es.html\">\n\
+             <link rel=\"canonical\" href=\"en.html\">\n</head><body><h1>English</h1>\
+             Some real paragraph text that gives the page enough substance to pass thresholds and nothing more.</body></html>"
+        ).unwrap();
+        std::fs::write(
+            dir.path().join("es.html"),
+            "<html><head><title>Una Pagina Espanola Con Titulo Largo Suficiente</title>\n\
+             <meta name=\"description\" content=\"Una descripcion con la longitud apropiada para minimos y maximos.\">\n\
+             <meta name=\"robots\" content=\"noindex\">\n\
+             <link rel=\"canonical\" href=\"es.html\">\n</head><body><h1>Espanol</h1>\
+             Texto espanol de relleno para que la pagina tenga contenido sustancial en el cuerpo.</body></html>"
+        ).unwrap();
+        let rep = with_findings(audit_path(dir.path().to_str().unwrap()).unwrap());
+        let f58 = rep
+            .findings
+            .iter()
+            .filter(|f| f.rule_id == "R58")
+            .map(|f| f.scope.clone())
+            .collect::<Vec<_>>();
+        assert!(!f58.is_empty(), "noindexed hreflang target must fire R58");
+        assert!(f58.iter().any(|s| s.contains("en.html")));
+        let g = crate::rules::gate("R58");
+        assert_eq!(g, crate::rules::Gate::Advisory, "R58 is a heuristic, must not block");
+    }
+
+    #[test]
+    fn test_tavily_extract_rejects_private_urls() {
+        // P1 SSRF: seo_extract must not forward loopback/metadata targets.
+        assert!(crate::serp::tavily_extract(&["http://127.0.0.1/admin".into()], "q").is_err());
+        assert!(crate::serp::tavily_extract(&["http://169.254.169.254/latest/meta-data".into()], "q").is_err());
+        assert!(crate::serp::tavily_extract(&["http://localhost".into()], "q").is_err());
+    }
+
+    #[test]
     fn test_r19_needs_density_not_single_hit() {
         use crate::rules::check_audit;
         let dir = tempfile::tempdir().unwrap();
@@ -1227,6 +1311,13 @@ Sitemap: https://example.com/sitemap.xml
         assert!(reject_private_url("http://[::ffff:127.0.0.1]/").is_err());
         assert!(reject_private_url("http://10.0.0.5/").is_err());
         assert!(reject_private_url("http://unresolvable.invalid/").is_err());
+    }
+
+    #[test]
+    fn test_basic_auth_header_token() {
+        // Gal's staging-behind-auth: user:pass must become Basic base64.
+        assert_eq!(crate::serp::base64_basic("foo:bar"), "Zm9vOmJhcg==");
+        assert_eq!(crate::serp::base64_basic("alice:secret1"), "YWxpY2U6c2VjcmV0MQ==");
     }
 
     #[test]
@@ -1368,6 +1459,16 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_probe_r56_soft404_fires_and_is_blocking() {
+        use crate::rules::probe_finding;
+        let f = probe_finding("R56", "https://x.test/junk".into(), "missing page returns 200".into())
+            .expect("R56 must be a known rule");
+        assert_eq!(f.rule_id, "R56");
+        assert_eq!(f.source, "live-crawl");
+        assert_eq!(crate::rules::gate(&f.rule_id), crate::rules::Gate::Blocking);
+    }
+
+    #[test]
     fn test_gate_fixtures_good_passes_broken_fails() {
         let good = crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/good").unwrap());
         assert!(
@@ -1426,11 +1527,11 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_registry_invariants() {
         use crate::rules::{gate, truth_kind, Gate, RULES};
-        assert_eq!(RULES.len(), 57);
+        assert_eq!(RULES.len(), 58);
         let mut ids: Vec<&str> = RULES.iter().map(|r| r.id).collect();
         ids.sort();
         ids.dedup();
-        assert_eq!(ids.len(), 57, "rule ids must be unique");
+        assert_eq!(ids.len(), 58, "rule ids must be unique");
         for r in RULES {
             assert!(!r.title.is_empty() && !r.fix.is_empty(), "{}", r.id);
             assert!(r.effort >= 1 && r.effort <= 3, "{}", r.id);
@@ -1447,7 +1548,7 @@ Sitemap: https://example.com/sitemap.xml
             .filter(|r| truth_kind(r.id) == "heuristic")
             .map(|r| &r.id)
             .collect();
-        assert_eq!(heu, vec![&"R18", &"R19", &"R20", &"R23", &"R24", &"R55", &"R41"]);
+        assert_eq!(heu, vec![&"R18", &"R19", &"R20", &"R23", &"R24", &"R54", &"R55", &"R58", &"R41"]);
     }
 
     #[test]

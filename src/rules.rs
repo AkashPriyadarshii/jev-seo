@@ -1,4 +1,4 @@
-//! Rule audit engine (R01-R57). Rules are data, findings are facts.
+//! Rule audit engine (R01-R58). Rules are data, findings are facts.
 //! Severity weights and reach factors turn findings into area scores;
 //! area scores blend into one overall grade. Deterministic, no model calls.
 
@@ -78,14 +78,14 @@ pub fn now_ms() -> u64 {
 pub fn truth_kind(rule_id: &str) -> &'static str {
     let bare = rule_id.strip_prefix("RULE-").unwrap_or(rule_id);
     match bare.to_ascii_uppercase().as_str() {
-        "R18" | "R19" | "R20" | "R23" | "R24" | "R41" | "R55" => "heuristic",
+        "R18" | "R19" | "R20" | "R23" | "R24" | "R41" | "R54" | "R55" | "R58" => "heuristic",
         _ => "fact",
     }
 }
 
 /// Rule-set build. Bump on ANY registry change (new rule, reworded fix,
 /// reclassified gate) so audits months apart stay comparable.
-pub const RULE_SET_VERSION: &str = "2026.09";
+pub const RULE_SET_VERSION: &str = "2026.09b";
 
 /// The registry. Ids are stable API: reports, docs, and tests cite them.
 pub const RULES: &[Rule] = &[
@@ -134,6 +134,7 @@ pub const RULES: &[Rule] = &[
     Rule { id: "R34", area: Area::Structured, severity: Severity::Medium, effort: 1, title: "Deprecated schema type", fix: "Migrate to the current type." },
     Rule { id: "R35", area: Area::Structured, severity: Severity::Low, effort: 1, title: "Missing Open Graph tags", fix: "Add og:title, description, and image." },
     Rule { id: "R36", area: Area::Canonical, severity: Severity::Low, effort: 1, title: "Missing canonical", fix: "Point every page at its canonical URL." },
+    Rule { id: "R58", area: Area::OnPage, severity: Severity::Medium, effort: 2, title: "Broken hreflang cluster", fix: "Make every hreflang pair reciprocal and never point at a noindexed target." },
     // AI access (5)
     Rule { id: "R37", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "No llms.txt", fix: "Ship /llms.txt for ChatGPT/Perplexity/Claude plumbing; Google Search ignores the file." },
     Rule { id: "R38", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "AI crawlers unnamed", fix: "Name AI crawlers explicitly in robots.txt." },
@@ -178,7 +179,7 @@ pub fn gate(id: &str) -> Gate {
     let bare = id.strip_prefix("RULE-").unwrap_or(id);
     match bare.to_ascii_uppercase().as_str() {
         "R01" | "R02" | "R03" | "R04" | "R05" | "R06" | "R07" | "R08" | "R09" | "R11" | "R13"
-        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" | "R54" | "R56"
+        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" | "R56"
         | "R57" => Gate::Blocking,
         _ => Gate::Advisory,
     }
@@ -483,8 +484,12 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
     for o in &rep.orphans {
         out.push(mk("R25", o.clone(), "0 inbound links".into()));
     }
-    for (from, to) in &rep.redirects {
-        out.push(mk("R03", from.clone(), format!("-> {}", to)));
+    for p in &rep.pages {
+        // A single hop is a normal redirect (http->https, trailing slash).
+        // Only real chains (2+ hops) surface as R03 redirect chains.
+        if p.status != 0 && p.hops.len() >= 2 {
+            out.push(mk("R03", p.url.clone(), format!("{} hops -> {}", p.hops.len(), p.final_url)));
+        }
     }
     if !rep.seeded_from_sitemap {
         out.push(mk("R05", rep.start_url.clone(), "no /sitemap.xml".into()));
@@ -620,6 +625,47 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
     }
     for f in &rep.orphan_pages {
         out.push(mk("R25", f.clone(), "0 inbound links".into()));
+    }
+    // R58 hreflang cluster graph: every alternate must (a) point at a page in
+    // this audit set, (b) not point at a self-noindexed target, and (c) be
+    // reciprocated by that target. Local-file names only; remote alternates
+    // (http(s) hosts or absolute file paths) stay out.
+    let by_path: std::collections::HashMap<String, &crate::audit::AuditReport> = rep
+        .reports
+        .iter()
+        .map(|r| (std::path::Path::new(&r.file_path).file_name().unwrap_or_default().to_string_lossy().to_string(), r))
+        .collect();
+    let mut seen_cluster: Vec<(String, String, String)> = Vec::new();
+    for r in &rep.reports {
+        for (lang, href) in &r.hreflang_alternates {
+            let bare = href.split(['/', '\\']).next_back().unwrap_or("").to_string();
+            let target = match by_path.get(&bare) {
+                Some(t) => t,
+                None => continue, // not in this audit set
+            };
+            let is_self = target.file_path == r.file_path;
+            let has_index = !target.noindex;
+            let governs = has_index && (is_self || target.hreflang_alternates.iter().any(|(l, h)| {
+                l == lang && {
+                    let other = h.split(['/', '\\']).next_back().unwrap_or("");
+                    other == std::path::Path::new(&r.file_path).file_name().unwrap_or_default()
+                }
+            }));
+            if !governs {
+                let why = if !has_index && !is_self {
+                    "points at a noindexed target"
+                } else if is_self {
+                    "points at itself"
+                } else {
+                    "alternate is not reciprocated"
+                };
+                let dup = seen_cluster.contains(&(r.file_path.clone(), target.file_path.clone(), lang.clone()));
+                if !dup {
+                    seen_cluster.push((r.file_path.clone(), target.file_path.clone(), lang.clone()));
+                    out.push(mk("R58", r.file_path.clone(), format!("{} -> {} ({}) {why}", lang, target.file_path, href)));
+                }
+            }
+        }
     }
     for f in &mut out {
         f.source = "local-audit".into();
