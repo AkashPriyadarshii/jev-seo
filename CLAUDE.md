@@ -16,11 +16,12 @@
 
 ## Tooling & Dependencies
 - Rust 2021 edition
-- HTTP & Transport: `ureq` (sync, lightweight, no Tokio bloat)
-- SERP Provider: DuckDuckGo HTML (`html.duckduckgo.com/html/`) & Suggest API (`duckduckgo.com/ac/`) (₹0 cost, zero API keys)
-- System One engine: TypeSafe AI Jev via `https://api.typesafe.ai/v1/systemone` ($TYPESAFE_API_KEY)
+- HTTP & Transport: `ureq` (sync, lightweight, no Tokio bloat). Target-site fetches (crawl/robots/sitemap/llms/site-scoring) accept `--user`/`--password` (Basic) and repeatable `--header`; API providers never see them.
+- SERP Provider: DuckDuckGo HTML free by default; optional Tavily (`--provider tavily`) and DataForSEO (`--provider dfs`) behind explicit opt-in flags + keys, free fallback on error.
+- System One engine: TypeSafe AI Jev via `https://api.typesafe.ai/v1/systemone` ($TYPESAFE_API_KEY). `--no-jev` is a complete offline path (zero network); `--jev-budget` hard-caps USD before every POST (default 0.25).
+- Rule engine: `src/rules.rs`, 58 stable ids R01-R58, `RULE_SET_VERSION` bumped on any registry change (current `2026.09b`). 22 Blocking / 36 Advisory via `gate()`; `truth_kind()` labels every finding fact/heuristic.
 - AST & Markup: `gray-matter-rs` (Markdown frontmatter) + `fast-html-parser` (SIMD HTML parsing)
-- Sitemap & Hreflang: `sitemap.rs` streaming XML parser with ISO region and HTTPS checks
+- Sitemap & Hreflang: `sitemap.rs` sitemap audit (loc/lastmod/HTTPS/50k limit, hreflang codes + x-default); R58 cross-page cluster check (noindexed or unreciprocated alternates) in `rules.rs`.
 - Local Cache / History: `rusqlite` (bundled SQLite with WAL mode in `.jev-seo.db`)
 - CLI Framework: `clap` with derive features
 - MCP Server: Stdio JSON-RPC 2.0 protocol for agent loops (13 native tools)
@@ -29,5 +30,8 @@
 - Maximum performance, zero runtime allocations on hot paths.
 - Error handling with `thiserror` / `anyhow`.
 - Pre-commit gates: `git jev check` or `jev-axi diff --staged`.
+- Scores rank work; they never predict rankings or traffic. Low-confidence Jev verdicts print `[verify]`.
+- No crates publish, no GitHub Release, no push without an explicit "go". v0.1.2 ships 22 Oct 2026.
+- Brag/demo output lives in `brag-output/` and is gitignored; never commit render artifacts.
 
 - Profile: release-order touch 2026-09-22
