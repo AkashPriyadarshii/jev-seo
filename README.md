@@ -85,7 +85,7 @@ keywords:
   - no subscription seo
 ---
 
-**Support:** fuel the next build ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
+**Support:** fuel the next build — [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
 
 <!--
 SEO / GEO crawler block (do not strip)
@@ -118,21 +118,21 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
     <a href="https://typesafe.ai"><img src="https://img.shields.io/badge/oracle-TypeSafe%20Jev-0055ff.svg?style=flat-square" alt="TypeSafe Jev" /></a>
     <img src="https://img.shields.io/badge/tests-112%20green-0055ff.svg?style=flat-square" alt="112 tests" />
   </p>
-  <p>By <strong>Akash Priyadarshi</strong> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· MIT ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Rust 2021 ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· zero runtime services</p>
+  <p>By <strong>Akash Priyadarshi</strong> · MIT · Rust 2021 · zero runtime services</p>
   <p>
-    <a href="#why-it-earns-a-slot">Why</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#direct-answer">Answer</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#quickstart">Quickstart</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#what-runs-where-and-what-it-costs">Cost</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#how-far-to-trust-it">Trust</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#whats-new">What's new</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#workflows">Workflows</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#command-reference">Commands</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#native-mcp-server-13-tools">MCP</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#examples-from-real-runs">Examples</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#faq">FAQ</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#architecture">Layout</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="#limits-and-non-goals">Limits</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
+    <a href="#why-it-earns-a-slot">Why</a> ·
+    <a href="#direct-answer">Answer</a> ·
+    <a href="#quickstart">Quickstart</a> ·
+    <a href="#what-runs-where-and-what-it-costs">Cost</a> ·
+    <a href="#how-far-to-trust-it">Trust</a> ·
+    <a href="#whats-new">What's new</a> ·
+    <a href="#workflows">Workflows</a> ·
+    <a href="#command-reference">Commands</a> ·
+    <a href="#native-mcp-server-13-tools">MCP</a> ·
+    <a href="#examples-from-real-runs">Examples</a> ·
+    <a href="#faq">FAQ</a> ·
+    <a href="#architecture">Layout</a> ·
+    <a href="#limits-and-non-goals">Limits</a> ·
     <a href="#ecosystem">Ecosystem</a>
   </p>
   <p>
@@ -147,19 +147,19 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
 
 ## Direct answer
 
-**What is jev-seo?** It is a free, open-source SEO and GEO command-line tool written in Rust. You install one binary from crates.io or a release archive. It audits local content and live sites under 57 stable rules, scores pages for AI answer-engine citation with TypeSafe AI Jev, stores rank history in local SQLite, gates CI on blocking rules, and exposes 13 MCP tools so coding agents can run the same checks. The free path uses DuckDuckGo and local files only. Optional paid backends stay off until you pass a flag and key.
+**What is jev-seo?** It is a free, open-source SEO and GEO command-line tool written in Rust. You install one binary from crates.io or a release archive. It audits local content and live sites under 58 stable rules, scores pages for AI answer-engine citation with TypeSafe AI Jev, stores rank history in local SQLite, gates CI on blocking rules, and exposes 13 MCP tools so coding agents can run the same checks. The free path uses DuckDuckGo and local files only. Optional paid backends stay off until you pass a flag and key.
 
 **Who is it for?** Developers, indie hackers, technical writers, and autonomous coding agents (Claude Code, Gemini CLI, Cursor, Antigravity) who need SEO evidence without a $130/month dashboard seat.
 
 **What does it cost?** Rules, crawls, reports, rank history: free. Jev semantic calls: fractions of a cent under `--jev-budget` (default $0.25 per run).
 
-`jev-seo` is a single static Rust binary for developers who refuse a $130/month SEO seat. It audits local Markdown and HTML trees under 57 stable rules, crawls live hosts with robots.txt honored, scores pages for answer-engine citation with TypeSafe AI Jev typed primitives, tracks rank drift in a local SQLite file, and exposes the same surface as a 13-tool stdio MCP server. Free search data comes from DuckDuckGo. Semantic scores sit behind `--jev-budget` (default $0.25 per run). Paid backends never fire without an explicit flag and key.
+`jev-seo` is a single static Rust binary for developers who refuse a $130/month SEO seat. It audits local Markdown and HTML trees under 58 stable rules, crawls live hosts with robots.txt honored, scores pages for answer-engine citation with TypeSafe AI Jev typed primitives, tracks rank drift in a local SQLite file, and exposes the same surface as a 13-tool stdio MCP server. Free search data comes from DuckDuckGo. Semantic scores sit behind `--jev-budget` (default $0.25 per run). Paid backends never fire without an explicit flag and key.
 
 One command proves the pitch:
 
 ```console
 $ jev-seo explain R19
-R19 | content | Medium | effort 2 (about a day)
+R19 | content | Medium | advisory (warning only) | effort 2 (about a day)
   title: AI slop markers
   fix:   Rewrite flagged boilerplate in plain words.
 ```
@@ -223,7 +223,7 @@ Paid suites price a seat. This prices a compile. The table maps what you get to 
 | Local rank history | SQLite drift in `.jev-seo.db`. `crawl --diff` compares to the last snapshot. |
 | Free search path | DuckDuckGo HTML and suggest. Tavily, DataForSEO, Jina, Firecrawl, extract stay parked until you opt in with a key. |
 
-**Start here:** [Example crawl](examples/jevseo-site/crawl.json) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Example audit HTML](examples/local-docs/report.html) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Narrative contract](references/narrative.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Eval protocol](docs/EVAL.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Agent skill](SKILL.md) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [PRD](docs/PRD.md)
+**Start here:** [Example crawl](examples/jevseo-site/crawl.json) · [Example audit HTML](examples/local-docs/report.html) · [Narrative contract](references/narrative.md) · [Eval protocol](docs/EVAL.md) · [Agent skill](SKILL.md) · [PRD](docs/PRD.md)
 
 ---
 
@@ -232,7 +232,7 @@ Paid suites price a seat. This prices a compile. The table maps what you get to 
 | Job | Paid dashboards | jev-seo |
 |---|---|---|
 | One-site audit with ranked fixes | Monthly seat, queued crawl | `crawl` in seconds, actions free |
-| Rank tracking over time | Subscription per project | SQLite drift history, ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¹0 |
+| Rank tracking over time | Subscription per project | SQLite drift history, ₹0 |
 | AI visibility scoring | Add-on tier | `geo` + `llms`, fractions of a cent per Jev call |
 | Agent access | API credits per call | 13-tool MCP on stdio |
 | Report exports | Export limits per plan | HTML, PDF, Markdown, CSV, action tracker, pairs |
@@ -247,7 +247,7 @@ Paid suites price a seat. This prices a compile. The table maps what you get to 
 | Part | Where it runs | Cost |
 |---|---|---|
 | 58-rule audit, local HTML/PDF/MD, CSV, pair matrix | Your machine | Free |
-| Live crawl (robots, redirects, orphans, timing) | Your binary ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ target host | Free |
+| Live crawl (robots, redirects, orphans, timing) | Your binary → target host | Free |
 | Rank history, snapshots, `--diff` | Local SQLite `.jev-seo.db` | Free |
 | Search Console pulls (`gsc`) | Google API with your OAuth client | Free |
 | SERP autocomplete and scrape | DuckDuckGo | Free |
@@ -272,9 +272,9 @@ Measured 2026-09-22. Protocol and re-run commands: [`docs/EVAL.md`](docs/EVAL.md
 | Cold start (`--help`) | 6ms | `time jev-seo --help` |
 | Local audit, 4 files | ~0.2s | `jev-seo audit docs/ --json` |
 | Live crawl, 6-10 pages | 3-11s wall (server-bound) | `jev-seo crawl <url> --max-pages 10` |
-| Score repeatability, 3 crawls | Score 99 stable; findings ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±2 from timing rules only | `jev-seo crawl <url> --json` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â3 |
-| Test suite | 107 green, clippy `-D warnings` clean | `cargo test` |
-| Budget guard | `--jev-budget 0` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ zero Jev POSTs | `jev-seo audit docs/ --jev-budget 0` |
+| Score repeatability, 3 crawls | Score 99 stable; findings ±2 from timing rules only | `jev-seo crawl <url> --json` ×3 |
+| Test suite | 112 green, clippy `-D warnings` clean | `cargo test` |
+| Budget guard | `--jev-budget 0` → zero Jev POSTs | `jev-seo audit docs/ --jev-budget 0` |
 | Citation gate | Report text citing unknown `RULE-Rxx` refuses to write | Covered in unit tests |
 
 Scores rank work. They do not predict rankings or traffic. Confidence gates print facts only when Jev is decisive; otherwise you get `[verify]` or a withheld number.
@@ -292,7 +292,7 @@ crates.io ships **v0.1.1**. **v0.1.2** releases **22 October 2026**.
 | `crawl --vitals` | Keyless PageSpeed lab vitals with R51-R53 |
 | `query --provider dfs` | Opt-in DataForSEO live SERP, free fallback |
 | `audit --actions-csv` | Ranked action tracker (id, priority, effort, impact) |
-| `audit --pairs-csv` | Cannibalization AÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂB pairs with word-count winner |
+| `audit --pairs-csv` | Cannibalization A×B pairs with word-count winner |
 | `audit --manifest` | Frozen `run.json` + `ledger.json` beside exports |
 | `--no-jev` / `--jev-budget` | Rules-only mode and hard USD spend cap |
 | `--user` / `--password` / `--header` | Basic auth + custom headers on target-site fetches; staging behind login becomes auditable |
@@ -348,7 +348,7 @@ jev-seo mcp
 | Lane | Command |
 |---|---|
 | Cargo (published) | `cargo install jev-seo` |
-| Build from source (What's new before release) | `git clone ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ && cargo install --path .` |
+| Build from source (What's new before release) | `git clone … && cargo install --path .` |
 | Linux x86_64 / ARM64 | `jev-seo-<target>.tar.gz` from [Releases](https://github.com/AkashPriyadarshii/jev-seo/releases) |
 | macOS Intel / ARM | Same Releases page, `tar.gz` with SHA256 |
 | Windows x86_64 | Same Releases page, `.zip` |
@@ -375,7 +375,7 @@ jev-seo audit content/posts/ --html report.html --pdf report.pdf --md report.md
 jev-seo audit content/posts/ --actions-csv actions.csv --pairs-csv pairs.csv --manifest out/
 ```
 
-Walks every Markdown and HTML file. Flags title collisions, thin content under 300 words, missing canonicals, missing alt text, skip-level headings, AI boilerplate, em-dash density, orphan pages, and keyword stems fighting each other. `--pairs-csv` expands each multi-file stem into AÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂB rows with a word-count winner.
+Walks every Markdown and HTML file. Flags title collisions, thin content under 300 words, missing canonicals, missing alt text, skip-level headings, AI boilerplate, em-dash density, orphan pages, and keyword stems fighting each other. `--pairs-csv` expands each multi-file stem into A×B rows with a word-count winner.
 
 ### 2. JSON-LD Schema.org validation
 
@@ -394,7 +394,7 @@ jev-seo robots example.com
 Reads `robots.txt` for GPTBot, ClaudeBot, anthropic-ai, PerplexityBot, Google-Extended, Bytespider. Prints allow/disallow and readiness actions.
 
 <details>
-<summary><strong>More workflows</strong> ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â briefs, GEO scoring, CI gate, sitemap, AI-slop radar, explain, baselines, narrative (click to expand)</summary>
+<summary><strong>More workflows</strong> — briefs, GEO scoring, CI gate, sitemap, AI-slop radar, explain, baselines, narrative (click to expand)</summary>
 
 ### 4. SERP-driven content brief
 
@@ -442,7 +442,7 @@ Built into `audit`:
 - 17 AI boilerplate markers (delve, leverage, testament, foster, seamless, crucial, robust, landscape, and peers)
 - Heading hierarchy skip-levels (H1 to H3 with no H2)
 - Internal link graph for zero-inbound orphans
-- Keyword cannibalization stems plus AÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂB conflict pairs
+- Keyword cannibalization stems plus A×B conflict pairs
 
 ### 10. Explain a rule, then diff a baseline
 
@@ -504,7 +504,7 @@ Options:
       --md <PATH>                 Write a Markdown report to this path
       --csv <PATH>                Write a CSV findings export to this path
       --actions-csv <PATH>        Write ranked action-tracker CSV (id, priority, effort, impact)
-      --pairs-csv <PATH>          Write stemÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂURL conflict pairs CSV (cannibalization)
+      --pairs-csv <PATH>          Write stem×URL conflict pairs CSV (cannibalization)
       --rescore <PATH>            Rebuild findings and actions from a saved audit JSON, no work
       --manifest <DIR>            Write run.json + ledger.json to this directory
       --no-jev                    Skip all Jev semantic calls (rules and local audit only)
@@ -541,19 +541,19 @@ Optional `narrative.json` beside audit exports loads at report time: unknown act
 
 Real output in the repo, not mockups:
 
-- `examples/jevseo-site/crawl.json` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â 10-page live crawl with health score, areas, findings, actions
-- `examples/jevseo-site/llms.json` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â answer-engine readiness with checks and actions
-- `examples/local-docs/report.html`, `report.md`, `findings.csv` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â one audit, three formats
-- `examples/narrative.example.json` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â narrative contract shape for report embeds
-- `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md` ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â full portfolio sweep: 38 orphans, 11 empty pages, 100/100 readiness, GEO 5 with verify, brand entity collision, under $0.001 spend
+- `examples/jevseo-site/crawl.json` — 10-page live crawl with health score, areas, findings, actions
+- `examples/jevseo-site/llms.json` — answer-engine readiness with checks and actions
+- `examples/local-docs/report.html`, `report.md`, `findings.csv` — one audit, three formats
+- `examples/narrative.example.json` — narrative contract shape for report embeds
+- `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md` — full portfolio sweep: 38 orphans, 11 empty pages, 100/100 readiness, GEO 5 with verify, brand entity collision, under $0.001 spend
 
-**Field report:** [Real audit: portfolio site, 50 pages, zero spend](https://jevseo.vercel.app/real-audit.html) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â every number from one live run, pre-fix findings included.
+**Field report:** [Real audit: portfolio site, 50 pages, zero spend](https://jevseo.vercel.app/real-audit.html) — every number from one live run, pre-fix findings included.
 
 **Single-file report and session shots** (regenerated pack in `docs/assets/`):
 
-- `banner.png` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· `trust-strip.png` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· `pipeline.svg` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· `cost-ladder.png`
-- `preview-summary.png` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· `preview-terminal.png` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· `preview-actions.png`
-- `preview-mcp.png` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· `preview-explain.png` ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· `impact-effort.png`
+- `banner.png` · `trust-strip.png` · `pipeline.svg` · `cost-ladder.png`
+- `preview-summary.png` · `preview-terminal.png` · `preview-actions.png`
+- `preview-mcp.png` · `preview-explain.png` · `impact-effort.png`
 
 ---
 
@@ -593,33 +593,33 @@ Real output in the repo, not mockups:
 
 ```
 jev-seo
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ src
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ main.rs         CLI entrypoint and command dispatch
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ engine.rs       TypeSafe Jev client, fan-out, spend counters
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ policy.rs       Confidence thresholds, GEO weights, injection gate
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ manifest.rs     run.json + ledger.json, citation gate, budgets
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ narrative.rs    narrative.json load, ID refusal, number checks
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ paths.rs        Guarded file reader, domain match, SSRF block
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ serp.rs         DuckDuckGo HTML and suggest scraper
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ audit.rs        Batch directory and file on-page auditor
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ rules.rs        Rule registry R01-R58, scoring, explain, CSV
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ actions.rs      Ranked actions and action-tracker CSV
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ schema.rs       JSON-LD Schema.org validator
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ robots.rs       Robots.txt and AI crawler analyzer
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ brief.rs        SERP-driven content brief generator
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ rank.rs         Local SQLite rank drift tracker
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ sitemap.rs      XML sitemap and hreflang auditor
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ crawl.rs        Live-site BFS crawler with dedup and timing
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ fetch.rs        Direct / Jina / Firecrawl bodies under credit budget
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ gsc.rs          Search Console device-flow client
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ llms.rs         llms.txt and AI crawler readiness scorer
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ mcp.rs          Stdio JSON-RPC 2.0 MCP server (13 tools)
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡   ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ tests.rs        Unit and integration harness (112 tests)
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ references/narrative.md
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ examples/           Real crawl, audit, and narrative fixtures
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ docs/               PRD, design, architecture, EVAL protocol
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Cargo.toml
-ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ README.md
+├── src
+│   ├── main.rs         CLI entrypoint and command dispatch
+│   ├── engine.rs       TypeSafe Jev client, fan-out, spend counters
+│   ├── policy.rs       Confidence thresholds, GEO weights, injection gate
+│   ├── manifest.rs     run.json + ledger.json, citation gate, budgets
+│   ├── narrative.rs    narrative.json load, ID refusal, number checks
+│   ├── paths.rs        Guarded file reader, domain match, SSRF block
+│   ├── serp.rs         DuckDuckGo HTML and suggest scraper
+│   ├── audit.rs        Batch directory and file on-page auditor
+│   ├── rules.rs        Rule registry R01-R58, scoring, explain, CSV
+│   ├── actions.rs      Ranked actions and action-tracker CSV
+│   ├── schema.rs       JSON-LD Schema.org validator
+│   ├── robots.rs       Robots.txt and AI crawler analyzer
+│   ├── brief.rs        SERP-driven content brief generator
+│   ├── rank.rs         Local SQLite rank drift tracker
+│   ├── sitemap.rs      XML sitemap and hreflang auditor
+│   ├── crawl.rs        Live-site BFS crawler with dedup and timing
+│   ├── fetch.rs        Direct / Jina / Firecrawl bodies under credit budget
+│   ├── gsc.rs          Search Console device-flow client
+│   ├── llms.rs         llms.txt and AI crawler readiness scorer
+│   ├── mcp.rs          Stdio JSON-RPC 2.0 MCP server (13 tools)
+│   └── tests.rs        Unit and integration harness (112 tests)
+├── references/narrative.md
+├── examples/           Real crawl, audit, and narrative fixtures
+├── docs/               PRD, design, architecture, EVAL protocol
+├── Cargo.toml
+└── README.md
 ```
 
 ---
@@ -653,13 +653,13 @@ CI runs `cargo check --all-targets`, `cargo test --all`, and the SEO gate on eve
 
 ## Ecosystem
 
-- [jev-seo](https://github.com/AkashPriyadarshii/jev-seo) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â this radar (FOSS SEO and GEO CLI + MCP)
-- [jev-superpowers](https://github.com/AkashPriyadarshii/jev-superpowers) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Jev-gated agent engineering workflows
-- [jev-curate](https://github.com/AkashPriyadarshii/jev-curate) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Jev-curated content toolkit
-- [jev-git](https://github.com/AkashPriyadarshii/jev-git) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Jev reflex gates for git
-- [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Precompiled TDLib binaries for four Android ABIs
-- [kharcha](https://github.com/AkashPriyadarshii/kharcha) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Offline-first UPI expense tracker for Android
-- [Prefer](https://tryprefer.com/) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â AI visibility platform for understanding how ChatGPT, Claude, Gemini, and Perplexity talk about your brand
+- [jev-seo](https://github.com/AkashPriyadarshii/jev-seo) — this radar (FOSS SEO and GEO CLI + MCP)
+- [jev-superpowers](https://github.com/AkashPriyadarshii/jev-superpowers) — Jev-gated agent engineering workflows
+- [jev-curate](https://github.com/AkashPriyadarshii/jev-curate) — Jev-curated content toolkit
+- [jev-git](https://github.com/AkashPriyadarshii/jev-git) — Jev reflex gates for git
+- [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android) — Precompiled TDLib binaries for four Android ABIs
+- [kharcha](https://github.com/AkashPriyadarshii/kharcha) — Offline-first UPI expense tracker for Android
+- [Prefer](https://tryprefer.com/) — AI visibility platform for understanding how ChatGPT, Claude, Gemini, and Perplexity talk about your brand
 
 ---
 
@@ -673,13 +673,13 @@ Patna, Bihar, India
 - LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akashpriyadarshii)
 - Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)
 
-**Social:** [X / Twitter](https://x.com/Akash__ydv001) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Threads](https://www.threads.net/@akash.priyadarshii) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Instagram](https://www.instagram.com/akash.priyadarshii/) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· [Reddit](https://reddit.com/user/akashpriyadarshi)
+**Social:** [X / Twitter](https://x.com/Akash__ydv001) · [Threads](https://www.threads.net/@akash.priyadarshii) · [Instagram](https://www.instagram.com/akash.priyadarshii/) · [Reddit](https://reddit.com/user/akashpriyadarshi)
 
 ---
 
 ## Contributors
 
-- [@jerryrat](https://github.com/jerryrat) ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â paid search provider path and DuckDuckGo header research (PR #2)
+- [@jerryrat](https://github.com/jerryrat) — paid search provider path and DuckDuckGo header research (PR #2)
 
 ---
 
