@@ -3,19 +3,13 @@
 ## Current Phase: Unreleased → v0.1.2 (2026-10-22)
 
 ### Shipped on master (local, unpushed)
-- [x] W6 designed PDF deck: cover, scorecard, findings by area, inventory, narrative, method
-- [x] W7 PageSpeed vitals: `crawl --vitals`, R51-R53, offline-safe degrade
-- [x] W8 eval rigor: second-judge protocol, wording A/B log, human-label table, registry snapshot test
-- [x] DFS opt-in: `query --provider dfs`, key-gated, free fallback
-- [x] GEO state fix (`b577aa2`): body copy scoring, deduped state, geo-only gate, model pin
-- [x] Phase A security (`d6dc533`): MCP path guards, fail-closed safety/SSRF, bounded reads, stderr spend
-- [x] Phase A-addition (`6f12e54`): escapes, question versioning, eval log, runner-up flags, `link`, meta verdict
-- [x] Phase B truthfulness (`98c7bfb`): upgrade math, spend truth, rank labels, audit precision, provider honesty, R25/R33/R24/R41
-- [x] Blocking vs advisory gates: 20 rules fail CI, 33 warn; `--fail-on`, tagged actions/CSV/explain
-- [x] Wave 1 (`wave-1`): provenance, truth tags, llms honesty, 15-bot registry, rank provenance, forbid/max-critical, query_fit, retry, fixtures, examples, integrations doc, Princeton trio
-- [x] Wave-1 additions: side-probability gating, opening state, reservation, probes, R54-R57, brief upgrades, durability, secret-scan CI, effective Markdown gates
-- [x] Site audit recorded: `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md`
-- [x] 107 tests green, clippy clean
+- [x] W6-W8 + Phase A/B + Wave 1: PDF deck, vitals R51-R53, eval rigor, DFS opt-in, security, truthfulness, provenance
+- [x] Live audits recorded: `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md`, `docs/audits/typesafe-ai-2026-09-24.md`
+- [x] Review-driven P1 + PH-comment fixes: R03 only on 2+ hops, `seo_extract` SSRF per-URL, `--no-jev` audit gate, R54 advisory/heuristic; R56 soft-404 verified with probe-gate test
+- [x] Basic auth / custom headers: `--user`/`--password` (Basic) and repeatable `--header` applied to all target-site fetches (crawl/robots/sitemap/llms/site-scoring)
+- [x] R58 broken-hreflang-cluster: cross-page graph flags noindexed or unreciprocated alternates, heuristic + advisory
+- [x] RULE_SET_VERSION 2026.09b; registry R01-R58
+- [x] 112 tests green, clippy clean
 
 ### Shipped on master (local + pushed docs)
 - [x] Phase 0-4 skeleton, modules, crawl, llms, doctor, HTML reports (v0.1.1 on crates.io)

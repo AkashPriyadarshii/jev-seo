@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Review-driven fixes from three real-product comments: basic auth (`--user`/`--password`) and custom request headers (`--header`, repeatable) applied to every target-site fetch so staging sites behind a login wall become auditable pre-launch; R58 broken-hreflang-cluster check spanning pages (noindexed or unreciprocated alternates), heuristic and advisory; R56 soft-404 verified against the "closed but still 200" pattern with a probe-gate test; Blocking→Advisory reclassification for R03 single-hop redirects and R54 templated metadata.
 - Wave-1 additions: side-probability Score decisiveness, opening-after-H1 state, conditional and policy-page question filtering, budget reservation with missing-usage estimate, soft-404/temp-redirect/host-variant probes, crawl score caps, R54 templated metadata, R55 uncited claims, brief competitor exclusion, report trust footer, atomic ledger writes, registry invariant test.
+- Test harness at 112 passing unit and integration tests with zero clippy warnings.
 - Premortem hardening: scope-aware effective gates (template-owned tags warn on Markdown), JSON-before-gates contract, zero clippy under `-D warnings`, rank observation trail, link budget flags, crate include list, secret-scan CI.
 - Wave 1 evidence foundations: finding provenance (`observed_at`, `source`, `RULE_SET_VERSION` in manifests), fact/heuristic truth tags on findings/CSV/actions/explain, `RULE-` gate truth split.
 - Wave 1 CI invariants: `audit --forbid R31,R36` and `--max-critical 0` above the class gate.
@@ -23,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Audit precision: order-insensitive meta/canonical parsing, all-three OG tags required, empty alt accepted as decorative, leading heading jumps flagged, inline HTML headings in Markdown counted, code-stripped word counts, broken JSON-LD fires R33, opening size fires R24/R41.
 - Search honesty: unknown `--provider` values bail with the valid list, explicit Tavily warns like DFS, labels name the backend that actually served, rank prints the real top-N window, `brief --provider` passthrough, validated and capped `extract`.
 - Jev sample path: homepage judges first, Markdown excerpts send prose without frontmatter, drops print a note.
-- Test harness at 107 passing unit and integration tests with zero clippy warnings.
+- Test harness at 112 passing unit and integration tests with zero clippy warnings.
 - Designed PDF deck from one manifest: cover, scorecard with impact list, findings by area, page inventory, narrative, method appendix (`audit --pdf`).
 - PageSpeed vitals on `crawl --vitals`: keyless lab LCP/CLS/INP for the start URL with R51-R53 (slow LCP, layout shift, lab-only note); degrades cleanly offline.
 - Eval rigor: second-judge protocol, wording A/B log, and human-label sample tables in `docs/EVAL.md`; question-registry snapshot test fails on silent Jev wording edits.
@@ -64,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Composite five-dimension GEO score, intent routing hints, and per-command speculative fan-out.
 - SERP relevance rerank with per-section confidence gating.
 - `audit --min-pass` CI gate with a GitHub Actions workflow, GEO score trend history, and home-directory database.
-- Test harness at 107 passing unit and integration tests with zero clippy warnings.
+- Test harness at 112 passing unit and integration tests with zero clippy warnings.
 - README rewritten for launch: What's new table, full command and MCP matrices, v0.1.2 date, build-from-source path. Ships as v0.1.2 on 2026-10-22.
 
 ## [0.1.1] - 2026-09-22
