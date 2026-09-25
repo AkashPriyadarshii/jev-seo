@@ -134,6 +134,8 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
     <a href="https://github.com/AkashPriyadarshii/jev-seo/stargazers"><img src="https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars" alt="stars" /></a>
   </p>
   <img src="docs/assets/banner.png" alt="jev-seo banner: free Rust SEO and GEO CLI with 57 rules, 13 MCP tools, 107 tests" width="100%">
+*Fuel the next build:* [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
+
 </div>
 
 ---
@@ -661,7 +663,7 @@ Patna, Bihar, India
 
 - GitHub: [@AkashPriyadarshii](https://github.com/AkashPriyadarshii)
 - Portfolio: [akashpriyadarshi.vercel.app](https://akashpriyadarshi.vercel.app)
-- LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akash-priyadarshi-1aa51b37a)
+- LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akashpriyadarshii)
 - Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)
 
 **Social:** [X / Twitter](https://x.com/Akash__ydv001) · [Threads](https://www.threads.net/@akash.priyadarshii) · [Instagram](https://www.instagram.com/akash.priyadarshii/) · [Reddit](https://reddit.com/user/akashpriyadarshi)
