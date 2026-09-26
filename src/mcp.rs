@@ -45,11 +45,14 @@ pub(crate) struct StdioSampler<'a> {
     lines: std::io::Lines<std::io::StdinLock<'a>>,
     stdout: &'a mut std::io::Stdout,
     next_id: u64,
+    /// Set from the client's `initialize` params: no declared capability,
+    /// no request sent (some clients silently drop it, which would hang).
+    sampling_allowed: bool,
 }
 
 impl<'a> StdioSampler<'a> {
     fn new(lines: std::io::Lines<std::io::StdinLock<'a>>, stdout: &'a mut std::io::Stdout) -> Self {
-        Self { lines, stdout, next_id: 0 }
+        Self { lines, stdout, next_id: 0, sampling_allowed: false }
     }
 
     /// Next non-empty client line, or None on EOF/error.
@@ -72,6 +75,9 @@ impl<'a> StdioSampler<'a> {
 
 impl Sampler for StdioSampler<'_> {
     fn sample(&mut self, prompt: &str) -> std::result::Result<String, String> {
+        if !self.sampling_allowed {
+            return Err("client did not declare the sampling capability".into());
+        }
         let id = format!("jev-seo-sample-{}", self.next_id);
         self.next_id += 1;
         let req = json!({
@@ -141,6 +147,17 @@ pub fn run_stdio_server() -> Result<()> {
             continue;
         }
 
+        // Capability gate: only clients that declare `sampling` ever get a
+        // `sampling/createMessage` request; the rest take the manual loop.
+        if req.method == "initialize" {
+            sampler.sampling_allowed = req
+                .params
+                .as_ref()
+                .and_then(|p| p.get("capabilities"))
+                .and_then(|c| c.get("sampling"))
+                .is_some();
+        }
+
         let resp = handle_request_with(&req, &mut sampler);
         let resp_str = serde_json::to_string(&resp)?;
         sampler.reply(&resp_str)?;
@@ -180,12 +197,13 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                 "tools": [
                     {
                         "name": "seo_cite_check",
-                        "description": "Ask the connected agent (MCP sampling, free) a buyer query and report whether it names the target domain",
+                        "description": "Check whether an AI answer names the target domain for a buyer query. Pass \"answer\" to score directly (works everywhere); omit it to borrow the client's model via sampling, or get the prompt back to answer yourself",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
                                 "target": { "type": "string", "description": "Domain or URL to look for, e.g. example.com" },
-                                "query": { "type": "string", "description": "Buyer query to put to the agent" }
+                                "query": { "type": "string", "description": "Buyer query to check" },
+                                "answer": { "type": "string", "description": "AI answer text to score; omit to use sampling or receive the prompt" }
                             },
                             "required": ["target", "query"]
                         }
@@ -392,6 +410,35 @@ fn safety_gate(tool: &str, target: &str) -> Option<String> {
 
 /// Normalize a target domain or URL to the bare host the model's answer is
 /// scanned for: lowercase, no scheme, no leading www., no path.
+/// The exact buyer-query prompt the agent answers, whether over sampling or
+/// with its own model in the manual loop.
+fn cite_prompt(query: &str) -> String {
+    format!(
+        "Answer this search query briefly, naming the specific websites or brands you recommend: {query}"
+    )
+}
+
+/// Score one answer for a target citation and log the drift verdict.
+/// Best-effort ledger: a stuck database never fails the check.
+fn cite_verdict(target: &str, query: &str, answer: &str, source: &str) -> String {
+    let host = cite_host(target);
+    let cited = answer.to_lowercase().contains(&host);
+    let prev = crate::rank::DbStore::open()
+        .ok()
+        .and_then(|db| db.record_cite(target, query, cited).ok())
+        .flatten();
+    let excerpt: String = answer.chars().take(300).collect();
+    serde_json::to_string_pretty(&json!({
+        "target": target,
+        "query": query,
+        "cited": cited,
+        "since_last": prev,
+        "source": source,
+        "excerpt": excerpt,
+    }))
+    .unwrap_or_default()
+}
+
 fn cite_host(target: &str) -> String {
     let t = target.trim().to_lowercase();
     let t = t.split("://").last().unwrap_or(&t);
@@ -410,29 +457,27 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
             if let Some(err) = safety_gate("seo_cite_check", target) {
                 return err;
             }
-            let host = cite_host(target);
-            let prompt = format!(
-                "Answer this search query briefly, naming the specific websites or brands you recommend: {query}"
-            );
-            let answer = match sampler.sample(&prompt) {
-                Ok(a) => a,
-                Err(e) => return format!("Error: sampling unavailable: {e}"),
-            };
-            let cited = answer.to_lowercase().contains(&host);
-            // Drift log is best-effort: a stuck ledger must never fail the check.
-            let prev = crate::rank::DbStore::open()
-                .ok()
-                .and_then(|db| db.record_cite(target, query, cited).ok())
-                .flatten();
-            let excerpt: String = answer.chars().take(300).collect();
-            serde_json::to_string_pretty(&json!({
-                "target": target,
-                "query": query,
-                "cited": cited,
-                "since_last": prev,
-                "excerpt": excerpt,
-            }))
-            .unwrap_or_default()
+            // Universal path: the agent answers with its own model, no client
+            // capability needed. Works on every MCP client ever made.
+            if let Some(answer) = args.get("answer").and_then(|v| v.as_str()) {
+                if !answer.trim().is_empty() {
+                    return cite_verdict(target, query, answer, "answer");
+                }
+            }
+            // Fast path: borrow the client's model over sampling.
+            let prompt = cite_prompt(query);
+            match sampler.sample(&prompt) {
+                Ok(answer) => cite_verdict(target, query, &answer, "sampling"),
+                // Manual loop fallback: tell the agent exactly how to finish.
+                Err(e) => serde_json::to_string_pretty(&json!({
+                    "target": target,
+                    "query": query,
+                    "needs_answer": true,
+                    "prompt": prompt,
+                    "note": format!("sampling unavailable ({e}); answer the prompt with your own model, then re-call seo_cite_check with \"answer\""),
+                }))
+                .unwrap_or_default(),
+            }
         }
         "seo_serp_inspect" => {
             let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
