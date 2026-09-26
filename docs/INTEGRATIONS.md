@@ -1,7 +1,7 @@
 # Integrations: drive jev-seo from Python, Node, and agents
 
 jev-seo is a Rust binary with machine-clean `--json` on every command and a
-13-tool MCP server. Any language drives it through stdout or stdio. No SDK
+15-tool MCP server. Any language drives it through stdout or stdio. No SDK
 needed; parse the JSON with your standard library.
 
 ## Stable JSON shapes
@@ -50,9 +50,9 @@ console.log(`health ${report.score} (${report.grade}), paid backends: ${new Set(
 ## Agents (Claude Code, Cursor, Gemini CLI)
 
 Prefer the MCP server over shelling out: `jev-seo mcp` speaks stdio
-JSON-RPC 2.0 with 13 tools (`seo_audit`, `seo_geo`, `seo_crawl`,
-`seo_llms`, `seo_brief`, `seo_extract`, `seo_explain`, `seo_report`,
-...). Point the client at the binary; no API keys required for the
+JSON-RPC 2.0 with 15 tools (`seo_cite_check`, `seo_gap`, `seo_audit`,
+`seo_geo`, `seo_crawl`, `seo_llms`, `seo_brief`, `seo_extract`,
+`seo_explain`, `seo_report`, ...). Point the client at the binary; no API keys required for the
 deterministic surface, `TYPESAFE_API_KEY` unlocks the semantic one.
 `SKILL.md` in the repo root is the agent contract: fast paths, output
 reading rules, and deploy-gating policy.
