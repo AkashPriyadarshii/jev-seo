@@ -209,6 +209,18 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                         }
                     },
                     {
+                        "name": "seo_gap",
+                        "description": "Ranked gap queue for a verified Search Console site: high-impression queries in weak positions joined with citation history",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "site": { "type": "string", "description": "Verified site URL, e.g. https://example.com/" },
+                                "limit": { "type": "integer", "description": "Top queries to rank (default 10)" }
+                            },
+                            "required": ["site"]
+                        }
+                    },
+                    {
                         "name": "seo_keywords",
                         "description": "Fetch autocomplete keyword suggestions for zero cost",
                         "inputSchema": {
@@ -420,9 +432,11 @@ fn cite_prompt(query: &str) -> String {
 
 /// Score one answer for a target citation and log the drift verdict.
 /// Best-effort ledger: a stuck database never fails the check.
-fn cite_verdict(target: &str, query: &str, answer: &str, source: &str) -> String {
+fn cite_verdict(target: &str, query: &str, answer: &str, source: &str, citations: &[String]) -> String {
     let host = cite_host(target);
-    let cited = answer.to_lowercase().contains(&host);
+    let lower = answer.to_lowercase();
+    let cited = lower.contains(&host)
+        || citations.iter().any(|c| c.to_lowercase().contains(&host));
     let prev = crate::rank::DbStore::open()
         .ok()
         .and_then(|db| db.record_cite(target, query, cited).ok())
@@ -434,6 +448,7 @@ fn cite_verdict(target: &str, query: &str, answer: &str, source: &str) -> String
         "cited": cited,
         "since_last": prev,
         "source": source,
+        "engine_citations": citations,
         "excerpt": excerpt,
     }))
     .unwrap_or_default()
@@ -448,6 +463,17 @@ fn cite_host(target: &str) -> String {
 
 fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sampler) -> String {
     match name {
+        "seo_gap" => {
+            let site = args.get("site").and_then(|v| v.as_str()).unwrap_or("");
+            if site.trim().is_empty() {
+                return "Error: seo_gap needs \"site\" (verified Search Console URL).".into();
+            }
+            let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+            match crate::gsc::gap(site, limit) {
+                Ok(rows) => serde_json::to_string_pretty(&rows).unwrap_or_default(),
+                Err(e) => format!("Error: {e:#}"),
+            }
+        }
         "seo_cite_check" => {
             let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("").trim();
             let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").trim();
@@ -461,22 +487,26 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
             // capability needed. Works on every MCP client ever made.
             if let Some(answer) = args.get("answer").and_then(|v| v.as_str()) {
                 if !answer.trim().is_empty() {
-                    return cite_verdict(target, query, answer, "answer");
+                    return cite_verdict(target, query, answer, "answer", &[]);
                 }
             }
             // Fast path: borrow the client's model over sampling.
             let prompt = cite_prompt(query);
             match sampler.sample(&prompt) {
-                Ok(answer) => cite_verdict(target, query, &answer, "sampling"),
-                // Manual loop fallback: tell the agent exactly how to finish.
-                Err(e) => serde_json::to_string_pretty(&json!({
-                    "target": target,
-                    "query": query,
-                    "needs_answer": true,
-                    "prompt": prompt,
-                    "note": format!("sampling unavailable ({e}); answer the prompt with your own model, then re-call seo_cite_check with \"answer\""),
-                }))
-                .unwrap_or_default(),
+                Ok(answer) => cite_verdict(target, query, &answer, "sampling", &[]),
+                Err(se) => match crate::llm::ask(&prompt) {
+                    // Paid path: configured engine answers server-side.
+                    Ok((answer, cites)) => cite_verdict(target, query, &answer, "engine", &cites),
+                    // Manual loop fallback: tell the agent exactly how to finish.
+                    Err(le) => serde_json::to_string_pretty(&json!({
+                        "target": target,
+                        "query": query,
+                        "needs_answer": true,
+                        "prompt": prompt,
+                        "note": format!("sampling unavailable ({se}); engine unavailable ({le}); answer the prompt with your own model, then re-call seo_cite_check with \"answer\""),
+                    }))
+                    .unwrap_or_default(),
+                },
             }
         }
         "seo_serp_inspect" => {
@@ -535,7 +565,14 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                     Err(e) => format!("Error evaluating GEO via Jev: {}", e),
                 }
             } else {
-                "Error: TYPESAFE_API_KEY environment variable not configured.".into()
+                // Free tier: deterministic keyless score, no model involved.
+                let out = json!({
+                    "target": target,
+                    "query": query,
+                    "keyless": crate::geo_keyless::score(&content, query),
+                    "note": "keyless deterministic score; set TYPESAFE_API_KEY for Jev semantic judgment",
+                });
+                serde_json::to_string_pretty(&out).unwrap_or_default()
             }
         }
         "seo_keywords" => {
@@ -655,10 +692,16 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                 ) {
                     (Ok(cur), Ok(base)) => {
                         let actions = crate::rules::actions_for(&cur.findings);
+                        // Drift is best-effort: a missing ledger yields no alerts.
+                        let drift = crate::rank::DbStore::open()
+                            .ok()
+                            .and_then(|db| db.drift_alerts(200).ok())
+                            .unwrap_or_default();
                         let out = json!({
                             "diff": crate::main_report_diff(&cur, &base),
                             "actions": actions,
                             "pairs": crate::audit::cannibalization_pairs(&cur),
+                            "drift": drift,
                         });
                         serde_json::to_string_pretty(&out).unwrap_or_default()
                     }

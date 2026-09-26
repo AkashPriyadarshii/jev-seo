@@ -10,7 +10,9 @@ mod brief;
 mod crawl;
 mod engine;
 mod fetch;
+mod geo_keyless;
 mod gsc;
+mod llm;
 mod llms;
 mod manifest;
 mod narrative;
@@ -265,7 +267,7 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Google Search Console: free first-party query data (auth, sites, query)
+    /// Google Search Console: free first-party query data (auth, sites, query, gap)
     Gsc {
         /// Action: auth, sites, or query
         op: String,
@@ -1057,7 +1059,22 @@ fn main() -> Result<()> {
                     Err(e) => eprintln!("{}", format!("Error: Jev scoring failed ({e:#}).").red()),
                 }
             } else {
-                eprintln!("{}", "Error: TYPESAFE_API_KEY environment variable not set.".red());
+                // Free tier: deterministic keyless score, same 6k-char signal.
+                let k = geo_keyless::score(&text, &query);
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&k)?);
+                } else {
+                    println!("\n{}", "GEO Report (keyless deterministic):".cyan().bold());
+                    println!("  Target Query:    {}", query);
+                    println!("  GEO Score:       {}/10 ({} / 100)", k.score_10, k.score_100);
+                    for s in &k.signals {
+                        println!("  - {}", s.dimmed());
+                    }
+                    println!("  {}", "Set TYPESAFE_API_KEY for Jev semantic judgment.".dimmed());
+                }
+                if let Ok(db) = rank::DbStore::open() {
+                    let _ = db.record_geo(&target, &query, k.score_10);
+                }
             }
         }
         Commands::Schema { target, json } => {
@@ -1114,6 +1131,7 @@ fn main() -> Result<()> {
             println!("  Robots URL:     {}", report.robots_url.dimmed());
             println!("  HTTP Status:    {}", report.status_code);
             println!("  Has robots.txt: {}", if report.has_robots { "YES".green() } else { "NO".red() });
+            println!("  Citation bots:  {}/{} search crawlers unblocked", report.citation_bots_allowed, robots::CITATION_BOTS.len());
 
             if !report.sitemaps.is_empty() {
                 println!("\n{}", "Sitemaps Discovered:".cyan().bold());
@@ -1732,8 +1750,34 @@ fn main() -> Result<()> {
                         }
                     }
                 }
+                "gap" => {
+                    let site = site.unwrap_or_else(|| {
+                        eprintln!("{}", "Error: gap needs --site <verified URL>.".red());
+                        std::process::exit(2);
+                    });
+                    let rows = gsc::gap(&site, limit)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&rows)?);
+                    } else {
+                        println!("\n{} {}", "Gap queue (impressions x weak position):".cyan().bold(), site.dimmed());
+                        for r in &rows {
+                            let cited = match r.cited_before {
+                                Some(true) => "cited".green().to_string(),
+                                Some(false) => "missed".yellow().to_string(),
+                                None => "unchecked".dimmed().to_string(),
+                            };
+                            println!(
+                                "  {:<40} imp {:>7.0} pos {:>5.1} {}",
+                                r.query.chars().take(40).collect::<String>(),
+                                r.impressions,
+                                r.position,
+                                cited
+                            );
+                        }
+                    }
+                }
                 other => {
-                    eprintln!("{}", format!("Error: unknown gsc action '{}', use auth, sites, or query.", other).red());
+                    eprintln!("{}", format!("Error: unknown gsc action '{}', use auth, sites, gap, or query.", other).red());
                     std::process::exit(2);
                 }
             }

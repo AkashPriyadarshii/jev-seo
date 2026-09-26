@@ -12,6 +12,8 @@ pub struct RobotsReport {
     pub ai_bot_rules: Vec<AiBotRule>,
     pub sitemaps: Vec<String>,
     pub disallow_all: bool,
+    /// Citation-driving search bots not blocked (Allowed or default allow).
+    pub citation_bots_allowed: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +69,7 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
                 ai_bot_rules: Vec::new(),
                 sitemaps: Vec::new(),
                 disallow_all: false,
+                citation_bots_allowed: 0,
             })
         }
     }
@@ -76,6 +79,29 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
 /// weights; search bots drive citations and answers. Blocking GPTBot does NOT
 /// block ChatGPT Search (OAI-SearchBot), and Google-Extended never affected
 /// AI Overviews: the categories below keep that distinction visible.
+/// Search bots whose fetches ground answers and citations. Training bots
+/// (GPTBot, CCBot) never cite; these five decide answer-engine visibility.
+pub const CITATION_BOTS: &[&str] = &[
+    "OAI-SearchBot",
+    "ChatGPT-User",
+    "Claude-SearchBot",
+    "PerplexityBot",
+    "Googlebot",
+];
+
+/// Count of citation bots not blocked. Pure function over parsed rules.
+pub fn citation_ready(rules: &[AiBotRule]) -> u8 {
+    CITATION_BOTS
+        .iter()
+        .filter(|bot| {
+            rules
+                .iter()
+                .find(|r| r.bot_name == **bot)
+                .is_none_or(|r| r.status != BotStatus::Disallowed)
+        })
+        .count() as u8
+}
+
 pub const TRACKED_AI_BOTS: &[(&str, &str)] = &[
     ("GPTBot", "training: OpenAI model training foundation data"),
     ("OAI-SearchBot", "search: ChatGPT search retrieval"),
@@ -111,6 +137,7 @@ pub fn parse_robots_txt(domain: &str, robots_url: &str, status_code: u16, body: 
             ai_bot_rules: Vec::new(),
             sitemaps: Vec::new(),
             disallow_all: false,
+            citation_bots_allowed: 0,
         });
     }
 
@@ -156,11 +183,12 @@ pub fn parse_robots_txt(domain: &str, robots_url: &str, status_code: u16, body: 
 
     let disallow_all = star_disallows.iter().any(|d| d == "/");
 
-    let ai_bot_rules = TRACKED_AI_BOTS
+    let ai_bot_rules: Vec<AiBotRule> = TRACKED_AI_BOTS
         .iter()
         .map(|(bot, purpose)| evaluate_bot_rule(bot, purpose, &sections, disallow_all))
         .collect();
 
+    let citation_bots_allowed = citation_ready(&ai_bot_rules);
     Ok(RobotsReport {
         domain: domain.to_string(),
         robots_url: robots_url.to_string(),
@@ -169,6 +197,7 @@ pub fn parse_robots_txt(domain: &str, robots_url: &str, status_code: u16, body: 
         ai_bot_rules,
         sitemaps,
         disallow_all,
+        citation_bots_allowed,
     })
 }
 

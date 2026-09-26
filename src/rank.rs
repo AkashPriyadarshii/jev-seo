@@ -15,6 +15,15 @@ pub struct DbStore {
     conn: Connection,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriftAlert {
+    pub kind: String,
+    pub target: String,
+    pub term: String,
+    pub from: String,
+    pub to: String,
+}
+
 impl DbStore {
     pub fn open() -> Result<Self> {
         let path = std::env::var("JEV_SEO_DB").ok().unwrap_or_else(|| {
@@ -194,6 +203,73 @@ impl DbStore {
         )?;
         Ok(prev)
     }
+
+    /// Latest citation verdict for a query term across any target, if ever checked.
+    pub fn last_cite_for_term(&self, term: &str) -> Option<bool> {
+        self.conn
+            .query_row(
+                "SELECT cited FROM cite_history WHERE term = ?1 ORDER BY id DESC LIMIT 1",
+                params![term],
+                |row| {
+                    let v: i64 = row.get(0)?;
+                    Ok(v != 0)
+                },
+            )
+            .ok()
+    }
+
+    /// Drift alerts from history flips: lost/gained citations, GEO score drops.
+    /// Reads the last two observations per (target, term) over recent rows.
+    pub fn drift_alerts(&self, recent: usize) -> Result<Vec<DriftAlert>> {
+    let mut out = Vec::new();
+    let mut cites: std::collections::BTreeMap<(String, String), Vec<bool>> =
+        std::collections::BTreeMap::new();
+    let mut stmt = self.conn.prepare(
+        "SELECT target, term, cited FROM cite_history ORDER BY id DESC LIMIT ?1",
+    )?;
+    let rows = stmt.query_map(params![recent as i64], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)? != 0))
+    })?;
+    for r in rows {
+        let (target, term, cited) = r?;
+        cites.entry((target, term)).or_default().push(cited);
+    }
+    for ((target, term), vals) in &cites {
+        if vals.len() >= 2 && vals[0] != vals[1] {
+            out.push(DriftAlert {
+                kind: if vals[0] { "citation_gained".into() } else { "citation_lost".into() },
+                target: target.clone(),
+                term: term.clone(),
+                from: vals[1].to_string(),
+                to: vals[0].to_string(),
+            });
+        }
+    }
+    let mut geos: std::collections::BTreeMap<(String, String), Vec<u32>> =
+        std::collections::BTreeMap::new();
+    let mut stmt = self.conn.prepare(
+        "SELECT target, term, score FROM geo_history ORDER BY id DESC LIMIT ?1",
+    )?;
+    let rows = stmt.query_map(params![recent as i64], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, u32>(2)?))
+    })?;
+    for r in rows {
+        let (target, term, score) = r?;
+        geos.entry((target, term)).or_default().push(score);
+    }
+    for ((target, term), vals) in &geos {
+        if vals.len() >= 2 && vals[0] < vals[1] {
+            out.push(DriftAlert {
+                kind: "geo_drop".into(),
+                target: target.clone(),
+                term: term.clone(),
+                from: vals[1].to_string(),
+                to: vals[0].to_string(),
+            });
+        }
+    }
+    Ok(out)
+}
 
     /// Store a crawl snapshot, returning the previous (pages, broken) pair for --diff.
     pub fn record_crawl_snapshot(

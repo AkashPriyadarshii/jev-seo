@@ -12,6 +12,10 @@ pub struct LlmsInfo {
     pub status: u16,
     pub bytes: usize,
     pub sections: Vec<String>,
+    /// llms.txt shape grade 0-100: H1, blockquote summary, link bullets,
+    /// Optional section, 25 points each.
+    pub shape_score: u8,
+    pub shape_notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +44,35 @@ pub fn parse_llms_txt(body: &str) -> (usize, Vec<String>) {
         .take(20)
         .collect();
     (body.len(), sections)
+}
+
+/// Grade llms.txt shape against the convention: H1 title, blockquote
+/// summary, markdown link bullets, Optional section. Pure function.
+pub fn shape_grade(body: &str) -> (u8, Vec<String>) {
+    let mut score = 0u8;
+    let mut notes = Vec::new();
+    let lines: Vec<&str> = body.lines().map(str::trim).collect();
+    if lines.iter().any(|l| l.starts_with("# ") && !l.starts_with("##")) {
+        score += 25;
+    } else {
+        notes.push("missing H1 title".into());
+    }
+    if lines.iter().any(|l| l.starts_with('>')) {
+        score += 25;
+    } else {
+        notes.push("missing blockquote summary".into());
+    }
+    if lines.iter().any(|l| l.starts_with("- [") && l.contains("](")) {
+        score += 25;
+    } else {
+        notes.push("missing markdown link bullets".into());
+    }
+    if lines.iter().any(|l| l.trim_start_matches('#').trim().eq_ignore_ascii_case("optional")) {
+        score += 25;
+    } else {
+        notes.push("missing Optional section".into());
+    }
+    (score, notes)
 }
 
 fn check(name: &str, passed: bool, message: &str) -> crate::audit::CheckItem {
@@ -73,6 +106,7 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     };
     let present = status == 200 && !body.trim().is_empty();
     let (bytes, sections) = if present { parse_llms_txt(&body) } else { (0, Vec::new()) };
+    let (shape_score, shape_notes) = if present { shape_grade(&body) } else { (0, vec!["no file to grade".into()]) };
 
     let robots = crate::robots::inspect_robots(&domain).unwrap_or_else(|_| crate::robots::RobotsReport {
         domain: domain.clone(),
@@ -82,6 +116,7 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
         ai_bot_rules: Vec::new(),
         sitemaps: Vec::new(),
         disallow_all: false,
+        citation_bots_allowed: 0,
     });
 
     let mut ai_allowed = Vec::new();
@@ -132,7 +167,7 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     Ok(LlmsReport {
         domain,
         llms_url,
-        info: LlmsInfo { present, status, bytes, sections },
+        info: LlmsInfo { present, status, bytes, sections, shape_score, shape_notes },
         ai_allowed,
         ai_default,
         ai_blocked,

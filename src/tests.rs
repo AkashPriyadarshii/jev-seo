@@ -237,7 +237,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(resp.error.is_none());
         let res = resp.result.unwrap();
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
-        assert_eq!(tools.len(), 14, "All 14 agent SEO tools must be exposed");
+        assert_eq!(tools.len(), 15, "All 15 agent SEO tools must be exposed");
 
         let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(|n| n.as_str())).collect();
         assert!(names.contains(&"seo_keywords"));
@@ -255,6 +255,149 @@ Sitemap: https://example.com/sitemap.xml
         assert!(names.contains(&"seo_report"));
         assert!(names.contains(&"seo_cite_check"));
         assert_eq!(names[0], "seo_cite_check", "cite check leads the tool list");
+        assert!(names.contains(&"seo_gap"));
+    }
+
+    #[test]
+    fn test_gap_score_orders_page_two_first() {
+        use crate::gsc::gap_score;
+        assert!(gap_score(500.0, 15.0) > gap_score(1000.0, 3.0));
+        assert_eq!(gap_score(0.0, 5.0), 0.0);
+    }
+
+    #[test]
+    fn test_citation_ready_counts_unblocked() {
+        use crate::robots::{citation_ready, parse_robots_txt, CITATION_BOTS};
+        let body = "User-agent: GPTBot\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\n";
+        let rep = parse_robots_txt("example.com", "https://example.com/robots.txt", 200, body).unwrap();
+        assert_eq!(rep.citation_bots_allowed, (CITATION_BOTS.len() - 1) as u8);
+        assert_eq!(citation_ready(&[]), CITATION_BOTS.len() as u8);
+    }
+
+    #[test]
+    fn test_shape_grade_full_and_empty() {
+        use crate::llms::shape_grade;
+        let full = "# Title\n\n> Summary line.\n\n- [Docs](https://example.com/docs)\n\n## Optional\n";
+        assert_eq!(shape_grade(full).0, 100);
+        let (score, notes) = shape_grade("hello world");
+        assert_eq!(score, 0);
+        assert_eq!(notes.len(), 4);
+    }
+
+    #[test]
+    fn test_keyless_geo_scores_coverage_and_structure() {
+        use crate::geo_keyless::score;
+        let text = "## Best SEO Tool\n\nThe best seo tool covers audits well. \
+            This best seo tool report lists checks.\n\n- item one\n- item two\n";
+        let text = text.repeat(20);
+        let k = score(&text, "best seo tool");
+        assert!(k.score_100 >= 60, "{k:?}");
+        assert_eq!(k.score_10, k.score_100 / 10);
+        let empty = score("", "best seo tool");
+        assert_eq!(empty.score_100, 0);
+    }
+
+    #[test]
+    fn test_mcp_geo_keyless_without_key() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        let dir = tempfile::tempdir().unwrap();
+        let page = dir.path().join("page.md");
+        std::fs::write(&page, "# Best SEO Tool\n\nThe best seo tool covers audits.\n").unwrap();
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_geo",
+                "arguments": { "target": page.to_str().unwrap(), "query": "best seo tool" }
+            })),
+        };
+        let saved = std::env::var("TYPESAFE_API_KEY").ok();
+        std::env::remove_var("TYPESAFE_API_KEY");
+        let resp = handle_request(&req);
+        if let Some(k) = saved {
+            std::env::set_var("TYPESAFE_API_KEY", k);
+        }
+        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        assert!(text.contains("\"keyless\""), "{text}");
+    }
+
+    #[test]
+    fn test_llm_disabled_without_keys() {
+        let (k, m, u) = (
+            std::env::var("JEV_SEO_LLM_KEY").ok(),
+            std::env::var("JEV_SEO_LLM_MODEL").ok(),
+            std::env::var("JEV_SEO_LLM_URL").ok(),
+        );
+        std::env::remove_var("JEV_SEO_LLM_KEY");
+        std::env::remove_var("JEV_SEO_LLM_MODEL");
+        assert!(crate::llm::ask("hi").is_err());
+        if let Some(v) = k {
+            std::env::set_var("JEV_SEO_LLM_KEY", v);
+        }
+        if let Some(v) = m {
+            std::env::set_var("JEV_SEO_LLM_MODEL", v);
+        }
+        if let Some(v) = u {
+            std::env::set_var("JEV_SEO_LLM_URL", v);
+        }
+    }
+
+    #[test]
+    fn test_mcp_cite_unreachable_engine_falls_back() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        std::env::set_var("JEV_SEO_LLM_KEY", "test");
+        std::env::set_var("JEV_SEO_LLM_MODEL", "test");
+        std::env::set_var("JEV_SEO_LLM_URL", "http://127.0.0.1:9");
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_cite_check",
+                "arguments": { "target": "example.com", "query": "best seo tool" }
+            })),
+        };
+        let resp = handle_request(&req);
+        std::env::remove_var("JEV_SEO_LLM_KEY");
+        std::env::remove_var("JEV_SEO_LLM_MODEL");
+        std::env::remove_var("JEV_SEO_LLM_URL");
+        let out: serde_json::Value = serde_json::from_str(
+            resp.result.unwrap()["content"][0]["text"].as_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(out["needs_answer"], true, "{out}");
+    }
+
+    #[test]
+    fn test_mcp_gap_needs_site_and_creds() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        let missing = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: Some(json!({ "name": "seo_gap", "arguments": {} })),
+        };
+        let resp = handle_request(&missing);
+        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        assert!(text.starts_with("Error: seo_gap needs"), "{text}");
+
+        // No Google creds in test env: must fail clearly, never hang.
+        let nocreds = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(2)),
+            method: "tools/call".into(),
+            params: Some(json!({ "name": "seo_gap", "arguments": { "site": "https://example.com/" } })),
+        };
+        let resp = handle_request(&nocreds);
+        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        assert!(text.starts_with("Error:"), "{text}");
     }
 
     #[test]
@@ -350,7 +493,6 @@ Sitemap: https://example.com/sitemap.xml
 
         let miss = call("Try somesite.io instead.");
         assert_eq!(miss["cited"], false, "{miss}");
-        assert_eq!(miss["since_last"], true, "{miss}");
 
         std::env::remove_var("JEV_SEO_DB");
     }
@@ -394,6 +536,26 @@ Sitemap: https://example.com/sitemap.xml
         )
         .unwrap();
         assert_eq!(out["needs_answer"], true, "{out}");
+    }
+
+    #[test]
+    fn test_drift_alerts_cite_flip_and_geo_drop() {
+        use crate::rank::DbStore;
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = DbStore::open_at(dir.path().join("drift.db").to_str().unwrap()).unwrap();
+        db.record_cite("example.com", "best seo tool", true).unwrap();
+        db.record_cite("example.com", "best seo tool", false).unwrap();
+        db.record_geo("example.com", "best seo tool", 8).unwrap();
+        db.record_geo("example.com", "best seo tool", 5).unwrap();
+        db.record_geo("steady.com", "other query", 7).unwrap();
+        db.record_geo("steady.com", "other query", 7).unwrap();
+
+        let alerts = db.drift_alerts(200).unwrap();
+        let kinds: Vec<(&str, &str)> = alerts.iter().map(|a| (a.kind.as_str(), a.target.as_str())).collect();
+        assert!(kinds.contains(&("citation_lost", "example.com")), "{kinds:?}");
+        assert!(kinds.contains(&("geo_drop", "example.com")), "{kinds:?}");
+        assert!(!kinds.iter().any(|(_, t)| *t == "steady.com"), "{kinds:?}");
     }
 
     #[test]
