@@ -1,0 +1,19 @@
+{
+  "name": "jev-seo",
+  "version": "0.1.1",
+  "description": "FOSS zero-cost, agent-first SEO & GEO search radar CLI powered by TypeSafe Jev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AkashPriyadarshii/jev-seo.git"
+  },
+  "bin": {
+    "jev-seo": "bin/jev-seo.js"
+  },
+  "files": [
+    "bin/jev-seo.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
