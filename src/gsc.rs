@@ -192,6 +192,47 @@ pub fn top_queries(site: &str, limit: usize) -> Result<Vec<GscRow>> {
         .unwrap_or_default())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GapRow {
+    pub query: String,
+    pub impressions: f64,
+    pub clicks: f64,
+    pub ctr: f64,
+    pub position: f64,
+    pub cited_before: Option<bool>,
+    pub gap_score: f64,
+}
+
+/// Page-two weight: high impressions far down the page outrank page-one
+/// tweaks. Pure arithmetic, no model involved.
+pub fn gap_score(impressions: f64, position: f64) -> f64 {
+    impressions * position.max(1.0) / 10.0
+}
+
+/// Ranked gap queue: top GSC queries joined with citation history.
+/// A missing ledger never blocks the queue; those rows score uncited.
+pub fn gap(site: &str, limit: usize) -> Result<Vec<GapRow>> {
+    let mut rows: Vec<GapRow> = top_queries(site, limit)?
+        .into_iter()
+        .map(|r| {
+            let cited = crate::rank::DbStore::open()
+                .ok()
+                .and_then(|db| db.last_cite_for_term(&r.query));
+            GapRow {
+                gap_score: gap_score(r.impressions, r.position),
+                query: r.query,
+                impressions: r.impressions,
+                clicks: r.clicks,
+                ctr: r.ctr,
+                position: r.position,
+                cited_before: cited,
+            }
+        })
+        .collect();
+    rows.sort_by(|a, b| b.gap_score.partial_cmp(&a.gap_score).unwrap_or(std::cmp::Ordering::Equal));
+    Ok(rows)
+}
+
 pub(crate) fn urlencoding(s: &str) -> String {
     let mut out = String::new();
     for b in s.bytes() {
