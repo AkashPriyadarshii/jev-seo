@@ -9,6 +9,10 @@ docs/jev-design-universe/
 # Local promo/render output (media assets stay out of git)
 brag-output/
 
+# Generated at npm publish time, never commit
+npm/README.md
+npm/*.tgz
+
 # Secrets and tokens — never commit
 .env
 .env.*

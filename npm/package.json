@@ -11,8 +11,12 @@
     "jev-seo": "bin/jev-seo.js"
   },
   "files": [
-    "bin/jev-seo.js"
+    "bin/jev-seo.js",
+    "README.md"
   ],
+  "scripts": {
+    "prepack": "cp ../README.md ./README.md"
+  },
   "engines": {
     "node": ">=18"
   }
