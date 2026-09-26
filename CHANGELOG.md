@@ -5,7 +5,7 @@ All notable changes to `jev-seo` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.2] - 2026-09-26
 
 ### Added
 - Agentic MCP kit: `seo_cite_check` works on every client (own answer, sampling fast path, paid engine, manual loop fallback); `seo_gap` ranks Search Console impressions × weak positions with citation history; keyless deterministic GEO score when no Jev key; paid engine answers over any OpenAI-compatible endpoint (`JEV_SEO_LLM_KEY` + model); drift alerts (citation lost/gained, GEO drops) inside `seo_report`.
@@ -70,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SERP relevance rerank with per-section confidence gating.
 - `audit --min-pass` CI gate with a GitHub Actions workflow, GEO score trend history, and home-directory database.
 - Test harness at 112 passing unit and integration tests with zero clippy warnings.
-- README rewritten for launch: What's new table, full command and MCP matrices, v0.1.2 date, build-from-source path. Ships as v0.1.2 on 2026-10-22.
+- README rewritten for launch: What's new table, full command and MCP matrices, build-from-source path. Shipped as v0.1.2 on 2026-09-26.
 
 ## [0.1.1] - 2026-09-22
 
