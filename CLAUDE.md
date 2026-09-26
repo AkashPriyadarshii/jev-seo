@@ -31,7 +31,7 @@
 - Error handling with `thiserror` / `anyhow`.
 - Pre-commit gates: `git jev check` or `jev-axi diff --staged`.
 - Scores rank work; they never predict rankings or traffic. Low-confidence Jev verdicts print `[verify]`.
-- No crates publish, no GitHub Release, no push without an explicit "go". v0.1.2 ships 22 Oct 2026.
+- No crates publish, no GitHub Release, no push without an explicit "go". v0.1.2 released 26 Sept 2026.
 - Brag/demo output lives in `brag-output/` and is gitignored; never commit render artifacts.
 
 - Profile: release-order touch 2026-09-22

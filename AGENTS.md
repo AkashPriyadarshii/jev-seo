@@ -4,7 +4,7 @@
 `jev-seo` is a 100% Free and Open Source (FOSS), agent-first SEO & Generative Engine Optimization (GEO) suite powered by TypeSafe AI Jev (System One) and local zero-cost scraping. An open-source, subscription-free alternative to Semrush, Ahrefs, and OpenSEO.
 - Registry: **58 stable rules (R01-R58)** across 9 areas; **132 tests** green; rule-set build `2026.09b`.
 - Free path costs ₹0 (DuckDuckGo + local files). Jev semantic calls are hard-capped (`--jev-budget`, default $0.25/run; `--no-jev` is fully offline). Paid backends (Tavily, DataForSEO, Jina, Firecrawl) are explicit opt-in only: flag + key, never silent.
-- **v0.1.2 releases 22 October 2026.** No crates publish, no GitHub Release, no public push without explicit "go".
+- **v0.1.2 released 26 September 2026.** No crates publish, no GitHub Release, no public push without explicit "go".
 
 ## Core Directives
 1. **FOSS & Zero-Cost Free Path**: MIT licensed. DuckDuckGo + local files + SQLite drift are free forever. No paid API is *required*; DFS/Tavily/Jina/Firecrawl exist only behind opt-in flags.

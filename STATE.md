@@ -1,6 +1,6 @@
 # Project State: jev-seo
 
-## Current Phase: Unreleased → v0.1.2 (2026-10-22)
+## Current Phase: v0.1.2 released 2026-09-26
 
 ### Shipped on master (local, unpushed)
 - [x] W6-W8 + Phase A/B + Wave 1: PDF deck, vitals R51-R53, eval rigor, DFS opt-in, security, truthfulness, provenance
@@ -37,18 +37,19 @@
 - [x] 85 tests green, clippy `-D warnings` clean
 - [ ] Deferred: thin `main.rs` to `view.rs`, trait-gate HTTP/Jev, explicit Tavily opt-in
 
-### Before release (22 Oct)
-- [ ] Bump `Cargo.toml` 0.1.1 → 0.1.2
-- [ ] Rename CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-10-22`
-- [ ] Tag `v0.1.2`, `cargo publish`, GitHub Release binaries
-- [x] Push master code + docs (`254e7ac`, `[skip ci]`, no release today)
+### Release v0.1.2 (2026-09-26)
+- [x] Bumped `Cargo.toml` 0.1.1 → 0.1.2
+- [x] Renamed CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-09-26`
+- [x] Tagged `v0.1.2`, pushed master + site + tag; GitHub Release binaries via workflow
+- [ ] `cargo publish` to crates.io (needs registry token)
+- [ ] `npm publish` for `npx -y jev-seo` (needs npm token)
 
 ## v0.2.0 Structural Backlog (from independent arch review)
 - [ ] Thin `src/main.rs`: extract printing to `src/view.rs`
 - [ ] One central fetch helper with body caps and redirect revalidation
 - [ ] Abstract HTTP and Jev behind traits for hermetic tests
 
-## Post-22-Oct Backlog (Phase C polish, after v0.1.2 ships)
+## Post-v0.1.2 Backlog (Phase C polish)
 - [ ] Robots bot list refresh: Claude-User, Claude-SearchBot, Perplexity-User, Meta-ExternalAgent, Applebot-Extended, DuckAssistBot, YouBot, Cohere-ai, MistralAI-User, amazonbot, Grok; wildcard and longest-match evaluation
 - [ ] Sitemap index support, 50MB limit check, malformed-XML errors
 - [ ] Schema array `@context`/`@type` handling, HowTo deprecation correction

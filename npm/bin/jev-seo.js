@@ -10,7 +10,7 @@ const { tmpdir, homedir } = require("node:os");
 const { join } = require("node:path");
 const https = require("node:https");
 
-const VERSION = "0.1.1";
+const VERSION = "0.1.2";
 const REPO = "AkashPriyadarshii/jev-seo";
 
 // Only targets with real published release assets. darwin/x64 is

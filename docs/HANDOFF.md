@@ -54,8 +54,9 @@ To test a live sitemap:
 jev-seo sitemap https://example.com/sitemap.xml
 ```
 
-## 5. Release checklist (v0.1.2 on 2026-10-22)
-1. Bump `Cargo.toml` to `0.1.2`
-2. Rename CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-10-22`
-3. Tag `v0.1.2` and `cargo publish`
-4. Cut GitHub Release binaries from the release workflow
+## 5. Release checklist (v0.1.2 released 2026-09-26)
+1. [x] Bump `Cargo.toml` to `0.1.2`
+2. [x] Rename CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-09-26`
+3. [x] Tag `v0.1.2`, push master + site + tag
+4. [x] GitHub Release binaries from the release workflow
+5. [ ] `cargo publish` (needs registry token), `npm publish` (needs npm token)
