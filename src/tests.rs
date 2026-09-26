@@ -254,6 +254,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(names.contains(&"seo_explain"));
         assert!(names.contains(&"seo_report"));
         assert!(names.contains(&"seo_cite_check"));
+        assert_eq!(names[0], "seo_cite_check", "cite check leads the tool list");
     }
 
     #[test]

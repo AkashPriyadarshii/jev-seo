@@ -24,7 +24,7 @@
 - Sitemap & Hreflang: `sitemap.rs` sitemap audit (loc/lastmod/HTTPS/50k limit, hreflang codes + x-default); R58 cross-page cluster check (noindexed or unreciprocated alternates) in `rules.rs`.
 - Local Cache / History: `rusqlite` (bundled SQLite with WAL mode in `.jev-seo.db`)
 - CLI Framework: `clap` with derive features
-- MCP Server: Stdio JSON-RPC 2.0 protocol for agent loops (13 native tools)
+- MCP Server: Stdio JSON-RPC 2.0 protocol for agent loops (14 native tools, incl. `seo_cite_check` via client sampling). Agent wiring lives in `SKILL.md`.
 
 ## Style & Constraints
 - Maximum performance, zero runtime allocations on hot paths.

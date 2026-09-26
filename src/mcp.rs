@@ -179,6 +179,18 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
             result: Some(json!({
                 "tools": [
                     {
+                        "name": "seo_cite_check",
+                        "description": "Ask the connected agent (MCP sampling, free) a buyer query and report whether it names the target domain",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "target": { "type": "string", "description": "Domain or URL to look for, e.g. example.com" },
+                                "query": { "type": "string", "description": "Buyer query to put to the agent" }
+                            },
+                            "required": ["target", "query"]
+                        }
+                    },
+                    {
                         "name": "seo_keywords",
                         "description": "Fetch autocomplete keyword suggestions for zero cost",
                         "inputSchema": {
@@ -325,18 +337,6 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                                 "baseline": { "type": "string", "description": "Baseline audit JSON path" }
                             },
                             "required": ["path", "baseline"]
-                        }
-                    },
-                    {
-                        "name": "seo_cite_check",
-                        "description": "Ask the connected agent (MCP sampling, free) a buyer query and report whether it names the target domain",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "target": { "type": "string", "description": "Domain or URL to look for, e.g. example.com" },
-                                "query": { "type": "string", "description": "Buyer query to put to the agent" }
-                            },
-                            "required": ["target", "query"]
                         }
                     }
                 ]
