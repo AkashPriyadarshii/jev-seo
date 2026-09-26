@@ -96,6 +96,18 @@ $0.042 per million input tokens under `--jev-budget` (default 0.25 USD).
 Each command prints a Jev spend line; `ledger.json` records requests, tokens,
 cost, budget, and budget skips.
 
+## Gate numbers: what 0.80 means and where it sits
+
+- `ACT = 0.80` (`src/policy.rs`): Choice/Score confidence at or above acts,
+  below prints `[verify]` or withholds. Noul pair verdicts use the same bar
+  both sides: keep at >= 0.80, merge at <= 0.20, silent between.
+- `score_side` (same file): Score answers decide by probability mass on each
+  side of the scale midpoint, not by top-label confidence alone.
+- These are engineering picks held by blind-judge agreement evidence, not
+  tuned constants. Re-measure with protocol steps 3-5 after any change to
+  question wording, thresholds, or the pair bands. The registry snapshot
+  test fails loudly on silent question edits, including the `pairs` suite.
+
 ## Known limits
 
 - Timing rules (R42) vary with the server; thresholds are engineering picks,

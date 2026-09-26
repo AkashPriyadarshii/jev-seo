@@ -7,6 +7,13 @@ mod tests {
     use crate::schema::validate_content;
     use crate::serp::get_autocomplete;
 
+    /// Serializes tests that mutate process env (JEV_SEO_DB, JEV_SEO_LLM_*):
+    /// parallel threads otherwise swap each other's databases mid-assertion.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     #[test]
     fn test_audit_markdown() {
         let dir = tempfile::tempdir().unwrap();
@@ -299,6 +306,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_mcp_geo_keyless_without_key() {
+        let _env = env_lock();
         use crate::mcp::{handle_request, RpcRequest};
         use serde_json::json;
 
@@ -326,6 +334,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_llm_disabled_without_keys() {
+        let _env = env_lock();
         let (k, m, u) = (
             std::env::var("JEV_SEO_LLM_KEY").ok(),
             std::env::var("JEV_SEO_LLM_MODEL").ok(),
@@ -347,6 +356,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_mcp_cite_unreachable_engine_falls_back() {
+        let _env = env_lock();
         use crate::mcp::{handle_request, RpcRequest};
         use serde_json::json;
 
@@ -402,6 +412,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_mcp_cite_check_cited_and_missed() {
+        let _env = env_lock();
         use crate::mcp::{handle_request_with, RpcRequest, Sampler};
         use serde_json::json;
 
@@ -466,6 +477,7 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_mcp_cite_check_answer_path_needs_no_sampler() {
+        let _env = env_lock();
         use crate::mcp::{handle_request, RpcRequest};
         use serde_json::json;
 
@@ -556,6 +568,143 @@ Sitemap: https://example.com/sitemap.xml
         assert!(kinds.contains(&("citation_lost", "example.com")), "{kinds:?}");
         assert!(kinds.contains(&("geo_drop", "example.com")), "{kinds:?}");
         assert!(!kinds.iter().any(|(_, t)| *t == "steady.com"), "{kinds:?}");
+    }
+
+    #[test]
+    fn test_bundle_has_digest_pairs_drift() {
+        use crate::actions::Action;
+        use crate::audit::{bundle_markdown, DirectoryAuditReport};
+        use crate::rank::DriftAlert;
+
+        let rep = DirectoryAuditReport {
+            dir_path: "docs/".into(),
+            total_files: 1,
+            total_words: 100,
+            avg_words_per_file: 100,
+            pass_rate: 90.0,
+            reports: Vec::new(),
+            duplicate_titles: std::collections::HashMap::new(),
+            thin_pages: Vec::new(),
+            missing_canonicals: Vec::new(),
+            missing_descriptions: Vec::new(),
+            orphan_pages: Vec::new(),
+            keyword_cannibalization: Vec::new(),
+            findings: Vec::new(),
+        };
+        let actions = vec![Action::new("RULE-R01", 1, 1, "Fix titles", "scope: a.md".into())];
+        let drift = vec![DriftAlert {
+            kind: "geo_drop".into(),
+            target: "example.com".into(),
+            term: "q".into(),
+            from: "8".into(),
+            to: "5".into(),
+        }];
+        let b = bundle_markdown(&rep, &actions, &drift);
+        assert!(b.contains("# Digest:"), "{b}");
+        assert!(b.contains("## Drift since last check"), "{b}");
+        assert!(b.contains("geo_drop"), "{b}");
+        let bare = bundle_markdown(&rep, &[], &[]);
+        assert!(!bare.contains("## Drift"), "{bare}");
+    }
+
+    #[test]
+    fn test_digest_has_verify_lines() {
+        use crate::actions::Action;
+        use crate::audit::{digest, DirectoryAuditReport};
+
+        let rep = DirectoryAuditReport {
+            dir_path: "docs/".into(),
+            total_files: 2,
+            total_words: 500,
+            avg_words_per_file: 250,
+            pass_rate: 80.0,
+            reports: Vec::new(),
+            duplicate_titles: std::collections::HashMap::new(),
+            thin_pages: Vec::new(),
+            missing_canonicals: Vec::new(),
+            missing_descriptions: Vec::new(),
+            orphan_pages: vec!["a.md".into()],
+            keyword_cannibalization: Vec::new(),
+            findings: Vec::new(),
+        };
+        let actions = vec![Action::new("RULE-R01", 1, 1, "Fix titles", "scope: a.md".into())];
+        let d = digest(&rep, &actions);
+        assert!(d.contains("80/100"), "{d}");
+        assert!(d.contains("RULE-R01"), "{d}");
+        assert!(d.contains("verify: re-audit"), "{d}");
+        assert!(d.contains("orphan pages: 1"), "{d}");
+        let clean = digest(&rep, &[]);
+        assert!(clean.contains("Nothing: directory is clean."), "{clean}");
+    }
+
+    #[test]
+    fn test_excerpt_starts_after_h1() {
+        let dir = tempfile::tempdir().unwrap();
+        let page = dir.path().join("p.md");
+        std::fs::write(&page, "---\ntitle: T\n---\nnav junk nav junk\n# Real Title\n\nBody words here.\n").unwrap();
+        let ex = crate::excerpt_local(page.to_str().unwrap());
+        assert!(ex.contains("Body words"), "{ex}");
+        assert!(!ex.contains("nav junk"), "{ex}");
+        assert!(!ex.contains("title: T"), "{ex}");
+    }
+
+    #[test]
+    fn test_pair_questions_shape() {
+        use crate::policy::{noul_prob, pair_questions};
+        use serde_json::json;
+
+        let q = pair_questions(2);
+        assert!(q.get("pair_0").is_some());
+        assert!(q.get("pair_1").is_some());
+        assert_eq!(q.get("pair_0").unwrap()["type"], "noul");
+        assert_eq!(noul_prob(&json!({"probability": 0.9})), 0.9);
+        assert_eq!(noul_prob(&json!({"noul": 0.3})), 0.3);
+        assert_eq!(noul_prob(&json!({})), 0.0);
+    }
+
+    #[test]
+    fn test_baseline_store_roundtrip() {
+        use crate::rank::DbStore;
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = DbStore::open_at(dir.path().join("base.db").to_str().unwrap()).unwrap();
+        assert_eq!(db.load_baseline("v1").unwrap(), None);
+        db.save_baseline("v1", r#"{"a":1}"#).unwrap();
+        assert_eq!(db.load_baseline("v1").unwrap(), Some(r#"{"a":1}"#.into()));
+        db.save_baseline("v1", r#"{"a":2}"#).unwrap();
+        assert_eq!(db.load_baseline("v1").unwrap(), Some(r#"{"a":2}"#.into()));
+        assert_eq!(db.list_baselines().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_mcp_report_baseline_label() {
+        let _env = env_lock();
+        use crate::mcp::{handle_request, RpcRequest};
+        use crate::rank::DbStore;
+        use serde_json::json;
+
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var("JEV_SEO_DB", dir.path().join("rep.db").to_str().unwrap());
+        let src = std::fs::read_to_string("examples/audit-good.json").unwrap();
+        DbStore::open().unwrap().save_baseline("lbl", &src).unwrap();
+
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_report",
+                "arguments": { "path": "examples/audit-good.json", "baseline_label": "lbl" }
+            })),
+        };
+        let resp = handle_request(&req);
+        std::env::remove_var("JEV_SEO_DB");
+        let out: serde_json::Value = serde_json::from_str(
+            resp.result.unwrap()["content"][0]["text"].as_str().unwrap(),
+        )
+        .unwrap();
+        assert!(out.get("diff").is_some(), "{out}");
+        assert!(out.get("drift").is_some(), "{out}");
     }
 
     #[test]
@@ -1367,6 +1516,7 @@ Sitemap: https://example.com/sitemap.xml
             ("site", crate::policy::site_extras()),
             ("brief", crate::policy::brief_extras()),
             ("keywords", crate::policy::keyword_value_extras(&["x".into()], 1)),
+            ("pairs", crate::policy::pair_questions(1)),
         ];
         let mut seen: BTreeMap<String, String> = BTreeMap::new();
         for (suite, v) in suites {

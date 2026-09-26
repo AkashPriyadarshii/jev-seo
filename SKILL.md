@@ -38,7 +38,7 @@ No local build? Set `JEV_SEO_BIN=/path/to/jev-seo` and the wrapper uses it inste
 
 `seo_cite_check` reports whether an AI answer names the target domain. Three paths, first one that works wins: pass `answer` to score your own words (works everywhere); omit it and sampling-capable clients answer via `sampling/createMessage`; otherwise you get `needs_answer: true` plus the prompt, answer it naturally as you would a user, and re-call with `answer`. Result fields: `cited` (bool), `since_last` (previous verdict or null), `source` (answer/sampling/engine), `excerpt` (300 chars).
 
-Agentic loop: `seo_gap` ranks the Search Console queue (needs site auth once via `gsc auth`); work it top down; `seo_cite_check` each query; `seo_report` surfaces `drift` alerts (citation lost/gained, geo drops). `seo_geo` scores keyless without any key; `TYPESAFE_API_KEY` upgrades it to Jev judgment. Paid engines (Perplexity, OpenRouter, Ollama) plug in via `JEV_SEO_LLM_KEY` + `JEV_SEO_LLM_MODEL` (+ optional `JEV_SEO_LLM_URL`) and answer cite checks server-side.
+Agentic loop: `seo_gap` ranks the Search Console queue (needs site auth once via `gsc auth`); work it top down; `seo_cite_check` each query; `seo_report` surfaces `drift` alerts (citation lost/gained, geo drops). `seo_geo` scores keyless without any key; `TYPESAFE_API_KEY` upgrades it to Jev judgment. Paid engines (Perplexity, OpenRouter, Ollama) plug in via `JEV_SEO_LLM_KEY` + `JEV_SEO_LLM_MODEL` (+ optional `JEV_SEO_LLM_URL`) and answer cite checks server-side. Deploy gate: `drift baseline --report audit.json --label v1` before a change, `drift compare --report new.json --label v1` after. One-file handoff: `audit --digest digest.md`, canonical close: `bundle audit.json --out bundle.md`.
 
 ## Rules for agents
 

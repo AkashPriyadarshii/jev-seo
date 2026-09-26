@@ -270,6 +270,34 @@ pub fn link_question(candidates: &[(String, String)]) -> serde_json::Value {
         }
     })
 }
+/// One Noul per cannibalization pair: distinct intents (keep both) or
+/// substitutable (merge candidate). Callers index `pairs[i]` in state.
+pub fn pair_questions(n: usize) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for i in 0..n {
+        map.insert(
+            format!("pair_{}", i),
+            serde_json::json!({
+                "type": "noul",
+                "instructions": format!(
+                    "Do pages A and B of pair {} in `pairs` serve distinct search intents worth keeping separate? Answer yes when a visitor could plausibly want one but not the other.",
+                    i
+                ),
+            }),
+        );
+    }
+    serde_json::Value::Object(map)
+}
+
+/// Affirmative probability of a Noul answer: distinct-intent mass or 0.0.
+pub fn noul_prob(answer: &serde_json::Value) -> f64 {
+    answer
+        .get("noul")
+        .or_else(|| answer.get("probability"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0)
+}
+
 /// Side-of-midpoint decisiveness for Score answers: sum the level
 /// probabilities on each side of the scale midpoint, take the heavier side.
 /// A 4-1 split at 0.55/0.45 on the same side is decisive; confidence alone
