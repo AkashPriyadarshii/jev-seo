@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>jev-seo — zero-cost SEO &amp; GEO search radar (Semrush alternative)</title>
-<meta name="description" content="jev-seo is a zero-subscription SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, and SERP briefs. Rust CLI + MCP.">
+<meta name="description" content="jev-seo is a free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost.">
 <meta name="keywords" content="seo, geo, generative engine optimization, seo audit, semrush alternative, typesafe ai, jev, rust, mcp, ai crawlers, robots.txt, schema validator, serp analysis">
 <link rel="canonical" href="https://jevseo.vercel.app/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -12,19 +12,19 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="jev-seo">
 <meta property="og:title" content="jev-seo — zero-cost SEO & GEO radar">
-<meta property="og:description" content="jev-seo is a zero-subscription SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, and SERP briefs. Rust CLI + MCP.">
+<meta property="og:description" content="jev-seo is a free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost.">
 <meta property="og:url" content="https://jevseo.vercel.app/">
 <meta property="og:image" content="https://jevseo.vercel.app/assets/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="jev-seo — zero-cost SEO & GEO search radar">
-<meta name="twitter:description" content="Zero-subscription SEO and GEO search radar. Rust CLI + MCP.">
+<meta name="twitter:description" content="Free Rust SEO and GEO toolkit powered by TypeSafe Jev. 58-rule audits, 15-tool MCP. Zero cost.">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"jev-seo","applicationCategory":"SEOApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"},"author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"url":"https://jevseo.vercel.app/","description":"FOSS zero-cost SEO and GEO search radar: batch audits, Schema.org validation, AI crawler radar, SERP briefs, and GEO scoring. Rust CLI with MCP server."}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"jev-seo","applicationCategory":"SEOApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"},"author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"url":"https://jevseo.vercel.app/","description":"Free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost."}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"jev-seo","url":"https://jevseo.vercel.app/","description":"Zero-cost SEO and GEO search radar. Rust CLI + MCP server.","inLanguage":"en","publisher":{"@type":"Organization","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app","logo":{"@type":"ImageObject","url":"https://jevseo.vercel.app/favicon.svg"}}}
+{"@context":"https://schema.org","@type":"WebSite","name":"jev-seo","url":"https://jevseo.vercel.app/","description":"Free Rust SEO and GEO toolkit powered by TypeSafe Jev. 58-rule audits, 15-tool MCP, zero cost.","inLanguage":"en","publisher":{"@type":"Organization","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app","logo":{"@type":"ImageObject","url":"https://jevseo.vercel.app/favicon.svg"}}}
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is jev-seo free?","acceptedAnswer":{"@type":"Answer","text":"Yes. jev-seo is MIT-licensed open source and costs zero subscriptions. It scrapes free DuckDuckGo endpoints and audits local files, so there is no paid API key required."}},{"@type":"Question","name":"What does GEO mean in jev-seo?","acceptedAnswer":{"@type":"Answer","text":"GEO stands for Generative Engine Optimization: making content likely to be cited by AI search engines such as Gemini Overviews, Perplexity, and SearchGPT. jev-seo scores citation likelihood from 1 to 10 with TypeSafe Jev."}},{"@type":"Question","name":"Does jev-seo need a credit card or paid API?","acceptedAnswer":{"@type":"Answer","text":"No. The only optional key is a free TypeSafe API key for semantic scoring. Ranking history, audits, schema validation, and SERP inspection all run locally with zero cost."}},{"@type":"Question","name":"What is the difference between jev-seo and Semrush or Ahrefs?","acceptedAnswer":{"@type":"Answer","text":"Semrush and Ahrefs are hosted dashboards that cost over $130 a month. jev-seo is a native Rust CLI and MCP server that audits local files, validates schema, checks robots.txt, and scores GEO citations, all in one binary under 30MB RAM."}},{"@type":"Question","name":"How do I install jev-seo?","acceptedAnswer":{"@type":"Answer","text":"Install with cargo install jev-seo, or download the release binary for Windows, macOS, or Linux from the GitHub releases page."}}]}
@@ -193,7 +193,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="whyspec">
         <p class="whyspec-no">04</p>
         <h3>Agent native</h3>
-        <p>A stdio JSON-RPC 2.0 MCP server feeds the same 13 tools into Claude Code, Gemini CLI, and Antigravity. SEO as a capability, not a dashboard.</p>
+        <p>A stdio JSON-RPC 2.0 MCP server feeds the same 15 tools into Claude Code, Gemini CLI, and Antigravity. SEO as a capability, not a dashboard.</p>
       </div>
     </div>
   </section>
@@ -212,7 +212,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="cmd"><code>jev-seo sitemap sitemap.xml</code><span class="cmd-cap">50,000 URL limit, HTTPS canonical, hreflang en-GB not en-UK, x-default</span></div>
       <div class="cmd"><code>jev-seo keywords "scraper"</code><span class="cmd-cap">autocomplete discovery + Jev intent classification</span></div>
       <div class="cmd"><code>jev-seo rank --domain crates.io --query "rust grep"</code><span class="cmd-cap">rank drift tracked in local SQLite over time</span></div>
-      <div class="cmd"><code>jev-seo mcp</code><span class="cmd-cap">stdio MCP server → the 13 tools, straight into your coding agent</span></div>
+      <div class="cmd"><code>jev-seo mcp</code><span class="cmd-cap">stdio MCP server → the 15 tools, straight into your coding agent</span></div>
       <div class="cmd"><code>jev-seo crawl example.com --max-pages 50</code><span class="cmd-cap">parallel live crawl: health score, broken links, redirect chains, orphans, timing</span></div>
       <div class="cmd"><code>jev-seo llms example.com</code><span class="cmd-cap">llms.txt plus AI crawler scoring for answer-engine readiness</span></div>
       <div class="cmd"><code>jev-seo doctor</code><span class="cmd-cap">version, API key presence, database, platform in one check</span></div>
@@ -231,7 +231,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <figure style="margin:1.5rem 0"><img src="docs/assets/preview-actions.png" alt="jev-seo ranked action tracker with priority, impact, effort, quick-win flags" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
     <figure style="margin:1.5rem 0"><img src="docs/assets/preview-explain.png" alt="jev-seo explain rule card and report baseline score delta" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
     <figure style="margin:1.5rem 0"><img src="docs/assets/preview-mcp.png" alt="jev-seo MCP tools grid and client config block" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
-    <figure style="margin:1.5rem 0"><img src="docs/assets/trust-strip.png" alt="jev-seo trust strip: 72 tests, 50 rules, 13 MCP tools, fast cold start, MIT, zero subscriptions" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/trust-strip.png" alt="jev-seo trust strip: 132 tests, 58 rules, 15 MCP tools, fast cold start, MIT, zero subscriptions" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
     <figure style="margin:1.5rem 0"><img src="docs/assets/cost-ladder.png" alt="jev-seo cost ladder: free path, capped Jev spend, opt-in paid backends, versus monthly SaaS seat" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
   </section>
 
