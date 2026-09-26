@@ -1156,6 +1156,77 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
     m
 }
 
+/// Agent digest: score, top actions each with evidence and a concrete
+/// verify line (re-audit shows the action id resolved), watch counts,
+/// limits. The handoff an agent loop reads instead of the full report.
+pub fn digest(rep: &DirectoryAuditReport, actions: &[crate::actions::Action]) -> String {
+    let score = rep.pass_rate.round().clamp(0.0, 100.0) as u32;
+    let mut m = String::new();
+    m.push_str(&format!(
+        "# Digest: {} — {}/100 ({})\n\n{} files, {} words, {} findings.\n",
+        rep.dir_path,
+        score,
+        crate::actions::grade(score),
+        rep.total_files,
+        rep.total_words,
+        rep.findings.len()
+    ));
+    let top = crate::actions::top(actions, 5);
+    if top.is_empty() {
+        m.push_str("\n## Do first\n\nNothing: directory is clean.\n");
+    } else {
+        m.push_str("\n## Do first\n\n");
+        for a in top {
+            let ev: String = a.evidence.chars().take(200).collect();
+            m.push_str(&format!(
+                "- [P{}] {} {} (effort {}, impact {}){}\n  evidence: {}\n  verify: re-audit; `{}` absent from findings\n",
+                a.priority,
+                a.id,
+                a.title,
+                a.effort,
+                a.impact,
+                if a.quick_win { " quick-win" } else { "" },
+                ev,
+                a.id
+            ));
+        }
+    }
+    m.push_str(&format!(
+        "\n## Watch\n\n- duplicate titles: {}\n- orphan pages: {}\n- thin pages: {}\n- missing canonicals: {}\n",
+        rep.duplicate_titles.len(),
+        rep.orphan_pages.len(),
+        rep.thin_pages.len(),
+        rep.missing_canonicals.len()
+    ));
+    m.push_str("\n## Limits\n\nLocal file walk only. Scores rank work; they never predict rankings or traffic. Fact findings were measured; heuristic ones need a human re-check before acting.\n");
+    m
+}
+
+/// Canonical close: digest + conflict pairs + drift alerts in one file.
+/// The single artifact an audit ends with; agents and owners read the same.
+pub fn bundle_markdown(
+    rep: &DirectoryAuditReport,
+    actions: &[crate::actions::Action],
+    drift: &[crate::rank::DriftAlert],
+) -> String {
+    let mut m = digest(rep, actions);
+    let pairs = cannibalization_pairs(rep);
+    if !pairs.is_empty() {
+        m.push_str(&format!("\n## Merge candidates ({})\n\n", pairs.len()));
+        m.push_str("| Stem | A | B | Keep |\n|---|---|---|---|\n");
+        for p in pairs.iter().take(20) {
+            m.push_str(&format!("| {} | {} | {} | {} |\n", p.keyword_stem, p.a, p.b, p.winner));
+        }
+    }
+    if !drift.is_empty() {
+        m.push_str("\n## Drift since last check\n\n");
+        for d in drift {
+            m.push_str(&format!("- {}: {} `{}` ({} → {})\n", d.kind, d.target, d.term, d.from, d.to));
+        }
+    }
+    m
+}
+
 /// PDF with an embedded narrative block when present.
 pub fn to_pdf_with_narrative(rep: &DirectoryAuditReport, n: &crate::narrative::Narrative) -> Vec<u8> {
     to_pdf_opt(rep, Some(n))

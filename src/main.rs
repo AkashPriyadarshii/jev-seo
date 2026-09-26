@@ -50,6 +50,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Commands {
     /// Autocomplete keyword discovery & intent classification
     Keywords {
@@ -124,6 +125,9 @@ enum Commands {
         /// Write a CSV findings export to this path
         #[arg(long, value_name = "PATH")]
         csv: Option<String>,
+        /// Write agent digest brief (score, top actions with verify lines)
+        #[arg(long, value_name = "PATH")]
+        digest: Option<String>,
         /// Write ranked action-tracker CSV (id, priority, effort, impact)
         #[arg(long, value_name = "PATH")]
         actions_csv: Option<String>,
@@ -264,6 +268,27 @@ enum Commands {
         /// Write action-tracker CSV for the current report
         #[arg(long, value_name = "PATH")]
         actions_csv: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Write the canonical close bundle (digest + pairs + drift) from an audit JSON
+    Bundle {
+        /// Audit JSON (from `audit --json`)
+        path: String,
+        /// Output markdown path
+        #[arg(long, value_name = "PATH")]
+        out: String,
+    },
+    /// Snapshot audit baselines and diff against them (baseline, compare, history)
+    Drift {
+        /// Action: baseline, compare, or history
+        op: String,
+        /// Audit JSON for baseline save or compare current
+        #[arg(long, value_name = "PATH")]
+        report: Option<String>,
+        /// Baseline label (save target or compare source, default "latest")
+        #[arg(long)]
+        label: Option<String>,
         #[arg(long)]
         json: bool,
     },
@@ -577,7 +602,7 @@ fn main() -> Result<()> {
             }
             print_jev_spend_line();
         }
-        Commands::Audit { path, target_query, json, min_pass, fail_on, forbid, max_critical, html, pdf, md, csv, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Audit { path, target_query, json, min_pass, fail_on, forbid, max_critical, html, pdf, md, csv, digest, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -616,6 +641,7 @@ fn main() -> Result<()> {
                 pdf.as_deref(),
                 md.as_deref(),
                 csv.as_deref(),
+                digest.as_deref(),
             ]);
             if let Some(dir) = &manifest {
                 export_dirs = vec![std::path::PathBuf::from(dir)];
@@ -667,6 +693,7 @@ fn main() -> Result<()> {
             let body_pdf = pdf.as_ref().map(|_| audit::to_pdf_with_narrative(&dir_report, n));
             let body_md = md.as_ref().map(|_| audit::to_markdown(&dir_report) + &n_md);
             let body_csv = csv.as_ref().map(|_| crate::rules::to_csv(&dir_report.findings));
+            let body_digest = digest.as_ref().map(|_| audit::digest(&dir_report, &actions));
             if let Some(body) = &body_html {
                 manifest::gate_report(body, &dir_report.findings, &actions)?;
             }
@@ -677,6 +704,9 @@ fn main() -> Result<()> {
                 manifest::gate_report(body, &dir_report.findings, &actions)?;
             }
             if let Some(body) = &body_csv {
+                manifest::gate_report(body, &dir_report.findings, &actions)?;
+            }
+            if let Some(body) = &body_digest {
                 manifest::gate_report(body, &dir_report.findings, &actions)?;
             }
             if let Some(out) = &html {
@@ -695,6 +725,10 @@ fn main() -> Result<()> {
                 std::fs::write(out, body_csv.as_deref().unwrap_or_default())?;
                 println!("CSV findings written to {}", out.dimmed());
             }
+            if let Some(out) = &digest {
+                std::fs::write(out, body_digest.as_deref().unwrap_or_default())?;
+                println!("Digest written to {}", out.dimmed());
+            }
             if let Some(out) = &actions_csv {
                 write_actions_csv(out, &dir_report.findings, &actions)?;
             }
@@ -703,6 +737,7 @@ fn main() -> Result<()> {
                 .iter()
                 .chain(body_md.iter())
                 .chain(body_csv.iter())
+                .chain(body_digest.iter())
                 .cloned()
                 .collect();
             let texts: Vec<&str> = texts_owned.iter().map(|s| s.as_str()).collect();
@@ -857,16 +892,25 @@ fn main() -> Result<()> {
                     }
                     let pairs = audit::cannibalization_pairs(&dir_report);
                     if !pairs.is_empty() {
+                        // Jev pair judge: one batched Noul per top pair, keep vs
+                        // merge. Skipped on rescore (no spend) and --no-jev.
+                        let verdicts = judge_pairs(&pairs, is_rescore || no_jev);
                         println!("\n{}", format!("Conflict pairs ({}):", pairs.len()).yellow().bold());
-                        for p in pairs.iter().take(10) {
+                        for (i, p) in pairs.iter().take(10).enumerate() {
+                            let mark = match verdicts.get(i).copied().flatten() {
+                                Some((true, c)) => format!(" [jev distinct {:.2}]", c).green().to_string(),
+                                Some((false, c)) => format!(" [jev merge? {:.2}]", c).yellow().to_string(),
+                                None => String::new(),
+                            };
                             println!(
-                                "  \"{}\"  {} ({}w) × {} ({}w)  → keep {}",
+                                "  \"{}\"  {} ({}w) × {} ({}w)  → keep {}{}",
                                 p.keyword_stem.cyan(),
                                 p.a,
                                 p.a_words,
                                 p.b,
                                 p.b_words,
-                                p.winner.green()
+                                p.winner.green(),
+                                mark
                             );
                         }
                         if pairs.len() > 10 {
@@ -1710,6 +1754,94 @@ fn main() -> Result<()> {
                 }
             }
         }
+        Commands::Bundle { path, out } => {
+            let src = crate::paths::read_user_file(&path, &["json"])?;
+            let saved: audit::DirectoryAuditReport = serde_json::from_str(&src)?;
+            let rep = audit::with_findings(saved);
+            let actions = crate::rules::actions_for(&rep.findings);
+            let drift = rank::DbStore::open()
+                .ok()
+                .and_then(|db| db.drift_alerts(200).ok())
+                .unwrap_or_default();
+            let body = audit::bundle_markdown(&rep, &actions, &drift);
+            manifest::gate_report(&body, &rep.findings, &actions)?;
+            std::fs::write(&out, body)?;
+            println!("Bundle written to {}", out.dimmed());
+        }
+        Commands::Drift { op, report, label, json } => {
+            let label = label.unwrap_or_else(|| "latest".into());
+            let db = rank::DbStore::open()?;
+            match op.as_str() {
+                "baseline" => {
+                    let path = report.unwrap_or_else(|| {
+                        eprintln!("{}", "Error: baseline needs --report <audit JSON>.".red());
+                        std::process::exit(2);
+                    });
+                    let src = crate::paths::read_user_file(&path, &["json"])?;
+                    let parsed: audit::DirectoryAuditReport = serde_json::from_str(&src)?;
+                    db.save_baseline(&label, &src)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                            "saved": label, "files": parsed.total_files, "score": parsed.pass_rate,
+                        }))?);
+                    } else {
+                        println!("Baseline '{}' saved: {} files, pass {:.1}%", label.dimmed(), parsed.total_files, parsed.pass_rate);
+                    }
+                }
+                "compare" => {
+                    let path = report.unwrap_or_else(|| {
+                        eprintln!("{}", "Error: compare needs --report <audit JSON>.".red());
+                        std::process::exit(2);
+                    });
+                    let base_src = db.load_baseline(&label)?.unwrap_or_else(|| {
+                        eprintln!("{}", format!("Error: no baseline '{}' stored.", label).red());
+                        std::process::exit(2);
+                    });
+                    let cur_src = crate::paths::read_user_file(&path, &["json"])?;
+                    let cur: audit::DirectoryAuditReport = serde_json::from_str(&cur_src)?;
+                    let base: audit::DirectoryAuditReport = serde_json::from_str(&base_src)?;
+                    let diff = diff_audit_reports(&cur, &base);
+                    let actions = crate::rules::actions_for(&cur.findings);
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
+                            "diff": diff, "actions": actions,
+                            "pairs": crate::audit::cannibalization_pairs(&cur),
+                        }))?);
+                        return Ok(());
+                    }
+                    let delta = diff["delta"].as_i64().unwrap_or(0);
+                    let sign = if delta > 0 { "+" } else { "" };
+                    println!("\n{} '{}':", "Drift vs baseline".cyan().bold(), label);
+                    println!(
+                        "  Score:  {} → {} ({sign}{delta}) grade {}",
+                        diff["baseline_score"], diff["current_score"], diff["grade"]
+                    );
+                    if !actions.is_empty() {
+                        println!("\n{}", "Top actions:".cyan().bold());
+                        for a in actions::top(&actions, 5) {
+                            println!("  [P{}] {}  {}", a.priority, a.id.bold(), a.title);
+                        }
+                    }
+                }
+                "history" => {
+                    let labels = db.list_baselines()?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&labels)?);
+                    } else if labels.is_empty() {
+                        println!("No baselines stored. Save one: jev-seo drift baseline --report <audit JSON>");
+                    } else {
+                        println!("\n{}", "Stored baselines:".cyan().bold());
+                        for (name, at) in &labels {
+                            println!("  {:<20} {}", name.green(), at.dimmed());
+                        }
+                    }
+                }
+                other => {
+                    eprintln!("{}", format!("Error: unknown drift action '{}', use baseline, compare, or history.", other).red());
+                    std::process::exit(2);
+                }
+            }
+        }
         Commands::Gsc { op, site, code, limit, json } => {
             match op.as_str() {
                 "auth" => {
@@ -1823,6 +1955,50 @@ fn merge_extras(a: serde_json::Value, b: serde_json::Value) -> serde_json::Value
     out
 }
 
+/// Batched Jev verdict per conflict pair: (keep, confidence). keep=false
+/// means substitutable (merge candidate). Decisive at 0.80 either side;
+/// anything under prints without a verdict.
+fn judge_pairs(pairs: &[audit::CannibalizationPair], skip: bool) -> Vec<Option<(bool, f64)>> {
+    let n = pairs.len().min(10);
+    if skip || n == 0 {
+        return vec![None; n];
+    }
+    let client = match engine::JevClient::new() {
+        Some(c) => c,
+        None => {
+            eprintln!("{}", "Note: pair judging needs TYPESAFE_API_KEY; word-count winners stand.".yellow());
+            return vec![None; n];
+        }
+    };
+    let state = serde_json::json!({
+        "pairs": pairs.iter().take(n).map(|p| serde_json::json!({
+            "stem": p.keyword_stem,
+            "a": excerpt_local(&p.a).chars().take(800).collect::<String>(),
+            "b": excerpt_local(&p.b).chars().take(800).collect::<String>(),
+        })).collect::<Vec<_>>(),
+    });
+    let eval = match client.fanout_eval_with(state, policy::pair_questions(n)) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("{}", format!("Warning: pair judge failed ({e:#}).").yellow());
+            return vec![None; n];
+        }
+    };
+    (0..n)
+        .map(|i| {
+            let key = format!("pair_{}", i);
+            let p = policy::noul_prob(&eval.extra.get(&key).cloned().unwrap_or_default());
+            if p >= 0.80 {
+                Some((true, p))
+            } else if p <= 0.20 {
+                Some((false, 1.0 - p))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 fn excerpt_local(path: &str) -> String {
     let raw = std::fs::read_to_string(path).unwrap_or_default();
     let cleaned: String = raw
@@ -1834,8 +2010,18 @@ fn excerpt_local(path: &str) -> String {
         crate::fetch::readable_text(&cleaned, 6000)
     } else if lower.ends_with(".md") || lower.ends_with(".mdx") || lower.ends_with(".markdown") {
         // Markdown sends prose, not frontmatter fences and link markup.
+        // Start after the H1: nav preamble contaminates semantic judgments.
         let body = gray_matter_strip(&cleaned);
-        crate::audit::md_plain_text(&body).chars().take(6000).collect()
+        let mut start = 0;
+        for (i, l) in body.lines().enumerate() {
+            let t = l.trim();
+            if t.starts_with("# ") {
+                start = i + 1;
+                break;
+            }
+        }
+        let after: String = body.lines().skip(start).collect::<Vec<_>>().join("\n");
+        crate::audit::md_plain_text(&after).chars().take(6000).collect()
     } else {
         cleaned.chars().take(6000).collect()
     }

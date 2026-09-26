@@ -64,6 +64,11 @@ impl DbStore {
                    score INTEGER NOT NULL,
                    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
                );
+                CREATE TABLE IF NOT EXISTS drift_baselines (
+                    label TEXT PRIMARY KEY,
+                    report TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
                 CREATE TABLE IF NOT EXISTS cite_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     target TEXT NOT NULL,
@@ -202,6 +207,40 @@ impl DbStore {
             params![target, term, cited as i64],
         )?;
         Ok(prev)
+    }
+
+    /// Store an audit JSON snapshot under a label (upsert). Deploy gate input.
+    pub fn save_baseline(&self, label: &str, report: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO drift_baselines (label, report) VALUES (?1, ?2)
+             ON CONFLICT(label) DO UPDATE SET report = excluded.report, created_at = CURRENT_TIMESTAMP",
+            params![label, report],
+        )?;
+        Ok(())
+    }
+
+    /// Load a stored baseline snapshot.
+    pub fn load_baseline(&self, label: &str) -> Result<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT report FROM drift_baselines WHERE label = ?1",
+                params![label],
+                |row| row.get(0),
+            )
+            .map(Some)
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(other.into()),
+            })
+    }
+
+    /// Stored baselines, newest first.
+    pub fn list_baselines(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT label, created_at FROM drift_baselines ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(anyhow::Error::from)
     }
 
     /// Latest citation verdict for a query term across any target, if ever checked.

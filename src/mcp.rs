@@ -364,9 +364,10 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                             "type": "object",
                             "properties": {
                                 "path": { "type": "string", "description": "Current audit JSON path" },
-                                "baseline": { "type": "string", "description": "Baseline audit JSON path" }
+                                "baseline": { "type": "string", "description": "Baseline audit JSON path" },
+                                "baseline_label": { "type": "string", "description": "Stored baseline label instead of a path (see drift baseline)" }
                             },
-                            "required": ["path", "baseline"]
+                            "required": ["path"]
                         }
                     }
                 ]
@@ -676,21 +677,35 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
         "seo_report" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
             let baseline = args.get("baseline").and_then(|v| v.as_str()).unwrap_or("");
+            let baseline_label = args.get("baseline_label").and_then(|v| v.as_str()).unwrap_or("");
             if let Some(err) = safety_gate("seo_report", path) {
                 return err;
             }
-            if let Some(err) = safety_gate("seo_report", baseline) {
-                return err;
-            }
-            match (
-                crate::paths::read_user_file(path, &["json"]),
-                crate::paths::read_user_file(baseline, &["json"]),
-            ) {
-                (Ok(c), Ok(b)) => match (
-                    serde_json::from_str::<crate::audit::DirectoryAuditReport>(&c),
-                    serde_json::from_str::<crate::audit::DirectoryAuditReport>(&b),
-                ) {
-                    (Ok(cur), Ok(base)) => {
+            let base_src = if !baseline_label.trim().is_empty() {
+                match crate::rank::DbStore::open() {
+                    Ok(db) => match db.load_baseline(baseline_label.trim()) {
+                        Ok(Some(src)) => src,
+                        Ok(None) => return format!("Error: no baseline '{}' stored.", baseline_label.trim()),
+                        Err(e) => return format!("Error: read baseline: {e:#}"),
+                    },
+                    Err(e) => return format!("Error: open drift store: {e:#}"),
+                }
+            } else {
+                if let Some(err) = safety_gate("seo_report", baseline) {
+                    return err;
+                }
+                match crate::paths::read_user_file(baseline, &["json"]) {
+                    Ok(src) => src,
+                    Err(e) => return format!("Error: read audit JSON: {e}"),
+                }
+            };
+            let base: crate::audit::DirectoryAuditReport = match serde_json::from_str(&base_src) {
+                Ok(b) => b,
+                Err(e) => return format!("Error: parse baseline JSON: {}", e),
+            };
+            match crate::paths::read_user_file(path, &["json"]) {
+                Ok(c) => match serde_json::from_str::<crate::audit::DirectoryAuditReport>(&c) {
+                    Ok(cur) => {
                         let actions = crate::rules::actions_for(&cur.findings);
                         // Drift is best-effort: a missing ledger yields no alerts.
                         let drift = crate::rank::DbStore::open()
@@ -705,9 +720,9 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                         });
                         serde_json::to_string_pretty(&out).unwrap_or_default()
                     }
-                    (Err(e), _) | (_, Err(e)) => format!("Error: parse audit JSON: {}", e),
+                    Err(e) => format!("Error: parse audit JSON: {}", e),
                 },
-                (Err(e), _) | (_, Err(e)) => format!("Error: read audit JSON: {}", e),
+                Err(e) => format!("Error: read audit JSON: {}", e),
             }
         }
         _ => format!("Error: unknown tool: {}", name),
