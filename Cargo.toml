@@ -14,12 +14,12 @@ categories = ["command-line-utilities", "development-tools"]
 # research notes, agent tooling, or binary assets.
 include = [
     "src/**/*.rs",
-    "Cargo.toml",
-    "Cargo.lock",
-    "README.md",
-    "LICENSE",
-    "SKILL.md",
-    "CHANGELOG.md",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/README.md",
+    "/LICENSE",
+    "/SKILL.md",
+    "/CHANGELOG.md",
     "examples/*.json",
     "examples/*.md",
 ]
