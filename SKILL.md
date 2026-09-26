@@ -1,6 +1,6 @@
 ---
 name: jev-seo
-description: Free SEO and GEO audits for any site or docs folder. Use when the user asks to audit SEO, check rankings, score AI visibility, validate schemas, inspect robots.txt, crawl for broken links, or gate a deploy on search health. Runs a single Rust binary, no paid APIs.
+description: Free SEO and GEO audits for any site or docs folder. Use when the user asks to audit SEO, check rankings, score AI visibility, validate schemas, inspect robots.txt, crawl for broken links, or gate a deploy on search health. Runs a single Rust binary, no paid APIs. Semantic judgments by TypeSafe Jev when keyed, deterministic scores otherwise.
 ---
 
 # jev-seo skill

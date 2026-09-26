@@ -10,6 +10,9 @@
 - [x] R58 broken-hreflang-cluster: cross-page graph flags noindexed or unreciprocated alternates, heuristic + advisory
 - [x] RULE_SET_VERSION 2026.09b; registry R01-R58
 - [x] 112 tests green, clippy clean
+- [x] 15-tool MCP: `seo_cite_check` (answer/sampling/engine/manual loop), `seo_gap` + `gsc gap`, keyless GEO score, paid engine answers, drift alerts, citation bot count, llms.txt shape grade
+- [x] Agentic loop kit: `drift baseline/compare/history`, `audit --digest`, `bundle`, pair judging, post-H1 excerpts, gate numbers in `docs/EVAL.md`
+- [x] 132 tests green, clippy `-D warnings` clean, descriptions refreshed with TypeSafe Jev naming
 
 ### Shipped on master (local + pushed docs)
 - [x] Phase 0-4 skeleton, modules, crawl, llms, doctor, HTML reports (v0.1.1 on crates.io)
