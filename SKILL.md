@@ -19,12 +19,24 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 ## Reading output
 
 - `Health`, `Score`, and `Grade` lines are deterministic 0-100 values with A-F grades.
-- `Top Actions` are ranked by impact with effort bands; ids like `RULE-R01` map to the rule registry (R01-R57) in `src/rules.rs`.
+- `Top Actions` are ranked by impact with effort bands; ids like `RULE-R01` map to the rule registry (R01-R58) in `src/rules.rs`.
 - New since v0.1.1: `explain` any rule id, `report --baseline` diffs, `crawl --vitals` PageSpeed checks, `query --provider dfs` opt-in DataForSEO.
 - Jev contract: Choices offer `insufficient_context`, Flags print the runner-up, every fan-out appends to `~/.jev-seo/eval.jsonl`. Question version rides the spend line.
 - `Completeness` says what was skipped (caps, missing sitemap, missing robots). A capped crawl is a sample, not a verdict.
 - `Needs review` marks Jev answers below the confidence bar. Treat those lines as unverified.
 - `--json` keeps stdout machine-clean; progress goes to stderr.
+
+## MCP server (14 tools)
+
+Run it over stdio: `npx -y jev-seo` (or `jev-seo mcp` with a local build). Client config:
+
+```json
+{ "mcpServers": { "jev-seo": { "command": "npx", "args": ["-y", "jev-seo"] } } }
+```
+
+No local build? Set `JEV_SEO_BIN=/path/to/jev-seo` and the wrapper uses it instead of downloading.
+
+`seo_cite_check` asks YOU the buyer query via MCP sampling and reports whether your answer names the target domain. It only works when your MCP client supports `sampling/createMessage`; otherwise it errors clearly. Result fields: `cited` (bool), `since_last` (previous verdict or null), `excerpt` (what you said, 300 chars). Answer the sampling prompt naturally, as you would a user, or the check is meaningless.
 
 ## Rules for agents
 
