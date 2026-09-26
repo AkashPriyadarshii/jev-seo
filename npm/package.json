@@ -1,6 +1,6 @@
 {
   "name": "jev-seo",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, site crawls, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost.",
   "license": "MIT",
   "repository": {
