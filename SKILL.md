@@ -34,7 +34,7 @@ Run it over stdio: `npx -y jev-seo` (or `jev-seo mcp` with a local build). Clien
 { "mcpServers": { "jev-seo": { "command": "npx", "args": ["-y", "jev-seo"] } } }
 ```
 
-No local build? Set `JEV_SEO_BIN=/path/to/jev-seo` and the wrapper uses it instead of downloading.
+No local build? Set `JEV_SEO_BIN=/path/to/jev-seo` and the wrapper uses it instead of downloading. First npx run needs network for the one-time download; musl/Alpine systems cannot run the glibc builds and must use `JEV_SEO_BIN` with a local `cargo build`.
 
 `seo_cite_check` reports whether an AI answer names the target domain. Three paths, first one that works wins: pass `answer` to score your own words (works everywhere); omit it and sampling-capable clients answer via `sampling/createMessage`; otherwise you get `needs_answer: true` plus the prompt, answer it naturally as you would a user, and re-call with `answer`. Result fields: `cited` (bool), `since_last` (previous verdict or null), `source` (answer/sampling/engine), `excerpt` (300 chars).
 

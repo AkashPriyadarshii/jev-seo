@@ -101,7 +101,7 @@ function extract(archive, destDir, entry) {
 
 async function ensureBin(entry) {
   const local = resolveLocalBin(entry);
-  if (local) return local;
+  if (local) return checkBin(local);
   const archive = `jev-seo-${entry.target}.${entry.ext}`;
   const url = `https://github.com/${REPO}/releases/download/v${VERSION}/${archive}`;
   const dir = cacheDir();
@@ -126,7 +126,22 @@ async function ensureBin(entry) {
       chmodSync(bin, 0o755);
     } catch {}
   }
-  return bin;
+  return checkBin(bin);
+}
+
+/// The download can succeed yet the binary still not run here (musl
+/// systems vs glibc builds, corrupt cache). Fail clearly instead of
+/// leaking a system relocation error to the agent.
+function checkBin(bin) {
+  const r = spawnSync(bin, ["--version"], { stdio: "pipe" });
+  if (r.status === 0) return bin;
+  console.error(
+    `jev-seo: binary at ${bin} failed to execute. ` +
+      `Prebuilt releases need glibc; musl/Alpine systems must build from ` +
+      `source (cargo build) and set JEV_SEO_BIN=/path/to/jev-seo. ` +
+      `Delete the cache dir above to force a fresh download.`
+  );
+  process.exit(1);
 }
 
 async function main() {
