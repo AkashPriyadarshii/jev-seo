@@ -237,7 +237,7 @@ Sitemap: https://example.com/sitemap.xml
         assert!(resp.error.is_none());
         let res = resp.result.unwrap();
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
-        assert_eq!(tools.len(), 13, "All 13 agent SEO tools must be exposed");
+        assert_eq!(tools.len(), 14, "All 14 agent SEO tools must be exposed");
 
         let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(|n| n.as_str())).collect();
         assert!(names.contains(&"seo_keywords"));
@@ -253,6 +253,116 @@ Sitemap: https://example.com/sitemap.xml
         assert!(names.contains(&"seo_extract"));
         assert!(names.contains(&"seo_explain"));
         assert!(names.contains(&"seo_report"));
+        assert!(names.contains(&"seo_cite_check"));
+    }
+
+    #[test]
+    fn test_mcp_cite_check_cited_and_missed() {
+        use crate::mcp::{handle_request_with, RpcRequest, Sampler};
+        use serde_json::json;
+
+        struct Fake(std::result::Result<String, String>);
+        impl Sampler for Fake {
+            fn sample(&mut self, _p: &str) -> std::result::Result<String, String> {
+                match &self.0 {
+                    Ok(s) => Ok(s.clone()),
+                    Err(e) => Err(e.clone()),
+                }
+            }
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var("JEV_SEO_DB", dir.path().join("cite.db").to_str().unwrap());
+
+        let call = |answer: std::result::Result<String, String>| {
+            let req = RpcRequest {
+                jsonrpc: "2.0".into(),
+                id: Some(json!(1)),
+                method: "tools/call".into(),
+                params: Some(json!({
+                    "name": "seo_cite_check",
+                    "arguments": { "target": "https://www.example.com/pricing", "query": "best seo tool" }
+                })),
+            };
+            let resp = handle_request_with(&req, &mut Fake(answer));
+            let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+            serde_json::from_str::<serde_json::Value>(&text).unwrap()
+        };
+
+        let hit = call(Ok("Try example.com, it covers audits well.".into()));
+        assert_eq!(hit["cited"], true, "{hit}");
+        assert_eq!(hit["since_last"], serde_json::Value::Null);
+
+        let miss = call(Ok("Try somesite.io instead.".into()));
+        assert_eq!(miss["cited"], false, "{miss}");
+        assert_eq!(miss["since_last"], true);
+
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(2)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_cite_check",
+                "arguments": { "target": "example.com", "query": "best seo tool" }
+            })),
+        };
+        let resp = handle_request_with(&req, &mut Fake(declined_err()));
+        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        assert!(text.starts_with("Error: sampling unavailable:"), "{text}");
+
+        std::env::remove_var("JEV_SEO_DB");
+
+        fn declined_err() -> std::result::Result<String, String> {
+            Err("client declined sampling: Method not found".into())
+        }
+    }
+
+    #[test]
+    fn test_mcp_cite_check_rejects_empty_args() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_cite_check",
+                "arguments": { "target": "", "query": "" }
+            })),
+        };
+        let resp = handle_request(&req);
+        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        assert!(text.starts_with("Error:"), "{text}");
+    }
+
+    #[test]
+    fn test_mcp_cite_check_no_sampler_fails_clearly() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: Some(json!({
+                "name": "seo_cite_check",
+                "arguments": { "target": "example.com", "query": "best seo tool" }
+            })),
+        };
+        let resp = handle_request(&req);
+        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        assert!(text.starts_with("Error: sampling unavailable:"), "{text}");
+    }
+
+    #[test]
+    fn test_record_cite_roundtrip() {
+        use crate::rank::DbStore;
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = DbStore::open_at(dir.path().join("cite.db").to_str().unwrap()).unwrap();
+        assert_eq!(db.record_cite("example.com", "best seo tool", true).unwrap(), None);
+        assert_eq!(db.record_cite("example.com", "best seo tool", false).unwrap(), Some(true));
     }
 
     #[test]

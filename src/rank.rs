@@ -55,7 +55,14 @@ impl DbStore {
                    score INTEGER NOT NULL,
                    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
                );
-               CREATE TABLE IF NOT EXISTS crawl_snapshots (
+                CREATE TABLE IF NOT EXISTS cite_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    target TEXT NOT NULL,
+                    term TEXT NOT NULL,
+                    cited INTEGER NOT NULL,
+                    checked_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS crawl_snapshots (
                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                    start_url TEXT NOT NULL,
                    pages INTEGER NOT NULL,
@@ -75,6 +82,7 @@ impl DbStore {
                 );
                 CREATE INDEX IF NOT EXISTS idx_rank_history_keyword ON rank_history(keyword_id);
                 CREATE INDEX IF NOT EXISTS idx_geo_history_target ON geo_history(target, term);
+                CREATE INDEX IF NOT EXISTS idx_cite_history_target ON cite_history(target, term);
                 CREATE INDEX IF NOT EXISTS idx_crawl_snapshots_url ON crawl_snapshots(start_url);
                 CREATE INDEX IF NOT EXISTS idx_rank_obs_keyword ON rank_observations(keyword_id);",
         )?;
@@ -163,6 +171,26 @@ impl DbStore {
         self.conn.execute(
             "INSERT INTO geo_history (target, term, score) VALUES (?1, ?2, ?3)",
             params![target, term, score as i64],
+        )?;
+        Ok(prev)
+    }
+
+    /// Record an MCP sampling citation check, returning the previous verdict.
+    pub fn record_cite(&self, target: &str, term: &str, cited: bool) -> Result<Option<bool>> {
+        let prev: Option<bool> = self
+            .conn
+            .query_row(
+                "SELECT cited FROM cite_history WHERE target = ?1 AND term = ?2 ORDER BY id DESC LIMIT 1",
+                params![target, term],
+                |row| {
+                    let v: i64 = row.get(0)?;
+                    Ok(v != 0)
+                },
+            )
+            .ok();
+        self.conn.execute(
+            "INSERT INTO cite_history (target, term, cited) VALUES (?1, ?2, ?3)",
+            params![target, term, cited as i64],
         )?;
         Ok(prev)
     }

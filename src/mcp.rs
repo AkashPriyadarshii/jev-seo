@@ -21,27 +21,117 @@ pub(crate) struct RpcResponse {
     pub(crate) error: Option<serde_json::Value>,
 }
 
+/// How `seo_cite_check` borrows a model. Live servers use [`StdioSampler`]
+/// (MCP `sampling/createMessage` against the connected client); tests and the
+/// pure [`handle_request`] path use [`NoSampler`], which always declines.
+pub(crate) trait Sampler {
+    fn sample(&mut self, prompt: &str) -> std::result::Result<String, String>;
+}
+
+/// Sampler for contexts with no client attached: every sampling call fails
+/// clearly instead of hanging.
+pub(crate) struct NoSampler;
+
+impl Sampler for NoSampler {
+    fn sample(&mut self, _prompt: &str) -> std::result::Result<String, String> {
+        Err("no sampling client attached; run jev-seo as an MCP server inside an agent that supports sampling".into())
+    }
+}
+
+/// Live sampler: sends `sampling/createMessage` to the connected client over
+/// the same stdio pair and waits for the matching response id. Notifications
+/// are skipped; responses for unknown ids keep waiting instead of dropping.
+pub(crate) struct StdioSampler<'a> {
+    lines: std::io::Lines<std::io::StdinLock<'a>>,
+    stdout: &'a mut std::io::Stdout,
+    next_id: u64,
+}
+
+impl<'a> StdioSampler<'a> {
+    fn new(lines: std::io::Lines<std::io::StdinLock<'a>>, stdout: &'a mut std::io::Stdout) -> Self {
+        Self { lines, stdout, next_id: 0 }
+    }
+
+    /// Next non-empty client line, or None on EOF/error.
+    fn next_line(&mut self) -> Option<String> {
+        loop {
+            match self.lines.next()? {
+                Ok(t) if t.trim().is_empty() => continue,
+                Ok(t) => return Some(t),
+                Err(_) => return None,
+            }
+        }
+    }
+
+    fn reply(&mut self, text: &str) -> Result<()> {
+        writeln!(self.stdout, "{}", text)?;
+        self.stdout.flush()?;
+        Ok(())
+    }
+}
+
+impl Sampler for StdioSampler<'_> {
+    fn sample(&mut self, prompt: &str) -> std::result::Result<String, String> {
+        let id = format!("jev-seo-sample-{}", self.next_id);
+        self.next_id += 1;
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "sampling/createMessage",
+            "params": {
+                "messages": [{ "role": "user", "content": { "type": "text", "text": prompt } }],
+                "maxTokens": 500,
+            }
+        });
+        self.reply(&serde_json::to_string(&req).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+
+        loop {
+            let text = match self.next_line() {
+                Some(t) => t,
+                None => return Err("client closed the stream during sampling".into()),
+            };
+            let msg: serde_json::Value =
+                serde_json::from_str(&text).map_err(|_| "client sent a non-JSON sampling reply".to_string())?;
+            if msg.get("id") != Some(&json!(id)) {
+                continue; // notification or unrelated response: keep waiting
+            }
+            if let Some(err) = msg.get("error") {
+                let detail = err.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error");
+                return Err(format!("client declined sampling: {}", detail));
+            }
+            return sample_text(msg.get("result")).ok_or_else(|| "client sent an unexpected sampling result shape".to_string());
+        }
+    }
+}
+
+/// Pull model text out of a `sampling/createMessage` result, accepting the
+/// single-object and array content shapes.
+fn sample_text(result: Option<&serde_json::Value>) -> Option<String> {
+    let content = result?.get("content")?;
+    let first = if let Some(arr) = content.as_array() {
+        arr.first()?
+    } else {
+        content
+    };
+    if first.get("type")?.as_str()? != "text" {
+        return None;
+    }
+    first.get("text")?.as_str().map(str::to_string)
+}
+
 pub fn run_stdio_server() -> Result<()> {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
+    let mut sampler = StdioSampler::new(stdin.lock().lines(), &mut stdout);
 
-    for line in stdin.lock().lines() {
-        let text = match line {
-            Ok(t) => t,
-            Err(_) => break,
-        };
-
-        if text.trim().is_empty() {
-            continue;
-        }
-
+    while let Some(text) = sampler.next_line() {
         let req: RpcRequest = match serde_json::from_str(&text) {
             Ok(r) => r,
             Err(_) => {
                 let err = json!({ "jsonrpc": "2.0", "id": null,
                     "error": { "code": -32700, "message": "Parse error" } });
-                writeln!(stdout, "{}", err)?;
-                stdout.flush()?;
+                sampler.reply(&err.to_string())?;
                 continue;
             }
         };
@@ -51,16 +141,21 @@ pub fn run_stdio_server() -> Result<()> {
             continue;
         }
 
-        let resp = handle_request(&req);
+        let resp = handle_request_with(&req, &mut sampler);
         let resp_str = serde_json::to_string(&resp)?;
-        writeln!(stdout, "{}", resp_str)?;
-        stdout.flush()?;
+        sampler.reply(&resp_str)?;
     }
 
     Ok(())
 }
 
+/// Pure entry point (no sampling client): used by tests and embedders.
+#[allow(dead_code)]
 pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
+    handle_request_with(req, &mut NoSampler)
+}
+
+pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -> RpcResponse {
     match req.method.as_str() {
         "initialize" => RpcResponse {
             jsonrpc: "2.0".into(),
@@ -231,6 +326,18 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
                             },
                             "required": ["path", "baseline"]
                         }
+                    },
+                    {
+                        "name": "seo_cite_check",
+                        "description": "Ask the connected agent (MCP sampling, free) a buyer query and report whether it names the target domain",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "target": { "type": "string", "description": "Domain or URL to look for, e.g. example.com" },
+                                "query": { "type": "string", "description": "Buyer query to put to the agent" }
+                            },
+                            "required": ["target", "query"]
+                        }
                     }
                 ]
             })),
@@ -241,7 +348,7 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
             let tool_name = params.and_then(|p| p.get("name")).and_then(|n| n.as_str()).unwrap_or("");
             let args = params.and_then(|p| p.get("arguments")).cloned().unwrap_or(json!({}));
 
-            let result_content = execute_tool(tool_name, &args);
+            let result_content = execute_tool_with(tool_name, &args, sampler);
             let is_error = result_content.starts_with("Error:");
             RpcResponse {
                 jsonrpc: "2.0".into(),
@@ -283,8 +390,50 @@ fn safety_gate(tool: &str, target: &str) -> Option<String> {
     }
 }
 
-fn execute_tool(name: &str, args: &serde_json::Value) -> String {
+/// Normalize a target domain or URL to the bare host the model's answer is
+/// scanned for: lowercase, no scheme, no leading www., no path.
+fn cite_host(target: &str) -> String {
+    let t = target.trim().to_lowercase();
+    let t = t.split("://").last().unwrap_or(&t);
+    let t = t.strip_prefix("www.").unwrap_or(t);
+    t.split(['/', '?', '#']).next().unwrap_or(t).to_string()
+}
+
+fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sampler) -> String {
     match name {
+        "seo_cite_check" => {
+            let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("").trim();
+            let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").trim();
+            if target.is_empty() || query.is_empty() {
+                return "Error: seo_cite_check needs both \"target\" (domain or URL) and \"query\".".into();
+            }
+            if let Some(err) = safety_gate("seo_cite_check", target) {
+                return err;
+            }
+            let host = cite_host(target);
+            let prompt = format!(
+                "Answer this search query briefly, naming the specific websites or brands you recommend: {query}"
+            );
+            let answer = match sampler.sample(&prompt) {
+                Ok(a) => a,
+                Err(e) => return format!("Error: sampling unavailable: {e}"),
+            };
+            let cited = answer.to_lowercase().contains(&host);
+            // Drift log is best-effort: a stuck ledger must never fail the check.
+            let prev = crate::rank::DbStore::open()
+                .ok()
+                .and_then(|db| db.record_cite(target, query, cited).ok())
+                .flatten();
+            let excerpt: String = answer.chars().take(300).collect();
+            serde_json::to_string_pretty(&json!({
+                "target": target,
+                "query": query,
+                "cited": cited,
+                "since_last": prev,
+                "excerpt": excerpt,
+            }))
+            .unwrap_or_default()
+        }
         "seo_serp_inspect" => {
             let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
             let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
