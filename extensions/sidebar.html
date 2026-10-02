@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"/>
+<title>jev-seo Site Health</title>
+<style>body{font:14px system-ui;margin:16px;color:#111}h1{font-size:16px}m{color:#0055ff}pre{white-space:pre-wrap;background:#f6f6f6;padding:8px;border-radius:8px}</style>
+<h1>jev-seo <m>Site Health</m></h1>
+<input id="u" placeholder="https://example.com" style="width:60%"/> <button id="go">Audit</button>
+<pre id="out">Enter URL then Audit — free 1-URL via seo_crawl, pro via external checkout.</pre>
+<script>
+go.onclick=async()=>{
+  out.textContent='crawling...';
+  const url=u.value.trim(); if(!url){out.textContent='enter url';return}
+  // In ChatGPT host, use window.openai.callTool ; fallback: POST /mcp
+  const body={jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"seo_crawl",arguments:{url,max_pages:10}}};
+  try{
+    const r=await fetch('/mcp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json(); out.textContent=JSON.stringify(j,null,2).slice(0,12000);
+  }catch(e){ out.textContent=String(e) }
+}
+</script>

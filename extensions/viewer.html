@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"/>
+<title>jev-seo Report Viewer</title>
+<style>body{margin:0}iframe{width:100%;height:100vh;border:0}</style>
+<iframe id="f"></iframe>
+<script>
+const u=new URLSearchParams(location.search).get('url');
+if(u) f.src=u; else document.body.innerHTML='<p style="padding:16px;color:#666">Pass ?url=/path/to/report.html — renders HTML audit report.</p>';
+</script>

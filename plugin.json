@@ -1,0 +1,58 @@
+{
+  "name": "jev-seo",
+  "version": "0.1.2",
+  "displayName": "jev-seo — Free SEO & GEO Radar",
+  "description": "Free Rust SEO & GEO audits: 58-rule checks, live crawl, AI citation scoring, rank drift. 15-tool MCP for agents.",
+  "repository": "https://github.com/AkashPriyadarshii/jev-seo",
+  "homepage": "https://github.com/AkashPriyadarshii/jev-seo",
+  "mcp": {
+    "transport": "streamable-http",
+    "url": "/mcp",
+    "tools": [
+      "seo_crawl",
+      "seo_audit",
+      "seo_geo",
+      "seo_cite_check",
+      "seo_gap",
+      "seo_explain",
+      "seo_report"
+    ]
+  },
+  "extensions": {
+    "sidebar": {
+      "entry": "/extensions/sidebar.html",
+      "description": "Site Health dashboard — score, areas, top actions"
+    },
+    "panels": [
+      {
+        "id": "audit-panel",
+        "entry": "/extensions/panel.html",
+        "description": "Ranked actions + comparison table + fix preview",
+        "tools": ["seo_audit", "seo_crawl", "seo_report"]
+      }
+    ],
+    "fileViewers": [
+      {
+        "pattern": "*.html",
+        "entry": "/extensions/viewer.html",
+        "description": "HTML audit report viewer"
+      }
+    ],
+    "forms": []
+  },
+  "events": {
+    "spec": "mcp-events-draft",
+    "transport": "webhook",
+    "events": [
+      {
+        "id": "rank_drift",
+        "description": "Rank or GEO citation drift detected — re-audit site"
+      }
+    ]
+  },
+  "auth": { "type": "none" },
+  "monetization": {
+    "mode": "external_checkout",
+    "note": "Free 1-URL audit in ChatGPT; Pro crawl (100 pages) redirects to Stripe on jevseo.vercel.app. Embedded checkout private beta not used."
+  }
+}

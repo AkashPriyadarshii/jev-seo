@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"/>
+<title>jev-seo Panel</title>
+<style>body{font:14px system-ui;margin:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:6px;text-align:left}th{background:#f6f6f6}</style>
+<h3>Ranked Actions</h3>
+<p style="color:#666">Tools: seo_audit / seo_crawl / seo_report — comparison table + fix preview. Pro crawl 100 pages → <a href="https://jevseo.vercel.app" target="_blank">external checkout</a>.</p>
+<div id="t">Run <code>seo_crawl https://example.com</code> or <code>seo_audit docs/</code> in chat.</div>
+<script>
+// Host injects window.openai data; render fallback
+if(window.openai?.toolOutput){ t.innerHTML='<pre>'+JSON.stringify(window.openai.toolOutput,null,2).slice(0,8000)+'</pre>' }
+</script>

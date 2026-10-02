@@ -53,3 +53,9 @@ crawl.json
 
 # Dropped research notes (local only, never commit)
 Research.md
+
+# Plugin Extensions — committed
+!plugin.json
+!.well-known/plugin.json
+!extensions/
+!src/plugin_bridge.rs

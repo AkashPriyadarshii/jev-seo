@@ -23,6 +23,7 @@ mod rank;
 mod robots;
 mod rules;
 mod schema;
+mod plugin_bridge;
 mod serp;
 mod sitemap;
 mod vitals;
@@ -309,6 +310,12 @@ enum Commands {
     },
     /// Start native stdio JSON-RPC 2.0 Agent MCP Server
     Mcp,
+    /// Start HTTP bridge for ChatGPT Plugin Extensions (Streamable HTTP)
+    Serve {
+        /// Listen address
+        #[arg(long, default_value = "0.0.0.0:8787")]
+        addr: String,
+    },
 }
 
 /// Push CLI `--jev-budget` into the process-wide spend cap (USD).
@@ -1916,6 +1923,9 @@ fn main() -> Result<()> {
         }
         Commands::Mcp => {
             mcp::run_stdio_server()?;
+        }
+        Commands::Serve { addr } => {
+            plugin_bridge::run_plugin_bridge(&addr)?;
         }
     }
 
