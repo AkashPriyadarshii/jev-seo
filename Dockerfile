@@ -2,7 +2,10 @@ FROM rust:stable-bookworm AS build
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-RUN cargo build --release --all-targets
+COPY plugin.json ./plugin.json
+COPY .well-known ./.well-known
+COPY extensions ./extensions
+RUN cargo build --release --bin jev-seo
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
