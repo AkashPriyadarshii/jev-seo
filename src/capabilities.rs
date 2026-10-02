@@ -47,6 +47,7 @@ pub const COMMANDS: &[&str] = &[
     "mcp",
     "serve",
     "capabilities",
+    "watch",
 ];
 
 pub fn as_json() -> serde_json::Value {

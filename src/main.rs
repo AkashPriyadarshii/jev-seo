@@ -25,6 +25,7 @@ mod rules;
 mod schema;
 mod capabilities;
 mod plugin_bridge;
+mod watch;
 mod serp;
 mod sitemap;
 mod vitals;
@@ -321,6 +322,31 @@ enum Commands {
     Capabilities {
         #[arg(long)]
         json: bool,
+    },
+    /// Watch a repo or site for regressions vs stored baseline (polling)
+    Watch {
+        /// Repo path (local dir) or site URL (https://...)
+        target: Option<String>,
+        /// Repo path alias for watch --repo .
+        #[arg(long)]
+        repo: Option<String>,
+        /// Site URL alias for watch --site https://example.com
+        #[arg(long)]
+        site: Option<String>,
+        /// Check once and exit (no loop)
+        #[arg(long, default_value_t = false)]
+        once: bool,
+        /// Poll interval minutes (loop mode only)
+        #[arg(long, default_value_t = 30)]
+        every: u64,
+        /// Baseline label override (default watch-<slug>)
+        #[arg(long)]
+        label: Option<String>,
+        #[arg(long)]
+        json: bool,
+        /// Skip Jev semantic calls
+        #[arg(long)]
+        no_jev: bool,
     },
 }
 
@@ -1935,6 +1961,38 @@ fn main() -> Result<()> {
         }
         Commands::Capabilities { json: _ } => {
             println!("{}", serde_json::to_string_pretty(&capabilities::as_json())?);
+        }
+        Commands::Watch { target, repo, site, once, every, label, json, no_jev } => {
+            let t = repo.or(site).or(target).unwrap_or_else(|| {
+                eprintln!("{}", "Error: watch needs a target: jev-seo watch <path-or-url> or --repo/--site".red());
+                std::process::exit(2);
+            });
+            let is_site = t.starts_with("http://") || t.starts_with("https://");
+            let run_once = || -> anyhow::Result<watch::WatchResult> {
+                if is_site { watch::watch_site_once(&t, label.as_deref(), no_jev) } else { watch::watch_repo_once(&t, label.as_deref(), no_jev) }
+            };
+            if once {
+                let r = run_once()?;
+                if json { println!("{}", serde_json::to_string_pretty(&r)?); } else {
+                    let sign = if r.delta > 0 { "+" } else { "" };
+                    let status_c = match r.status.as_str() { "regressed" => r.status.red().bold().to_string(), "improved" => r.status.green().bold().to_string(), _ => r.status.dimmed().to_string() };
+                    println!("{} {} -> {} ({}{}) {}", "Watch".cyan().bold(), r.target.dimmed(), format!("{}/100", r.score_now).bold(), sign, r.delta, status_c);
+                    println!("  {} blocking {}->{} warnings {}->{} findings {}->{}", "Gate:".bold(), r.blocking_before, r.blocking_now, r.warnings_before, r.warnings_now, r.findings_before, r.findings_now);
+                    if !r.drift.is_empty() { println!("  Drift: {} alerts", r.drift.len()); for d in &r.drift { println!("    - {} {} `{}` {}->{}", d.kind.yellow(), d.target.dimmed(), d.term, d.from, d.to); } }
+                    if !r.top_actions.is_empty() { println!("  Actions:"); for a in &r.top_actions { println!("    [P{}] {} {}", a.priority, a.id, a.title.dimmed()); } }
+                }
+                return Ok(());
+            }
+            // Loop mode: poll every N minutes
+            let secs = every.max(1) * 60;
+            loop {
+                let r = run_once()?;
+                if json { println!("{}", serde_json::to_string(&r)?); } else {
+                    let sign = if r.delta > 0 { "+" } else { "" };
+                    println!("[{}] {} {}/100 ({}{}) {}", r.at.dimmed(), r.target, r.score_now, sign, r.delta, r.status);
+                }
+                std::thread::sleep(std::time::Duration::from_secs(secs));
+            }
         }
     }
 

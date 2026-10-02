@@ -498,6 +498,7 @@ Drop `narrative.json` next to exports (or in `--manifest`). Required keys: `exec
 | `drift <op>` | Snapshot baselines `baseline`/`compare`/`history` | `--report <path>`, `--label <name>`, `--json` |
 | `doctor` | Version, API key, database, platform | `--json` |
 | `capabilities` | Machine source of truth `{version, rule_set, rules, mcp_tools, commands}` | `--json` |
+| `watch <target>` | Regression watch vs stored baseline (polling) | `--repo/--site`, `--once`, `--every <min>`, `--label`, `--json`, `--no-jev` |
 | `serve` | HTTP bridge for ChatGPT Plugin Extensions (Streamable HTTP) | `--addr <host:port>` |
 | `gsc <auth\|sites\|query\|gap>` | Search Console: free first-party query data | `--site <url>`, `--code`, `--limit <n>`, `--json` |
 | `mcp` | Stdio JSON-RPC 2.0 agent MCP server | (None) |
@@ -604,6 +605,15 @@ Real output in the repo, not mockups:
 **What license?** MIT. Source and binaries are free to use, modify, and redistribute.
 
 ---
+
+## Watch
+
+```bash
+jev-seo watch docs/ --once --no-jev          # one-shot vs last baseline (repo)
+jev-seo watch https://example.com --once --every 30  # site; loop every 30m
+jev-seo watch --repo . --json | jq .status   # machine gate: clean|regressed|improved|baseline
+```
+Compares score, blocking/warning counts, findings, and `drift_alerts` (citation/geo) against `watch-<slug>` sqlite baseline, then saves current as next baseline. `ponytail: polling, not inotify; pool if >100 rps.`
 
 ## Architecture
 

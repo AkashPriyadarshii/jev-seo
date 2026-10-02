@@ -131,6 +131,9 @@
 ### `capabilities.rs` (Single source)
 - `RULES.len()` + `MCP_TOOLS` + `COMMANDS` → `jev-seo capabilities --json`; generator for README/SKILL/PRD.
 
+### `watch.rs` (Regression watch)
+- `watch_repo_once` / `watch_site_once` vs `watch-<slug>` baseline in sqlite, delta + blocking + drift + top actions; loop via `watch --every` sleep.
+
 ### `plugin_bridge.rs` (HTTP bridge)
 - Stdlib `TcpListener` → `POST /mcp` (JSON-RPC), `GET /plugin.json` + `/extensions/*`; ponytail per-connection threads.
 
