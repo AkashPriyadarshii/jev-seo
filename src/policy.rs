@@ -31,10 +31,19 @@ pub const FLAG: f64 = 0.45;
 pub fn thresholds(command: &str) -> Thresholds {
     match command {
         // Noul-heavy surfaces: still require 0.80 to treat as fact.
-        "geo" | "brief" | "audit" | "crawl" | "link" => Thresholds { act: ACT, flag: FLAG },
+        "geo" | "brief" | "audit" | "crawl" | "link" => Thresholds {
+            act: ACT,
+            flag: FLAG,
+        },
         // Preference / ranking noise: lower flag only; act unchanged.
-        "query" | "keywords" => Thresholds { act: ACT, flag: 0.40 },
-        _ => Thresholds { act: ACT, flag: FLAG },
+        "query" | "keywords" => Thresholds {
+            act: ACT,
+            flag: 0.40,
+        },
+        _ => Thresholds {
+            act: ACT,
+            flag: FLAG,
+        },
     }
 }
 
@@ -184,13 +193,19 @@ pub fn composite_geo(extra: &serde_json::Map<String, serde_json::Value>) -> Opti
         total += (score / 4.0) * weight;
         conf_total += a.get("confidence").and_then(|c| c.as_f64()).unwrap_or(0.0) * weight;
     }
-    Some((((total * 9.0) + 1.0).round().clamp(1.0, 10.0) as u32, conf_total))
+    Some((
+        ((total * 9.0) + 1.0).round().clamp(1.0, 10.0) as u32,
+        conf_total,
+    ))
 }
 
 /// Question ids in `extra` whose confidence sits below the act bar.
 /// Code prints these as needs-review instead of silently trusting them.
 /// A missing confidence also surfaces: unknown certainty is review-worthy.
-pub fn needs_review(extra: &serde_json::Map<String, serde_json::Value>, command: &str) -> Vec<String> {
+pub fn needs_review(
+    extra: &serde_json::Map<String, serde_json::Value>,
+    command: &str,
+) -> Vec<String> {
     let act = thresholds(command).act;
     let mut ids: Vec<String> = extra
         .iter()
@@ -260,7 +275,9 @@ pub fn link_question(candidates: &[(String, String)]) -> serde_json::Value {
     }
     criteria.insert(
         "no_link".into(),
-        serde_json::Value::String("No candidate is a natural contextual fit; linking would feel forced".into()),
+        serde_json::Value::String(
+            "No candidate is a natural contextual fit; linking would feel forced".into(),
+        ),
     );
     serde_json::json!({
         "link_target": {

@@ -203,18 +203,26 @@ pub fn readable_text(html: &str, limit: usize) -> String {
 }
 
 fn jina_key() -> Option<String> {
-    std::env::var("JINA_API_KEY").ok().filter(|k| !k.trim().is_empty())
+    std::env::var("JINA_API_KEY")
+        .ok()
+        .filter(|k| !k.trim().is_empty())
 }
 
 fn firecrawl_key() -> Option<String> {
-    std::env::var("FIRECRAWL_API_KEY").ok().filter(|k| !k.trim().is_empty())
+    std::env::var("FIRECRAWL_API_KEY")
+        .ok()
+        .filter(|k| !k.trim().is_empty())
 }
 
 fn firecrawl_endpoint() -> anyhow::Result<String> {
     match std::env::var("FIRECRAWL_API_URL") {
         Ok(b) => {
             let b = b.trim_end_matches('/').to_string();
-            let full = if b.ends_with("/scrape") { b } else { format!("{}/scrape", b) };
+            let full = if b.ends_with("/scrape") {
+                b
+            } else {
+                format!("{}/scrape", b)
+            };
             crate::paths::reject_api_endpoint(&full, "FIRECRAWL_API_URL")
         }
         Err(_) => Ok("https://api.firecrawl.dev/v1/scrape".to_string()),
@@ -233,7 +241,12 @@ pub fn jina_fetch(url: &str) -> Result<FetchResult> {
         req = req.set("Authorization", &format!("Bearer {}", key));
     }
     let body = capped_string(req.call()?, MAX_AUX_BYTES)?;
-    Ok(FetchResult { body, source: "jina", elapsed_ms: t0.elapsed().as_millis(), cost: 0 })
+    Ok(FetchResult {
+        body,
+        source: "jina",
+        elapsed_ms: t0.elapsed().as_millis(),
+        cost: 0,
+    })
 }
 
 /// Firecrawl scrape: JS-rendered markdown. Paid, key-gated.
@@ -259,5 +272,10 @@ pub fn firecrawl_fetch(url: &str) -> Result<FetchResult> {
     if md.trim().is_empty() {
         anyhow::bail!("firecrawl returned no markdown");
     }
-    Ok(FetchResult { body: md, source: "firecrawl", elapsed_ms: t0.elapsed().as_millis(), cost: 1 })
+    Ok(FetchResult {
+        body: md,
+        source: "firecrawl",
+        elapsed_ms: t0.elapsed().as_millis(),
+        cost: 1,
+    })
 }

@@ -44,11 +44,19 @@ pub fn score(text: &str, query: &str) -> KeylessGeo {
 
     let mut struct_pts = 0u32;
     let mut signals = vec![format!("term coverage {:.0}%", cover * 100.0)];
-    if text.contains("\n# ") || text.contains("\n## ") || text.contains("<h2") || text.contains("<h3") {
+    if text.contains("\n# ")
+        || text.contains("\n## ")
+        || text.contains("<h2")
+        || text.contains("<h3")
+    {
         struct_pts += 7;
         signals.push("headings present".into());
     }
-    if text.contains("\n- ") || text.contains("\n* ") || text.contains("\n1. ") || text.contains("<li") {
+    if text.contains("\n- ")
+        || text.contains("\n* ")
+        || text.contains("\n1. ")
+        || text.contains("<li")
+    {
         struct_pts += 7;
         signals.push("list structure present".into());
     }
@@ -68,5 +76,9 @@ pub fn score(text: &str, query: &str) -> KeylessGeo {
     signals.push(format!("{} words", words));
 
     let total = (cover_pts + first_pts + struct_pts + depth_pts).min(100);
-    KeylessGeo { score_10: total / 10, score_100: total, signals }
+    KeylessGeo {
+        score_10: total / 10,
+        score_100: total,
+        signals,
+    }
 }

@@ -55,7 +55,9 @@ pub fn extract_action_ids(text: &str) -> BTreeSet<String> {
             continue;
         }
         let start = i;
-        while i < bytes.len() && (bytes[i].is_ascii_uppercase() || bytes[i].is_ascii_digit() || bytes[i] == '-') {
+        while i < bytes.len()
+            && (bytes[i].is_ascii_uppercase() || bytes[i].is_ascii_digit() || bytes[i] == '-')
+        {
             i += 1;
         }
         let tok: String = bytes[start..i].iter().collect();
@@ -63,7 +65,10 @@ pub fn extract_action_ids(text: &str) -> BTreeSet<String> {
         let is_pref = tok.ends_with(|c: char| c.is_ascii_digit())
             && tok.contains('-')
             && tok.len() >= 5
-            && matches!(tok.split('-').next().unwrap_or(""), "LLMS" | "CRAWL" | "ACT" | "SEO");
+            && matches!(
+                tok.split('-').next().unwrap_or(""),
+                "LLMS" | "CRAWL" | "ACT" | "SEO"
+            );
         if is_rule || is_pref {
             out.insert(tok);
         }
@@ -71,7 +76,11 @@ pub fn extract_action_ids(text: &str) -> BTreeSet<String> {
     out
 }
 
-fn known_numbers(findings: &[crate::rules::Finding], actions: &[crate::actions::Action], n_files: usize) -> BTreeSet<u64> {
+fn known_numbers(
+    findings: &[crate::rules::Finding],
+    actions: &[crate::actions::Action],
+    n_files: usize,
+) -> BTreeSet<u64> {
     // Store rounded micro-units so we avoid f64 Ord (not implemented).
     let mut known: BTreeSet<u64> = BTreeSet::new();
     let mut add = |v: f64| {
@@ -104,7 +113,12 @@ fn known_numbers(findings: &[crate::rules::Finding], actions: &[crate::actions::
 
 /// Numbers in narrative text that match nothing citable in the audit.
 /// Skips tiny integers (1..=10 without a decimal) and URL/date-like runs.
-pub fn unverified_numbers(text: &str, findings: &[crate::rules::Finding], actions: &[crate::actions::Action], n_files: usize) -> Vec<String> {
+pub fn unverified_numbers(
+    text: &str,
+    findings: &[crate::rules::Finding],
+    actions: &[crate::actions::Action],
+    n_files: usize,
+) -> Vec<String> {
     let cleaned = {
         let mut s = text.to_string();
         for id in extract_action_ids(text) {
@@ -249,7 +263,15 @@ pub fn auto(
     let top: Vec<String> = actions
         .iter()
         .take(3)
-        .map(|a| format!("{} {} (impact {}, effort {})", a.id, a.title, a.impact, effort_band(a.effort)))
+        .map(|a| {
+            format!(
+                "{} {} (impact {}, effort {})",
+                a.id,
+                a.title,
+                a.impact,
+                effort_band(a.effort)
+            )
+        })
         .collect();
     let strengths: Vec<String> = vec![format!(
         "{n_files} files walked; pass rate {pass_rate:.1}%; {} findings recorded",
@@ -388,7 +410,10 @@ pub fn to_html(n: &Narrative) -> String {
             ));
         }
         if !n.effort_mismatches.is_empty() {
-            h.push_str(&format!("effort mismatches: {}.", esc(&n.effort_mismatches.join("; "))));
+            h.push_str(&format!(
+                "effort mismatches: {}.",
+                esc(&n.effort_mismatches.join("; "))
+            ));
         }
         h.push_str("</p>");
     }
@@ -429,8 +454,16 @@ mod tests {
     fn unverified_flags_large_unknown_number() {
         let findings = vec![];
         let actions = vec![act("RULE-R10", 1)];
-        let bad = unverified_numbers("Pass rate was 79.2% with 5000 pages.", &findings, &actions, 2);
-        assert!(bad.iter().any(|t| t.starts_with("5000") || t == "5000"), "{bad:?}");
+        let bad = unverified_numbers(
+            "Pass rate was 79.2% with 5000 pages.",
+            &findings,
+            &actions,
+            2,
+        );
+        assert!(
+            bad.iter().any(|t| t.starts_with("5000") || t == "5000"),
+            "{bad:?}"
+        );
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Single source of truth for capability counts.
 //! Never hand-edit counts elsewhere; import from here or query `jev-seo capabilities --json`.
 
-use crate::rules::{RULE_SET_VERSION, RULES};
+use crate::rules::{RULES, RULE_SET_VERSION};
 
 pub const MCP_TOOLS: usize = 15;
 

@@ -43,9 +43,14 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
     let robots_url = format!("{}://{}/robots.txt", base_url.scheme(), domain);
 
     let resp = crate::fetch::with_extra_headers(
-        ureq::get(&robots_url)
-            .timeout(Duration::from_secs(8))
-            .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Search Radar; +https://github.com/AkashPriyadarshii/jev-seo)")),
+        ureq::get(&robots_url).timeout(Duration::from_secs(8)).set(
+            "User-Agent",
+            concat!(
+                "jev-seo/",
+                env!("CARGO_PKG_VERSION"),
+                " (TypeSafe Jev Search Radar; +https://github.com/AkashPriyadarshii/jev-seo)"
+            ),
+        ),
     )
     .call();
 
@@ -53,25 +58,25 @@ pub fn inspect_robots(target: &str) -> Result<RobotsReport> {
         Ok(response) => {
             crate::paths::reject_redirect_target(response.get_url())?;
             let status_code = response.status();
-            let body = crate::fetch::capped_string(response, crate::fetch::MAX_AUX_BYTES).unwrap_or_default();
+            let body = crate::fetch::capped_string(response, crate::fetch::MAX_AUX_BYTES)
+                .unwrap_or_default();
             parse_robots_txt(&domain, &robots_url, status_code, &body)
         }
         Err(ureq::Error::Status(code, response)) => {
-            let body = crate::fetch::capped_string(response, crate::fetch::MAX_AUX_BYTES).unwrap_or_default();
+            let body = crate::fetch::capped_string(response, crate::fetch::MAX_AUX_BYTES)
+                .unwrap_or_default();
             parse_robots_txt(&domain, &robots_url, code, &body)
         }
-        Err(_) => {
-            Ok(RobotsReport {
-                domain,
-                robots_url,
-                status_code: 0,
-                has_robots: false,
-                ai_bot_rules: Vec::new(),
-                sitemaps: Vec::new(),
-                disallow_all: false,
-                citation_bots_allowed: 0,
-            })
-        }
+        Err(_) => Ok(RobotsReport {
+            domain,
+            robots_url,
+            status_code: 0,
+            has_robots: false,
+            ai_bot_rules: Vec::new(),
+            sitemaps: Vec::new(),
+            disallow_all: false,
+            citation_bots_allowed: 0,
+        }),
     }
 }
 
@@ -109,15 +114,33 @@ pub const TRACKED_AI_BOTS: &[(&str, &str)] = &[
     ("ClaudeBot", "training: Anthropic Claude model training"),
     ("Claude-SearchBot", "search: Claude search retrieval"),
     ("anthropic-ai", "search: Anthropic search and web indexing"),
-    ("PerplexityBot", "search: Perplexity generative search citation indexer"),
-    ("Google-Extended", "training: Gemini and Vertex AI training data token"),
-    ("Googlebot", "search: Google Search crawling (includes AI Overviews grounding)"),
+    (
+        "PerplexityBot",
+        "search: Perplexity generative search citation indexer",
+    ),
+    (
+        "Google-Extended",
+        "training: Gemini and Vertex AI training data token",
+    ),
+    (
+        "Googlebot",
+        "search: Google Search crawling (includes AI Overviews grounding)",
+    ),
     ("Google-CloudVertexBot", "search: Vertex AI agent fetch"),
     ("Applebot", "search: Apple Search and Siri retrieval"),
-    ("Applebot-Extended", "training: Apple intelligence training data token"),
+    (
+        "Applebot-Extended",
+        "training: Apple intelligence training data token",
+    ),
     ("Amazonbot", "search: Alexa and Amazon retrieval"),
-    ("Bytespider", "training: ByteDance AI and TikTok search crawler"),
-    ("CCBot", "training: Common Crawl open foundation training set"),
+    (
+        "Bytespider",
+        "training: ByteDance AI and TikTok search crawler",
+    ),
+    (
+        "CCBot",
+        "training: Common Crawl open foundation training set",
+    ),
 ];
 
 #[derive(Debug, Clone, Default)]
@@ -127,7 +150,12 @@ struct AgentSection {
     allows: Vec<String>,
 }
 
-pub fn parse_robots_txt(domain: &str, robots_url: &str, status_code: u16, body: &str) -> Result<RobotsReport> {
+pub fn parse_robots_txt(
+    domain: &str,
+    robots_url: &str,
+    status_code: u16,
+    body: &str,
+) -> Result<RobotsReport> {
     if status_code != 200 || body.trim().is_empty() {
         return Ok(RobotsReport {
             domain: domain.to_string(),
@@ -220,7 +248,9 @@ fn evaluate_bot_rule(
                 status: BotStatus::Disallowed,
                 rule_snippet: format!("User-agent: {} -> Disallow: /", bot),
             }
-        } else if sec.disallows.is_empty() || (sec.disallows.len() == 1 && sec.disallows[0].is_empty()) {
+        } else if sec.disallows.is_empty()
+            || (sec.disallows.len() == 1 && sec.disallows[0].is_empty())
+        {
             AiBotRule {
                 bot_name: bot.to_string(),
                 purpose: purpose.to_string(),

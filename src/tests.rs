@@ -26,8 +26,14 @@ mod tests {
         let report = audit_file(path.to_str().unwrap()).unwrap();
         assert_eq!(report.h1_count, 1);
         assert_eq!(report.h2_count, 1);
-        assert_eq!(report.title.as_deref(), Some("High Performance Rust Web Frameworks"));
-        assert!(report.checks.iter().any(|c| c.name == "H1 Uniqueness" && c.passed));
+        assert_eq!(
+            report.title.as_deref(),
+            Some("High Performance Rust Web Frameworks")
+        );
+        assert!(report
+            .checks
+            .iter()
+            .any(|c| c.name == "H1 Uniqueness" && c.passed));
     }
 
     #[test]
@@ -48,7 +54,10 @@ mod tests {
 
         let dir_report = audit_path(dir.path().to_str().unwrap()).unwrap();
         assert_eq!(dir_report.total_files, 2);
-        assert!(dir_report.duplicate_titles.is_empty(), "Titles should be unique");
+        assert!(
+            dir_report.duplicate_titles.is_empty(),
+            "Titles should be unique"
+        );
     }
 
     #[test]
@@ -112,10 +121,28 @@ mod tests {
     #[test]
     fn test_sqlite_rank_drift() {
         let mut db = DbStore::open().unwrap();
-        let delta1 = db.track_keyword("example.com", "best rust framework", Some(5), Some("https://example.com/rust"), "ddg", "duckduckgo-html").unwrap();
+        let delta1 = db
+            .track_keyword(
+                "example.com",
+                "best rust framework",
+                Some(5),
+                Some("https://example.com/rust"),
+                "ddg",
+                "duckduckgo-html",
+            )
+            .unwrap();
         assert_eq!(delta1.curr_rank, Some(5));
 
-        let delta2 = db.track_keyword("example.com", "best rust framework", Some(3), Some("https://example.com/rust"), "ddg", "duckduckgo-html").unwrap();
+        let delta2 = db
+            .track_keyword(
+                "example.com",
+                "best rust framework",
+                Some(3),
+                Some("https://example.com/rust"),
+                "ddg",
+                "duckduckgo-html",
+            )
+            .unwrap();
         assert_eq!(delta2.prev_rank, Some(5));
         assert_eq!(delta2.curr_rank, Some(3));
     }
@@ -125,8 +152,17 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("prov.db");
         let mut db = DbStore::open_at(db_path.to_str().unwrap()).unwrap();
-        db.track_keyword("x.test", "q", Some(4), Some("https://x.test/"), "tavily", "tavily-search").unwrap();
-        db.track_keyword("x.test", "q", None, None, "ddg", "duckduckgo-html").unwrap();
+        db.track_keyword(
+            "x.test",
+            "q",
+            Some(4),
+            Some("https://x.test/"),
+            "tavily",
+            "tavily-search",
+        )
+        .unwrap();
+        db.track_keyword("x.test", "q", None, None, "ddg", "duckduckgo-html")
+            .unwrap();
         let trail = db.observation_trail("x.test", "q").unwrap();
         assert_eq!(trail.len(), 2);
         assert_eq!(trail[0], (None, "ddg".into(), "duckduckgo-html".into()));
@@ -158,19 +194,37 @@ Disallow: /api/
 
 Sitemap: https://example.com/sitemap.xml
 "#;
-        let rep = parse_robots_txt("example.com", "https://example.com/robots.txt", 200, robots_body).unwrap();
+        let rep = parse_robots_txt(
+            "example.com",
+            "https://example.com/robots.txt",
+            200,
+            robots_body,
+        )
+        .unwrap();
         assert!(rep.has_robots);
         assert_eq!(rep.sitemaps.len(), 1);
         assert_eq!(rep.sitemaps[0], "https://example.com/sitemap.xml");
 
-        let gpt = rep.ai_bot_rules.iter().find(|r| r.bot_name == "GPTBot").unwrap();
+        let gpt = rep
+            .ai_bot_rules
+            .iter()
+            .find(|r| r.bot_name == "GPTBot")
+            .unwrap();
         assert_eq!(gpt.status, BotStatus::Disallowed);
 
-        let claude = rep.ai_bot_rules.iter().find(|r| r.bot_name == "ClaudeBot").unwrap();
+        let claude = rep
+            .ai_bot_rules
+            .iter()
+            .find(|r| r.bot_name == "ClaudeBot")
+            .unwrap();
         assert_eq!(claude.status, BotStatus::Allowed);
         assert!(claude.rule_snippet.contains("/private"));
 
-        let perplexity = rep.ai_bot_rules.iter().find(|r| r.bot_name == "PerplexityBot").unwrap();
+        let perplexity = rep
+            .ai_bot_rules
+            .iter()
+            .find(|r| r.bot_name == "PerplexityBot")
+            .unwrap();
         assert_eq!(perplexity.status, BotStatus::DefaultStar);
     }
 
@@ -179,7 +233,13 @@ Sitemap: https://example.com/sitemap.xml
         use crate::robots::{parse_robots_txt, BotStatus};
 
         let robots_body = "User-agent: *\nDisallow: /\n";
-        let rep = parse_robots_txt("blocked.com", "https://blocked.com/robots.txt", 200, robots_body).unwrap();
+        let rep = parse_robots_txt(
+            "blocked.com",
+            "https://blocked.com/robots.txt",
+            200,
+            robots_body,
+        )
+        .unwrap();
         assert!(rep.disallow_all);
         for rule in &rep.ai_bot_rules {
             assert_eq!(rule.status, BotStatus::Disallowed);
@@ -225,7 +285,10 @@ Sitemap: https://example.com/sitemap.xml
         let report = audit_file(path.to_str().unwrap()).unwrap();
         assert_eq!(report.image_count, 2);
         assert_eq!(report.images_missing_alt, 1);
-        assert!(report.checks.iter().any(|c| c.name == "Image Alt Tags" && !c.passed));
+        assert!(report
+            .checks
+            .iter()
+            .any(|c| c.name == "Image Alt Tags" && !c.passed));
     }
 
     #[test]
@@ -246,7 +309,10 @@ Sitemap: https://example.com/sitemap.xml
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
         assert_eq!(tools.len(), 15, "All 15 agent SEO tools must be exposed");
 
-        let names: Vec<&str> = tools.iter().filter_map(|t| t.get("name").and_then(|n| n.as_str())).collect();
+        let names: Vec<&str> = tools
+            .iter()
+            .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+            .collect();
         assert!(names.contains(&"seo_keywords"));
         assert!(names.contains(&"seo_serp_inspect"));
         assert!(names.contains(&"seo_audit"));
@@ -276,7 +342,8 @@ Sitemap: https://example.com/sitemap.xml
     fn test_citation_ready_counts_unblocked() {
         use crate::robots::{citation_ready, parse_robots_txt, CITATION_BOTS};
         let body = "User-agent: GPTBot\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\n";
-        let rep = parse_robots_txt("example.com", "https://example.com/robots.txt", 200, body).unwrap();
+        let rep =
+            parse_robots_txt("example.com", "https://example.com/robots.txt", 200, body).unwrap();
         assert_eq!(rep.citation_bots_allowed, (CITATION_BOTS.len() - 1) as u8);
         assert_eq!(citation_ready(&[]), CITATION_BOTS.len() as u8);
     }
@@ -284,7 +351,8 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_shape_grade_full_and_empty() {
         use crate::llms::shape_grade;
-        let full = "# Title\n\n> Summary line.\n\n- [Docs](https://example.com/docs)\n\n## Optional\n";
+        let full =
+            "# Title\n\n> Summary line.\n\n- [Docs](https://example.com/docs)\n\n## Optional\n";
         assert_eq!(shape_grade(full).0, 100);
         let (score, notes) = shape_grade("hello world");
         assert_eq!(score, 0);
@@ -312,7 +380,11 @@ Sitemap: https://example.com/sitemap.xml
 
         let dir = tempfile::tempdir().unwrap();
         let page = dir.path().join("page.md");
-        std::fs::write(&page, "# Best SEO Tool\n\nThe best seo tool covers audits.\n").unwrap();
+        std::fs::write(
+            &page,
+            "# Best SEO Tool\n\nThe best seo tool covers audits.\n",
+        )
+        .unwrap();
         let req = RpcRequest {
             jsonrpc: "2.0".into(),
             id: Some(json!(1)),
@@ -328,7 +400,10 @@ Sitemap: https://example.com/sitemap.xml
         if let Some(k) = saved {
             std::env::set_var("TYPESAFE_API_KEY", k);
         }
-        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        let text = resp.result.unwrap()["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert!(text.contains("\"keyless\""), "{text}");
     }
 
@@ -376,10 +451,9 @@ Sitemap: https://example.com/sitemap.xml
         std::env::remove_var("JEV_SEO_LLM_KEY");
         std::env::remove_var("JEV_SEO_LLM_MODEL");
         std::env::remove_var("JEV_SEO_LLM_URL");
-        let out: serde_json::Value = serde_json::from_str(
-            resp.result.unwrap()["content"][0]["text"].as_str().unwrap(),
-        )
-        .unwrap();
+        let out: serde_json::Value =
+            serde_json::from_str(resp.result.unwrap()["content"][0]["text"].as_str().unwrap())
+                .unwrap();
         assert_eq!(out["needs_answer"], true, "{out}");
     }
 
@@ -395,7 +469,10 @@ Sitemap: https://example.com/sitemap.xml
             params: Some(json!({ "name": "seo_gap", "arguments": {} })),
         };
         let resp = handle_request(&missing);
-        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        let text = resp.result.unwrap()["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert!(text.starts_with("Error: seo_gap needs"), "{text}");
 
         // No Google creds in test env: must fail clearly, never hang.
@@ -403,10 +480,15 @@ Sitemap: https://example.com/sitemap.xml
             jsonrpc: "2.0".into(),
             id: Some(json!(2)),
             method: "tools/call".into(),
-            params: Some(json!({ "name": "seo_gap", "arguments": { "site": "https://example.com/" } })),
+            params: Some(
+                json!({ "name": "seo_gap", "arguments": { "site": "https://example.com/" } }),
+            ),
         };
         let resp = handle_request(&nocreds);
-        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        let text = resp.result.unwrap()["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert!(text.starts_with("Error:"), "{text}");
     }
 
@@ -440,7 +522,10 @@ Sitemap: https://example.com/sitemap.xml
                 })),
             };
             let resp = handle_request_with(&req, &mut Fake(answer));
-            let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+            let text = resp.result.unwrap()["content"][0]["text"]
+                .as_str()
+                .unwrap()
+                .to_string();
             serde_json::from_str::<serde_json::Value>(&text).unwrap()
         };
 
@@ -465,12 +550,14 @@ Sitemap: https://example.com/sitemap.xml
             &req,
             &mut Fake(Err("client declined sampling: Method not found".into())),
         );
-        let out: serde_json::Value = serde_json::from_str(
-            resp.result.unwrap()["content"][0]["text"].as_str().unwrap(),
-        )
-        .unwrap();
+        let out: serde_json::Value =
+            serde_json::from_str(resp.result.unwrap()["content"][0]["text"].as_str().unwrap())
+                .unwrap();
         assert_eq!(out["needs_answer"], true, "{out}");
-        assert!(out["prompt"].as_str().unwrap().contains("best seo tool"), "{out}");
+        assert!(
+            out["prompt"].as_str().unwrap().contains("best seo tool"),
+            "{out}"
+        );
 
         std::env::remove_var("JEV_SEO_DB");
     }
@@ -495,7 +582,10 @@ Sitemap: https://example.com/sitemap.xml
                 })),
             };
             let resp = handle_request(&req);
-            let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+            let text = resp.result.unwrap()["content"][0]["text"]
+                .as_str()
+                .unwrap()
+                .to_string();
             serde_json::from_str::<serde_json::Value>(&text).unwrap()
         };
 
@@ -524,7 +614,10 @@ Sitemap: https://example.com/sitemap.xml
             })),
         };
         let resp = handle_request(&req);
-        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        let text = resp.result.unwrap()["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert!(text.starts_with("Error:"), "{text}");
     }
 
@@ -543,10 +636,9 @@ Sitemap: https://example.com/sitemap.xml
             })),
         };
         let resp = handle_request(&req);
-        let out: serde_json::Value = serde_json::from_str(
-            resp.result.unwrap()["content"][0]["text"].as_str().unwrap(),
-        )
-        .unwrap();
+        let out: serde_json::Value =
+            serde_json::from_str(resp.result.unwrap()["content"][0]["text"].as_str().unwrap())
+                .unwrap();
         assert_eq!(out["needs_answer"], true, "{out}");
     }
 
@@ -556,16 +648,24 @@ Sitemap: https://example.com/sitemap.xml
 
         let dir = tempfile::tempdir().unwrap();
         let db = DbStore::open_at(dir.path().join("drift.db").to_str().unwrap()).unwrap();
-        db.record_cite("example.com", "best seo tool", true).unwrap();
-        db.record_cite("example.com", "best seo tool", false).unwrap();
+        db.record_cite("example.com", "best seo tool", true)
+            .unwrap();
+        db.record_cite("example.com", "best seo tool", false)
+            .unwrap();
         db.record_geo("example.com", "best seo tool", 8).unwrap();
         db.record_geo("example.com", "best seo tool", 5).unwrap();
         db.record_geo("steady.com", "other query", 7).unwrap();
         db.record_geo("steady.com", "other query", 7).unwrap();
 
         let alerts = db.drift_alerts(200).unwrap();
-        let kinds: Vec<(&str, &str)> = alerts.iter().map(|a| (a.kind.as_str(), a.target.as_str())).collect();
-        assert!(kinds.contains(&("citation_lost", "example.com")), "{kinds:?}");
+        let kinds: Vec<(&str, &str)> = alerts
+            .iter()
+            .map(|a| (a.kind.as_str(), a.target.as_str()))
+            .collect();
+        assert!(
+            kinds.contains(&("citation_lost", "example.com")),
+            "{kinds:?}"
+        );
         assert!(kinds.contains(&("geo_drop", "example.com")), "{kinds:?}");
         assert!(!kinds.iter().any(|(_, t)| *t == "steady.com"), "{kinds:?}");
     }
@@ -591,7 +691,13 @@ Sitemap: https://example.com/sitemap.xml
             keyword_cannibalization: Vec::new(),
             findings: Vec::new(),
         };
-        let actions = vec![Action::new("RULE-R01", 1, 1, "Fix titles", "scope: a.md".into())];
+        let actions = vec![Action::new(
+            "RULE-R01",
+            1,
+            1,
+            "Fix titles",
+            "scope: a.md".into(),
+        )];
         let drift = vec![DriftAlert {
             kind: "geo_drop".into(),
             target: "example.com".into(),
@@ -627,7 +733,13 @@ Sitemap: https://example.com/sitemap.xml
             keyword_cannibalization: Vec::new(),
             findings: Vec::new(),
         };
-        let actions = vec![Action::new("RULE-R01", 1, 1, "Fix titles", "scope: a.md".into())];
+        let actions = vec![Action::new(
+            "RULE-R01",
+            1,
+            1,
+            "Fix titles",
+            "scope: a.md".into(),
+        )];
         let d = digest(&rep, &actions);
         assert!(d.contains("80/100"), "{d}");
         assert!(d.contains("RULE-R01"), "{d}");
@@ -641,7 +753,11 @@ Sitemap: https://example.com/sitemap.xml
     fn test_excerpt_starts_after_h1() {
         let dir = tempfile::tempdir().unwrap();
         let page = dir.path().join("p.md");
-        std::fs::write(&page, "---\ntitle: T\n---\nnav junk nav junk\n# Real Title\n\nBody words here.\n").unwrap();
+        std::fs::write(
+            &page,
+            "---\ntitle: T\n---\nnav junk nav junk\n# Real Title\n\nBody words here.\n",
+        )
+        .unwrap();
         let ex = crate::excerpt_local(page.to_str().unwrap());
         assert!(ex.contains("Body words"), "{ex}");
         assert!(!ex.contains("nav junk"), "{ex}");
@@ -699,10 +815,9 @@ Sitemap: https://example.com/sitemap.xml
         };
         let resp = handle_request(&req);
         std::env::remove_var("JEV_SEO_DB");
-        let out: serde_json::Value = serde_json::from_str(
-            resp.result.unwrap()["content"][0]["text"].as_str().unwrap(),
-        )
-        .unwrap();
+        let out: serde_json::Value =
+            serde_json::from_str(resp.result.unwrap()["content"][0]["text"].as_str().unwrap())
+                .unwrap();
         assert!(out.get("diff").is_some(), "{out}");
         assert!(out.get("drift").is_some(), "{out}");
     }
@@ -713,8 +828,16 @@ Sitemap: https://example.com/sitemap.xml
 
         let dir = tempfile::tempdir().unwrap();
         let db = DbStore::open_at(dir.path().join("cite.db").to_str().unwrap()).unwrap();
-        assert_eq!(db.record_cite("example.com", "best seo tool", true).unwrap(), None);
-        assert_eq!(db.record_cite("example.com", "best seo tool", false).unwrap(), Some(true));
+        assert_eq!(
+            db.record_cite("example.com", "best seo tool", true)
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            db.record_cite("example.com", "best seo tool", false)
+                .unwrap(),
+            Some(true)
+        );
     }
 
     #[test]
@@ -732,7 +855,10 @@ Sitemap: https://example.com/sitemap.xml
             })),
         };
         let resp = handle_request(&explain);
-        let text = resp.result.unwrap()["content"][0]["text"].as_str().unwrap().to_string();
+        let text = resp.result.unwrap()["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert!(text.contains("AI slop markers"), "{text}");
 
         let missing = RpcRequest {
@@ -754,7 +880,10 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_cannibalization_pairs_expand() {
-        use crate::audit::{cannibalization_pairs, AuditReport, CannibalizationItem, CheckItem, DirectoryAuditReport};
+        use crate::audit::{
+            cannibalization_pairs, AuditReport, CannibalizationItem, CheckItem,
+            DirectoryAuditReport,
+        };
         let mk = |path: &str, wc: usize| AuditReport {
             file_path: path.into(),
             title: Some("Best Rust SEO".into()),
@@ -771,6 +900,8 @@ Sitemap: https://example.com/sitemap.xml
             external_links: 0,
             schema_found: false,
             schema_json_valid: true,
+            schema_missing_required: vec![],
+            js_shell: false,
             canonical_found: false,
             og_tags_found: false,
             geo_opening_words: 0,
@@ -781,7 +912,11 @@ Sitemap: https://example.com/sitemap.xml
             hreflang_alternates: vec![],
             noindex: false,
             uncited_claims: 0,
-            checks: vec![CheckItem { name: "n".into(), passed: true, message: "m".into() }],
+            checks: vec![CheckItem {
+                name: "n".into(),
+                passed: true,
+                message: "m".into(),
+            }],
         };
         let rep = DirectoryAuditReport {
             dir_path: "d".into(),
@@ -803,11 +938,17 @@ Sitemap: https://example.com/sitemap.xml
         };
         let pairs = cannibalization_pairs(&rep);
         assert_eq!(pairs.len(), 3, "3 files → C(3,2)=3 pairs");
-        let ab = pairs.iter().find(|p| p.a == "a.md" && p.b == "b.md").expect("a×b");
+        let ab = pairs
+            .iter()
+            .find(|p| p.a == "a.md" && p.b == "b.md")
+            .expect("a×b");
         assert_eq!(ab.winner, "b.md");
         assert_eq!(ab.a_words, 10);
         assert_eq!(ab.b_words, 40);
-        let ac = pairs.iter().find(|p| p.a == "a.md" && p.b == "c.md").expect("a×c");
+        let ac = pairs
+            .iter()
+            .find(|p| p.a == "a.md" && p.b == "c.md")
+            .expect("a×c");
         assert_eq!(ac.winner, "c.md");
     }
 
@@ -830,7 +971,13 @@ Sitemap: https://example.com/sitemap.xml
 
         let resp = handle_request(&req);
         assert!(resp.error.is_none());
-        let content = resp.result.unwrap().get("content").and_then(|c| c.as_array()).cloned().unwrap();
+        let content = resp
+            .result
+            .unwrap()
+            .get("content")
+            .and_then(|c| c.as_array())
+            .cloned()
+            .unwrap();
         let text = content[0].get("text").and_then(|t| t.as_str()).unwrap();
         assert!(text.contains("\"is_valid\": true"));
     }
@@ -864,7 +1011,13 @@ Sitemap: https://example.com/sitemap.xml
 
         let resp = handle_request(&req);
         assert!(resp.error.is_none());
-        let content = resp.result.unwrap().get("content").and_then(|c| c.as_array()).cloned().unwrap();
+        let content = resp
+            .result
+            .unwrap()
+            .get("content")
+            .and_then(|c| c.as_array())
+            .cloned()
+            .unwrap();
         let text = content[0].get("text").and_then(|t| t.as_str()).unwrap();
         assert!(text.contains("\"total_urls\": 2"));
         assert!(text.contains("\"is_valid\": true"));
@@ -880,9 +1033,15 @@ Sitemap: https://example.com/sitemap.xml
         ).unwrap();
 
         let rep = audit_file(path.to_str().unwrap()).unwrap();
-        assert!(!rep.heading_skipped_levels.is_empty(), "Should detect skipped H2 level");
+        assert!(
+            !rep.heading_skipped_levels.is_empty(),
+            "Should detect skipped H2 level"
+        );
         assert!(rep.heading_skipped_levels[0].contains("H1 -> H3"));
-        assert!(rep.checks.iter().any(|c| c.name == "Heading Hierarchy" && !c.passed));
+        assert!(rep
+            .checks
+            .iter()
+            .any(|c| c.name == "Heading Hierarchy" && !c.passed));
     }
 
     #[test]
@@ -896,10 +1055,16 @@ Sitemap: https://example.com/sitemap.xml
 
         let rep = audit_file(path.to_str().unwrap()).unwrap();
         assert!(rep.em_dash_count >= 2, "Should count em-dashes");
-        assert!(!rep.ai_slop_words_found.is_empty(), "Should find AI crutch words");
+        assert!(
+            !rep.ai_slop_words_found.is_empty(),
+            "Should find AI crutch words"
+        );
         assert!(rep.ai_slop_words_found.contains(&"delve".to_string()));
         assert!(rep.ai_slop_words_found.contains(&"testament".to_string()));
-        assert!(rep.checks.iter().any(|c| c.name == "Helpful Content (AI Slop)" && !c.passed));
+        assert!(rep
+            .checks
+            .iter()
+            .any(|c| c.name == "Helpful Content (AI Slop)" && !c.passed));
     }
 
     #[test]
@@ -926,11 +1091,23 @@ Sitemap: https://example.com/sitemap.xml
 
         let dir_rep = audit_path(dir.path().to_str().unwrap()).unwrap();
         assert_eq!(dir_rep.total_files, 3);
-        assert!(!dir_rep.orphan_pages.is_empty(), "Should detect orphan page");
-        assert!(dir_rep.orphan_pages.iter().any(|p| p.contains("isolated.md")));
+        assert!(
+            !dir_rep.orphan_pages.is_empty(),
+            "Should detect orphan page"
+        );
+        assert!(dir_rep
+            .orphan_pages
+            .iter()
+            .any(|p| p.contains("isolated.md")));
 
-        assert!(!dir_rep.keyword_cannibalization.is_empty(), "Should detect title keyword cannibalization");
-        assert!(dir_rep.keyword_cannibalization.iter().any(|c| c.keyword_stem.contains("best rust seo")));
+        assert!(
+            !dir_rep.keyword_cannibalization.is_empty(),
+            "Should detect title keyword cannibalization"
+        );
+        assert!(dir_rep
+            .keyword_cannibalization
+            .iter()
+            .any(|c| c.keyword_stem.contains("best rust seo")));
     }
 
     #[test]
@@ -962,7 +1139,10 @@ Sitemap: https://example.com/sitemap.xml
         assert_eq!(rep.urls_with_params, 1);
         assert_eq!(rep.urls_with_lastmod, 1);
         assert_eq!(rep.hreflang_count, 3);
-        assert!(!rep.invalid_hreflang_codes.is_empty(), "en-UK should be flagged as invalid");
+        assert!(
+            !rep.invalid_hreflang_codes.is_empty(),
+            "en-UK should be flagged as invalid"
+        );
         assert!(rep.invalid_hreflang_codes[0].contains("en-GB"));
         assert!(rep.warnings.iter().any(|w| w.contains("Insecure HTTP")));
         assert!(rep.warnings.iter().any(|w| w.contains("Query Parameters")));
@@ -1005,10 +1185,16 @@ Sitemap: https://example.com/sitemap.xml
         use crate::policy::injection_blocked;
         use serde_json::json;
         let mut yes = serde_json::Map::new();
-        yes.insert("injection_risk".into(), json!({"type":"noul","value":0.9,"noul":0.9}));
+        yes.insert(
+            "injection_risk".into(),
+            json!({"type":"noul","value":0.9,"noul":0.9}),
+        );
         assert!(injection_blocked(&yes));
         let mut no = serde_json::Map::new();
-        no.insert("injection_risk".into(), json!({"type":"noul","value":0.1,"noul":0.1}));
+        no.insert(
+            "injection_risk".into(),
+            json!({"type":"noul","value":0.1,"noul":0.1}),
+        );
         assert!(!injection_blocked(&no));
         assert!(!injection_blocked(&serde_json::Map::new()));
     }
@@ -1069,7 +1255,13 @@ Sitemap: https://example.com/sitemap.xml
         use crate::policy::composite_geo;
         use serde_json::json;
         let mut extra = serde_json::Map::new();
-        for id in ["geo_structure", "geo_density", "geo_directness", "geo_statistics", "geo_freshness"] {
+        for id in [
+            "geo_structure",
+            "geo_density",
+            "geo_directness",
+            "geo_statistics",
+            "geo_freshness",
+        ] {
             extra.insert(id.into(), json!({"score": 4.0, "confidence": 0.9}));
         }
         assert_eq!(composite_geo(&extra), Some((10, 0.9)));
@@ -1080,7 +1272,10 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_url_matches_domain() {
         use crate::paths::url_matches_domain;
-        assert!(url_matches_domain("https://crates.io/crates/rg", "crates.io"));
+        assert!(url_matches_domain(
+            "https://crates.io/crates/rg",
+            "crates.io"
+        ));
         assert!(url_matches_domain("https://docs.crates.io/x", "crates.io"));
         assert!(!url_matches_domain("https://evilcrates.io/x", "crates.io"));
         assert!(!url_matches_domain("not a url", "crates.io"));
@@ -1113,8 +1308,14 @@ Sitemap: https://example.com/sitemap.xml
         assert!(read_user_file(exe.to_str().unwrap(), &["md"]).is_err());
         let ok = dir.path().join("page.md");
         std::fs::write(&ok, "hello").unwrap();
-        assert_eq!(read_user_file(ok.to_str().unwrap(), &["md"]).unwrap(), "hello");
-        assert_eq!(read_user_file("just a snippet", &["md"]).unwrap(), "just a snippet");
+        assert_eq!(
+            read_user_file(ok.to_str().unwrap(), &["md"]).unwrap(),
+            "hello"
+        );
+        assert_eq!(
+            read_user_file("just a snippet", &["md"]).unwrap(),
+            "just a snippet"
+        );
         assert!(read_user_file("https://example.com/x", &["md"]).is_err());
     }
 
@@ -1130,7 +1331,12 @@ Sitemap: https://example.com/sitemap.xml
             params: None,
         };
         let resp = handle_request(&init);
-        assert!(resp.result.as_ref().unwrap().get("protocolVersion").is_some());
+        assert!(resp
+            .result
+            .as_ref()
+            .unwrap()
+            .get("protocolVersion")
+            .is_some());
 
         let call = RpcRequest {
             jsonrpc: "2.0".into(),
@@ -1166,28 +1372,69 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
-    fn test_crawl_sitemap_seeds() {        use crate::crawl::sitemap_seed_urls;
+    fn test_crawl_sitemap_seeds() {
+        use crate::crawl::sitemap_seed_urls;
         let xml = r#"<?xml version="1.0"?><urlset><url><loc>https://example.com/a</loc></url><url><loc>https://example.com/b</loc></url></urlset>"#;
         let seeds = sitemap_seed_urls(xml);
-        assert_eq!(seeds, vec!["https://example.com/a", "https://example.com/b"]);
+        assert_eq!(
+            seeds,
+            vec!["https://example.com/a", "https://example.com/b"]
+        );
     }
 
     #[test]
-    fn test_crawl_canonicalize() {        use crate::crawl::canonicalize;
-        assert_eq!(canonicalize("https://Example.COM/a/?utm_source=x#frag"), "https://example.com/a");
-        assert_eq!(canonicalize("https://example.com/index.html"), "https://example.com/");
-        assert_eq!(canonicalize("https://example.com/docs/?fbclid=1&x=2"), "https://example.com/docs?x=2");
-        assert_eq!(canonicalize("https://example.com/a/"), "https://example.com/a");
-        assert_eq!(canonicalize("https://example.com/a"), "https://example.com/a");
+    fn test_crawl_canonicalize() {
+        use crate::crawl::canonicalize;
+        assert_eq!(
+            canonicalize("https://Example.COM/a/?utm_source=x#frag"),
+            "https://example.com/a"
+        );
+        assert_eq!(
+            canonicalize("https://example.com/index.html"),
+            "https://example.com/"
+        );
+        assert_eq!(
+            canonicalize("https://example.com/docs/?fbclid=1&x=2"),
+            "https://example.com/docs?x=2"
+        );
+        assert_eq!(
+            canonicalize("https://example.com/a/"),
+            "https://example.com/a"
+        );
+        assert_eq!(
+            canonicalize("https://example.com/a"),
+            "https://example.com/a"
+        );
     }
 
     #[test]
-    fn test_rules_registry_and_scoring() {        use crate::rules::{overall, score_areas, Area, Finding, Severity, RULES};
+    fn test_rules_registry_and_scoring() {
+        use crate::rules::{overall, score_areas, Area, Finding, Severity, RULES};
         assert_eq!(RULES.len(), 58);
         assert!(RULES.iter().all(|r| crate::rules::rule(r.id).is_some()));
         let findings = vec![
-            Finding { rule_id: "R01".into(), area: Area::Crawl, severity: Severity::High, scope: "https://x.test/a".into(), evidence: "HTTP 404".into(), fix: "Restore the target.".into(), kind: "fact".into(), observed_at: 1, source: "t".into() },
-            Finding { rule_id: "R42".into(), area: Area::Performance, severity: Severity::Medium, scope: "https://x.test/a".into(), evidence: "900ms".into(), fix: "Cut server time.".into(), kind: "fact".into(), observed_at: 1, source: "t".into() },
+            Finding {
+                rule_id: "R01".into(),
+                area: Area::Crawl,
+                severity: Severity::High,
+                scope: "https://x.test/a".into(),
+                evidence: "HTTP 404".into(),
+                fix: "Restore the target.".into(),
+                kind: "fact".into(),
+                observed_at: 1,
+                source: "t".into(),
+            },
+            Finding {
+                rule_id: "R42".into(),
+                area: Area::Performance,
+                severity: Severity::Medium,
+                scope: "https://x.test/a".into(),
+                evidence: "900ms".into(),
+                fix: "Cut server time.".into(),
+                kind: "fact".into(),
+                observed_at: 1,
+                source: "t".into(),
+            },
         ];
         let mut totals = std::collections::HashMap::new();
         totals.insert(Area::Crawl, 10);
@@ -1208,8 +1455,32 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
         let pages = vec![
-            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
-            PageRecord { url: "https://x.test/dead".into(), status: 404, final_url: "https://x.test/dead".into(), outlinks: 0, elapsed_ms: 50, bytes: 0, hops: vec![], encoding: None, source: "direct".into(), fetch_cost: 0, upgraded: false },
+            PageRecord {
+                url: "https://x.test/".into(),
+                status: 200,
+                final_url: "https://x.test/".into(),
+                outlinks: 1,
+                elapsed_ms: 100,
+                bytes: 500,
+                hops: vec![],
+                encoding: Some("gzip".into()),
+                source: "direct".into(),
+                fetch_cost: 0,
+                upgraded: false,
+            },
+            PageRecord {
+                url: "https://x.test/dead".into(),
+                status: 404,
+                final_url: "https://x.test/dead".into(),
+                outlinks: 0,
+                elapsed_ms: 50,
+                bytes: 0,
+                hops: vec![],
+                encoding: None,
+                source: "direct".into(),
+                fetch_cost: 0,
+                upgraded: false,
+            },
         ];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
@@ -1234,9 +1505,19 @@ Sitemap: https://example.com/sitemap.xml
     fn test_vitals_rules_fire_on_lab_numbers() {
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
-        let pages = vec![
-            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
-        ];
+        let pages = vec![PageRecord {
+            url: "https://x.test/".into(),
+            status: 200,
+            final_url: "https://x.test/".into(),
+            outlinks: 0,
+            elapsed_ms: 100,
+            bytes: 500,
+            hops: vec![],
+            encoding: Some("gzip".into()),
+            source: "direct".into(),
+            fetch_cost: 0,
+            upgraded: false,
+        }];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
             pages,
@@ -1258,7 +1539,10 @@ Sitemap: https://example.com/sitemap.xml
         assert!(rep.findings.iter().any(|f| f.rule_id == "R51"));
         assert!(rep.findings.iter().any(|f| f.rule_id == "R52"));
         assert!(rep.findings.iter().any(|f| f.rule_id == "R53"));
-        assert!(rep.findings.iter().any(|f| f.rule_id == "R53" && f.fix.contains("directional")));
+        assert!(rep
+            .findings
+            .iter()
+            .any(|f| f.rule_id == "R53" && f.fix.contains("directional")));
         let clean = crate::crawl::finish_report(crate::crawl::ReportParts {
             start_url: "https://x.test/".into(),
             pages: vec![],
@@ -1284,7 +1568,9 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_pdf_deck_sections() {
-        use crate::audit::{audit_path, pdf_cover, pdf_findings_by_area, pdf_inventory, pdf_method, pdf_scorecard};
+        use crate::audit::{
+            audit_path, pdf_cover, pdf_findings_by_area, pdf_inventory, pdf_method, pdf_scorecard,
+        };
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("p.md"), "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here live happily in this file with enough of them to pass depth.\n").unwrap();
         let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
@@ -1300,7 +1586,13 @@ Sitemap: https://example.com/sitemap.xml
         assert!(method.contains("Method:") && method.contains("never predict rankings"));
         let pdf = crate::audit::to_pdf_opt(&rep, None);
         let text = String::from_utf8_lossy(&pdf);
-        for section in ["jev-seo audit report", "Scorecard:", "Findings by area:", "Page inventory", "Method:"] {
+        for section in [
+            "jev-seo audit report",
+            "Scorecard:",
+            "Findings by area:",
+            "Page inventory",
+            "Method:",
+        ] {
             assert!(text.contains(section), "missing {section}");
         }
     }
@@ -1309,7 +1601,9 @@ Sitemap: https://example.com/sitemap.xml
     fn test_rules_check_audit_shapes() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("p.md"), "# T\n\nshort\n").unwrap();
-        let rep = crate::audit::with_findings(crate::audit::audit_path(dir.path().to_str().unwrap()).unwrap());
+        let rep = crate::audit::with_findings(
+            crate::audit::audit_path(dir.path().to_str().unwrap()).unwrap(),
+        );
         assert!(rep.findings.iter().any(|f| f.rule_id == "R18"));
         let thin = rep.findings.iter().find(|f| f.rule_id == "R18").unwrap();
         assert_eq!(thin.kind, "heuristic");
@@ -1359,7 +1653,13 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_action_tracker_csv() {
         use crate::actions::{to_csv, Action};
-        let a = vec![Action::new("RULE-R19", 2, 2, "AI slop markers (2 hits)", "index.html, about.html".into())];
+        let a = vec![Action::new(
+            "RULE-R19",
+            2,
+            2,
+            "AI slop markers (2 hits)",
+            "index.html, about.html".into(),
+        )];
         let csv = to_csv(&a);
         assert!(csv.starts_with("id,priority,effort_band,impact,quick_win,gate,title,evidence\n"));
         assert!(csv.contains("RULE-R19"));
@@ -1380,7 +1680,17 @@ Sitemap: https://example.com/sitemap.xml
         for id in ["R01", "R09", "R11", "R33", "R36", "R47", "RULE-R02"] {
             assert_eq!(gate(id), Gate::Blocking, "{id}");
         }
-        for id in ["R10", "R19", "R20", "R24", "R41", "R42", "R51", "R99", "CRAWL-001"] {
+        for id in [
+            "R10",
+            "R19",
+            "R20",
+            "R24",
+            "R41",
+            "R42",
+            "R51",
+            "R99",
+            "CRAWL-001",
+        ] {
             assert_eq!(gate(id), Gate::Advisory, "{id}");
         }
     }
@@ -1466,12 +1776,13 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_policy_needs_review() {
         use crate::policy::needs_review;
-        let extra: serde_json::Map<String, serde_json::Value> = serde_json::from_value(serde_json::json!({
-            "geo_structure": { "score": 3.0, "confidence": 0.9 },
-            "geo_density": { "score": 2.0, "confidence": 0.6 },
-            "geo_freshness": { "score": 1.0 }
-        }))
-        .unwrap();
+        let extra: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_value(serde_json::json!({
+                "geo_structure": { "score": 3.0, "confidence": 0.9 },
+                "geo_density": { "score": 2.0, "confidence": 0.6 },
+                "geo_freshness": { "score": 1.0 }
+            }))
+            .unwrap();
         let ids = needs_review(&extra, "geo");
         assert_eq!(ids, vec!["geo_density", "geo_freshness"]);
     }
@@ -1515,7 +1826,10 @@ Sitemap: https://example.com/sitemap.xml
             ("page", crate::policy::page_audit_extras()),
             ("site", crate::policy::site_extras()),
             ("brief", crate::policy::brief_extras()),
-            ("keywords", crate::policy::keyword_value_extras(&["x".into()], 1)),
+            (
+                "keywords",
+                crate::policy::keyword_value_extras(&["x".into()], 1),
+            ),
             ("pairs", crate::policy::pair_questions(1)),
         ];
         let mut seen: BTreeMap<String, String> = BTreeMap::new();
@@ -1529,7 +1843,10 @@ Sitemap: https://example.com/sitemap.xml
                     "{suite}.{qid} has unknown type {qtype}"
                 );
                 assert!(
-                    q.get("instructions").and_then(|s| s.as_str()).map(|s| !s.is_empty()).unwrap_or(false),
+                    q.get("instructions")
+                        .and_then(|s| s.as_str())
+                        .map(|s| !s.is_empty())
+                        .unwrap_or(false),
                     "{suite}.{qid} needs instructions"
                 );
                 seen.insert(format!("{suite}.{qid}"), qtype.to_string());
@@ -1561,16 +1878,28 @@ Sitemap: https://example.com/sitemap.xml
         assert!(crate::paths::reject_api_endpoint("http://127.0.0.1:8000/x", "TEST").is_err());
         assert!(crate::paths::reject_api_endpoint("http://10.0.0.5/", "TEST").is_err());
         // Fail closed: .invalid never resolves, so the host is unverifiable.
-        assert!(crate::paths::reject_api_endpoint("https://unresolvable.invalid/", "TEST").is_err());
+        assert!(
+            crate::paths::reject_api_endpoint("https://unresolvable.invalid/", "TEST").is_err()
+        );
     }
 
     #[test]
     fn test_chain_exhaust_reports_redirect_not_fetch_failure() {
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
-        let pages = vec![
-            PageRecord { url: "https://x.test/loop".into(), status: 0, final_url: "https://x.test/loop".into(), outlinks: 0, elapsed_ms: 5, bytes: 0, hops: vec![(301, "https://x.test/loop".into()); 6], encoding: None, source: "direct".into(), fetch_cost: 0, upgraded: false },
-        ];
+        let pages = vec![PageRecord {
+            url: "https://x.test/loop".into(),
+            status: 0,
+            final_url: "https://x.test/loop".into(),
+            outlinks: 0,
+            elapsed_ms: 5,
+            bytes: 0,
+            hops: vec![(301, "https://x.test/loop".into()); 6],
+            encoding: None,
+            source: "direct".into(),
+            fetch_cost: 0,
+            upgraded: false,
+        }];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
             pages,
@@ -1592,9 +1921,19 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
         // Normal http->https 301, one hop: must NOT surface as R03 chain.
-        let pages = vec![
-            PageRecord { url: "http://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 1, elapsed_ms: 10, bytes: 500, hops: vec![(301, "http://x.test/".into())], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
-        ];
+        let pages = vec![PageRecord {
+            url: "http://x.test/".into(),
+            status: 200,
+            final_url: "https://x.test/".into(),
+            outlinks: 1,
+            elapsed_ms: 10,
+            bytes: 500,
+            hops: vec![(301, "http://x.test/".into())],
+            encoding: Some("gzip".into()),
+            source: "direct".into(),
+            fetch_cost: 0,
+            upgraded: false,
+        }];
         let rep = finish_report(ReportParts {
             start_url: "http://x.test/".into(),
             pages,
@@ -1609,9 +1948,22 @@ Sitemap: https://example.com/sitemap.xml
         });
         assert!(!rep.findings.iter().any(|f| f.rule_id == "R03"));
         // Two real hops form a chain: R03 fires.
-        let pages = vec![
-            PageRecord { url: "https://x.test/a".into(), status: 200, final_url: "https://x.test/b".into(), outlinks: 0, elapsed_ms: 10, bytes: 500, hops: vec![(301, "https://x.test/a".into()), (302, "https://x.test/a2".into())], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
-        ];
+        let pages = vec![PageRecord {
+            url: "https://x.test/a".into(),
+            status: 200,
+            final_url: "https://x.test/b".into(),
+            outlinks: 0,
+            elapsed_ms: 10,
+            bytes: 500,
+            hops: vec![
+                (301, "https://x.test/a".into()),
+                (302, "https://x.test/a2".into()),
+            ],
+            encoding: Some("gzip".into()),
+            source: "direct".into(),
+            fetch_cost: 0,
+            upgraded: false,
+        }];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/a".into(),
             pages,
@@ -1658,14 +2010,22 @@ Sitemap: https://example.com/sitemap.xml
         assert!(!f58.is_empty(), "noindexed hreflang target must fire R58");
         assert!(f58.iter().any(|s| s.contains("en.html")));
         let g = crate::rules::gate("R58");
-        assert_eq!(g, crate::rules::Gate::Advisory, "R58 is a heuristic, must not block");
+        assert_eq!(
+            g,
+            crate::rules::Gate::Advisory,
+            "R58 is a heuristic, must not block"
+        );
     }
 
     #[test]
     fn test_tavily_extract_rejects_private_urls() {
         // P1 SSRF: seo_extract must not forward loopback/metadata targets.
         assert!(crate::serp::tavily_extract(&["http://127.0.0.1/admin".into()], "q").is_err());
-        assert!(crate::serp::tavily_extract(&["http://169.254.169.254/latest/meta-data".into()], "q").is_err());
+        assert!(crate::serp::tavily_extract(
+            &["http://169.254.169.254/latest/meta-data".into()],
+            "q"
+        )
+        .is_err());
         assert!(crate::serp::tavily_extract(&["http://localhost".into()], "q").is_err());
     }
 
@@ -1676,14 +2036,20 @@ Sitemap: https://example.com/sitemap.xml
         std::fs::write(dir.path().join("p.md"), "---\ntitle: A reasonably long page title for testing here\n---\n# Title\n\nOne delve.\n").unwrap();
         let rep = crate::audit::audit_path(dir.path().to_str().unwrap()).unwrap();
         let findings = check_audit(&rep);
-        assert!(!findings.iter().any(|f| f.rule_id == "R19"), "single slop word must not fire R19");
+        assert!(
+            !findings.iter().any(|f| f.rule_id == "R19"),
+            "single slop word must not fire R19"
+        );
     }
 
     #[test]
     fn test_provider_selection_stays_explicit() {
         use crate::serp::Provider;
         assert_eq!(crate::serp::select_provider(Provider::Ddg), Provider::Ddg);
-        assert_eq!(crate::serp::select_provider(Provider::Tavily), Provider::Tavily);
+        assert_eq!(
+            crate::serp::select_provider(Provider::Tavily),
+            Provider::Tavily
+        );
     }
 
     #[test]
@@ -1700,7 +2066,10 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_fetch_quality_and_budget() {
         use crate::fetch::Budget;
-        let mut b = Budget { max_credits: 1, spent: 0 };
+        let mut b = Budget {
+            max_credits: 1,
+            spent: 0,
+        };
         assert!(b.allow(1));
         assert!(!b.allow(1));
     }
@@ -1712,11 +2081,15 @@ Sitemap: https://example.com/sitemap.xml
         assert_eq!(&d[4..5], "-");
         assert_eq!(&d[7..8], "-");
         assert!(crate::gsc::chrono_now_days_ago(0) >= d);
-        assert_eq!(crate::gsc::urlencoding("https://x.test/a b"), "https%3A%2F%2Fx.test%2Fa%20b");
+        assert_eq!(
+            crate::gsc::urlencoding("https://x.test/a b"),
+            "https%3A%2F%2Fx.test%2Fa%20b"
+        );
     }
 
     #[test]
-    fn test_audit_to_html() {        use crate::audit::{audit_path, to_html};
+    fn test_audit_to_html() {
+        use crate::audit::{audit_path, to_html};
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("p.md"), "---\ntitle: T\ndescription: A fine description for testing.\n---\n# T\n\nWords here.\n").unwrap();
         let rep = audit_path(dir.path().to_str().unwrap()).unwrap();
@@ -1744,7 +2117,15 @@ Sitemap: https://example.com/sitemap.xml
         assert!(pdf.windows(9).any(|w| w == b"endstream"));
         // startxref must point at the xref table.
         let text = String::from_utf8_lossy(&pdf);
-        let xpos: usize = text.rsplit("startxref\n").next().unwrap().lines().next().unwrap().parse().unwrap();
+        let xpos: usize = text
+            .rsplit("startxref\n")
+            .next()
+            .unwrap()
+            .lines()
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
         assert!(pdf[xpos..].starts_with(b"xref\n"));
         assert!(text.contains("jev-seo audit report"));
         assert!(text.contains("Scorecard:"));
@@ -1780,7 +2161,10 @@ Sitemap: https://example.com/sitemap.xml
     fn test_basic_auth_header_token() {
         // Gal's staging-behind-auth: user:pass must become Basic base64.
         assert_eq!(crate::serp::base64_basic("foo:bar"), "Zm9vOmJhcg==");
-        assert_eq!(crate::serp::base64_basic("alice:secret1"), "YWxpY2U6c2VjcmV0MQ==");
+        assert_eq!(
+            crate::serp::base64_basic("alice:secret1"),
+            "YWxpY2U6c2VjcmV0MQ=="
+        );
     }
 
     #[test]
@@ -1812,7 +2196,10 @@ Sitemap: https://example.com/sitemap.xml
                 "intent_probs": {"informational": 0.5, "navigational": 0.4, "commercial": 0.1}
             }))
             .unwrap();
-        assert_eq!(intent_runner_up(&extra).as_deref(), Some("navigational (0.40)"));
+        assert_eq!(
+            intent_runner_up(&extra).as_deref(),
+            Some("navigational (0.40)")
+        );
         assert!(intent_runner_up(&serde_json::Map::new()).is_none());
     }
 
@@ -1891,8 +2278,14 @@ Sitemap: https://example.com/sitemap.xml
         assert!(!file_rep.schema_json_valid);
         let dir_rep = audit_path(dir.path().to_str().unwrap()).unwrap();
         let findings = check_audit(&dir_rep);
-        assert!(findings.iter().any(|f| f.rule_id == "R33"), "invalid JSON-LD must fire R33");
-        assert!(findings.iter().any(|f| f.rule_id == "R24"), "short lede must fire R24");
+        assert!(
+            findings.iter().any(|f| f.rule_id == "R33"),
+            "invalid JSON-LD must fire R33"
+        );
+        assert!(
+            findings.iter().any(|f| f.rule_id == "R24"),
+            "short lede must fire R24"
+        );
     }
 
     #[test]
@@ -1900,8 +2293,32 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{finish_report, PageRecord, ReportParts};
         use std::collections::HashMap;
         let pages = vec![
-            PageRecord { url: "https://x.test/".into(), status: 200, final_url: "https://x.test/".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
-            PageRecord { url: "https://x.test/orph".into(), status: 200, final_url: "https://x.test/orph".into(), outlinks: 0, elapsed_ms: 100, bytes: 500, hops: vec![], encoding: Some("gzip".into()), source: "direct".into(), fetch_cost: 0, upgraded: false },
+            PageRecord {
+                url: "https://x.test/".into(),
+                status: 200,
+                final_url: "https://x.test/".into(),
+                outlinks: 0,
+                elapsed_ms: 100,
+                bytes: 500,
+                hops: vec![],
+                encoding: Some("gzip".into()),
+                source: "direct".into(),
+                fetch_cost: 0,
+                upgraded: false,
+            },
+            PageRecord {
+                url: "https://x.test/orph".into(),
+                status: 200,
+                final_url: "https://x.test/orph".into(),
+                outlinks: 0,
+                elapsed_ms: 100,
+                bytes: 500,
+                hops: vec![],
+                encoding: Some("gzip".into()),
+                source: "direct".into(),
+                fetch_cost: 0,
+                upgraded: false,
+            },
         ];
         let rep = finish_report(ReportParts {
             start_url: "https://x.test/".into(),
@@ -1916,16 +2333,33 @@ Sitemap: https://example.com/sitemap.xml
             probes: vec![],
         });
         assert_eq!(rep.orphans, vec!["https://x.test/orph".to_string()]);
-        assert!(rep.findings.iter().any(|f| f.rule_id == "R25"), "orphans must emit R25");
-        assert!(rep.areas.iter().any(|a| a.area == crate::rules::Area::Links), "Links must score when R25 fires");
-        assert!(!rep.areas.iter().any(|a| a.area == crate::rules::Area::OnPage), "phantom OnPage must stay out");
+        assert!(
+            rep.findings.iter().any(|f| f.rule_id == "R25"),
+            "orphans must emit R25"
+        );
+        assert!(
+            rep.areas
+                .iter()
+                .any(|a| a.area == crate::rules::Area::Links),
+            "Links must score when R25 fires"
+        );
+        assert!(
+            !rep.areas
+                .iter()
+                .any(|a| a.area == crate::rules::Area::OnPage),
+            "phantom OnPage must stay out"
+        );
     }
 
     #[test]
     fn test_probe_r56_soft404_fires_and_is_blocking() {
         use crate::rules::probe_finding;
-        let f = probe_finding("R56", "https://x.test/junk".into(), "missing page returns 200".into())
-            .expect("R56 must be a known rule");
+        let f = probe_finding(
+            "R56",
+            "https://x.test/junk".into(),
+            "missing page returns 200".into(),
+        )
+        .expect("R56 must be a known rule");
         assert_eq!(f.rule_id, "R56");
         assert_eq!(f.source, "live-crawl");
         assert_eq!(crate::rules::gate(&f.rule_id), crate::rules::Gate::Blocking);
@@ -1933,7 +2367,8 @@ Sitemap: https://example.com/sitemap.xml
 
     #[test]
     fn test_gate_fixtures_good_passes_broken_fails() {
-        let good = crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/good").unwrap());
+        let good =
+            crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/good").unwrap());
         assert!(
             crate::rules::blocking_findings(&good.findings).is_empty(),
             "good fixture must have zero blocking findings: {:?}",
@@ -1942,12 +2377,19 @@ Sitemap: https://example.com/sitemap.xml
                 .map(|f| f.rule_id.clone())
                 .collect::<Vec<_>>()
         );
-        let bad = crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/broken").unwrap());
+        let bad =
+            crate::audit::with_findings(crate::audit::audit_path("tests/fixtures/broken").unwrap());
         let blocked = crate::rules::blocking_findings(&bad.findings);
-        assert!(blocked.iter().any(|f| f.rule_id == "R09"), "broken fixture must fire R09");
+        assert!(
+            blocked.iter().any(|f| f.rule_id == "R09"),
+            "broken fixture must fire R09"
+        );
         // Template-owned tags stay findings on Markdown but never block it.
         assert!(bad.findings.iter().any(|f| f.rule_id == "R11"));
-        assert!(!blocked.iter().any(|f| f.rule_id == "R11"), "R11 must not block Markdown");
+        assert!(
+            !blocked.iter().any(|f| f.rule_id == "R11"),
+            "R11 must not block Markdown"
+        );
     }
 
     #[test]
@@ -1971,7 +2413,7 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_reserve_settle_roundtrip() {
         use crate::manifest::{
-            reserve_jev_tokens, settle_jev_tokens, set_jev_budget_usd, DEFAULT_JEV_BUDGET_USD,
+            reserve_jev_tokens, set_jev_budget_usd, settle_jev_tokens, DEFAULT_JEV_BUDGET_USD,
             JEV_INPUT_TOKENS,
         };
         use std::sync::atomic::Ordering;
@@ -2011,7 +2453,10 @@ Sitemap: https://example.com/sitemap.xml
             .filter(|r| truth_kind(r.id) == "heuristic")
             .map(|r| &r.id)
             .collect();
-        assert_eq!(heu, vec![&"R18", &"R19", &"R20", &"R23", &"R24", &"R54", &"R55", &"R58", &"R41"]);
+        assert_eq!(
+            heu,
+            vec![&"R18", &"R19", &"R20", &"R23", &"R24", &"R54", &"R55", &"R58", &"R41"]
+        );
     }
 
     #[test]
@@ -2032,8 +2477,14 @@ Sitemap: https://example.com/sitemap.xml
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("t.db");
         let store = DbStore::open_at(db_path.to_str().unwrap()).unwrap();
-        assert!(store.record_crawl_snapshot("https://example.com", 10, 1).unwrap().is_none());
-        let prev = store.record_crawl_snapshot("https://example.com", 12, 0).unwrap().unwrap();
+        assert!(store
+            .record_crawl_snapshot("https://example.com", 10, 1)
+            .unwrap()
+            .is_none());
+        let prev = store
+            .record_crawl_snapshot("https://example.com", 12, 0)
+            .unwrap()
+            .unwrap();
         assert_eq!(prev, (10, 1));
     }
 
@@ -2051,8 +2502,14 @@ Sitemap: https://example.com/sitemap.xml
         let text = readable_text(html, 6000);
         assert!(text.contains("Agent readiness checker"), "{text}");
         assert!(text.contains("118 evidence checks"), "{text}");
-        assert!(!text.contains("secret-beacon"), "script body leaked: {text}");
-        assert!(!text.contains("meta words here"), "head markup leaked: {text}");
+        assert!(
+            !text.contains("secret-beacon"),
+            "script body leaked: {text}"
+        );
+        assert!(
+            !text.contains("meta words here"),
+            "head markup leaked: {text}"
+        );
         assert!(!text.contains('<'), "raw tags leaked: {text}");
     }
 
@@ -2069,13 +2526,26 @@ Sitemap: https://example.com/sitemap.xml
         use crate::crawl::{is_sitemap_xml, robots_sitemaps, sitemap_seed_urls};
         let robots = "User-agent: *\nDisallow: /private\nSitemap: https://example.com/sitemap.xml\nSitemap: https://example.com/fr/sitemap_index.xml\n# Sitemap: https://example.invalid/commented\n";
         let sites = robots_sitemaps(robots);
-        assert_eq!(sites, vec!["https://example.com/sitemap.xml", "https://example.com/fr/sitemap_index.xml"]);
+        assert_eq!(
+            sites,
+            vec![
+                "https://example.com/sitemap.xml",
+                "https://example.com/fr/sitemap_index.xml"
+            ]
+        );
         assert!(robots_sitemaps("User-agent: *\nDisallow: /").is_empty());
         let urlset = r#"<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/a</loc></url><url><loc>https://example.com/b</loc></url></urlset>"#;
-        assert_eq!(sitemap_seed_urls(urlset), vec!["https://example.com/a", "https://example.com/b"]);
+        assert_eq!(
+            sitemap_seed_urls(urlset),
+            vec!["https://example.com/a", "https://example.com/b"]
+        );
         assert!(is_sitemap_xml(urlset));
-        assert!(is_sitemap_xml(r#"<sitemapindex><sitemap><loc>https://example.com/sitemap.xml</loc></sitemap></sitemapindex>"#));
-        assert!(!is_sitemap_xml("<html><body><a href=\"/a\">a</a></body></html>"));
+        assert!(is_sitemap_xml(
+            r#"<sitemapindex><sitemap><loc>https://example.com/sitemap.xml</loc></sitemap></sitemapindex>"#
+        ));
+        assert!(!is_sitemap_xml(
+            "<html><body><a href=\"/a\">a</a></body></html>"
+        ));
         assert!(!is_sitemap_xml(""));
     }
 
@@ -2083,7 +2553,10 @@ Sitemap: https://example.com/sitemap.xml
     fn test_page_state_has_single_text_field() {
         use crate::engine::page_state;
         let state = page_state("q", Some("t".into()), None, "body copy".into(), 2, None);
-        assert!(state.get("content").is_none(), "duplicated content key: {state}");
+        assert!(
+            state.get("content").is_none(),
+            "duplicated content key: {state}"
+        );
         assert_eq!(state["page"]["text"], "body copy");
         assert_eq!(state["query"], "q");
     }

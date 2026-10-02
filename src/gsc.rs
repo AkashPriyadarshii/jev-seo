@@ -11,7 +11,10 @@ const SCOPE: &str = "https://www.googleapis.com/auth/webmasters.readonly";
 
 fn config_path() -> Result<std::path::PathBuf> {
     let home = std::env::var("HOME").context("HOME not set")?;
-    Ok(std::path::PathBuf::from(format!("{}/.config/jev-seo/gsc.json", home)))
+    Ok(std::path::PathBuf::from(format!(
+        "{}/.config/jev-seo/gsc.json",
+        home
+    )))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,12 +38,22 @@ fn save_refresh(token: &str) -> Result<()> {
             .mode(0o600)
             .open(&path)?;
         use std::io::Write;
-        f.write_all(serde_json::to_string_pretty(&TokenStore { refresh_token: token.to_string() })?.as_bytes())?;
+        f.write_all(
+            serde_json::to_string_pretty(&TokenStore {
+                refresh_token: token.to_string(),
+            })?
+            .as_bytes(),
+        )?;
         Ok(())
     }
     #[cfg(not(unix))]
     {
-        std::fs::write(&path, serde_json::to_string_pretty(&TokenStore { refresh_token: token.to_string() })?)?;
+        std::fs::write(
+            &path,
+            serde_json::to_string_pretty(&TokenStore {
+                refresh_token: token.to_string(),
+            })?,
+        )?;
         Ok(())
     }
 }
@@ -84,9 +97,21 @@ pub fn auth_start() -> Result<String> {
         .send_json(serde_json::json!({ "client_id": id, "scope": SCOPE }))
         .context("device flow start failed")?
         .into_json()?;
-    let url = body.get("verification_url").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let code = body.get("user_code").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let device = body.get("device_code").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let url = body
+        .get("verification_url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let code = body
+        .get("user_code")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let device = body
+        .get("device_code")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     println!("Open:   {}", url);
     println!("Enter:  {}", code);
     println!("Then:   jev-seo gsc auth --code {}", device);
@@ -116,7 +141,10 @@ pub fn auth_poll(device_code: &str) -> Result<()> {
             println!("Search Console linked. Token stored with owner-only permissions.");
             return Ok(());
         }
-        let err = body.get("error").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let err = body
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
         if err != "authorization_pending" && err != "slow_down" {
             anyhow::bail!("auth failed: {}", err);
         }
@@ -142,7 +170,11 @@ pub fn sites() -> Result<Vec<String>> {
         .and_then(|v| v.as_array())
         .map(|a| {
             a.iter()
-                .filter_map(|e| e.get("siteUrl").and_then(|u| u.as_str()).map(str::to_string))
+                .filter_map(|e| {
+                    e.get("siteUrl")
+                        .and_then(|u| u.as_str())
+                        .map(str::to_string)
+                })
                 .collect()
         })
         .unwrap_or_default())
@@ -162,7 +194,10 @@ pub fn top_queries(site: &str, limit: usize) -> Result<Vec<GscRow>> {
     let token = access_token()?;
     let end = chrono_now_days_ago(0);
     let start = chrono_now_days_ago(28);
-    let url = format!("/webmasters/v3/sites/{}/searchAnalytics/query", urlencoding(site));
+    let url = format!(
+        "/webmasters/v3/sites/{}/searchAnalytics/query",
+        urlencoding(site)
+    );
     let body: serde_json::Value = ureq::post(&format!("https://www.googleapis.com{}", url))
         .timeout(Duration::from_secs(20))
         .set("Authorization", &format!("Bearer {}", token))
@@ -181,7 +216,12 @@ pub fn top_queries(site: &str, limit: usize) -> Result<Vec<GscRow>> {
         .map(|a| {
             a.iter()
                 .map(|r| GscRow {
-                    query: r.get("keys").and_then(|k| k.get(0)).and_then(|q| q.as_str()).unwrap_or("").to_string(),
+                    query: r
+                        .get("keys")
+                        .and_then(|k| k.get(0))
+                        .and_then(|q| q.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     clicks: r.get("clicks").and_then(|v| v.as_f64()).unwrap_or(0.0),
                     impressions: r.get("impressions").and_then(|v| v.as_f64()).unwrap_or(0.0),
                     ctr: r.get("ctr").and_then(|v| v.as_f64()).unwrap_or(0.0),
@@ -229,7 +269,11 @@ pub fn gap(site: &str, limit: usize) -> Result<Vec<GapRow>> {
             }
         })
         .collect();
-    rows.sort_by(|a, b| b.gap_score.partial_cmp(&a.gap_score).unwrap_or(std::cmp::Ordering::Equal));
+    rows.sort_by(|a, b| {
+        b.gap_score
+            .partial_cmp(&a.gap_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     Ok(rows)
 }
 

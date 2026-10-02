@@ -30,8 +30,15 @@ fn handle_stream(mut stream: TcpStream) {
     }
 
     // Health / manifest
-    if req.contains("GET /health") || req.contains("GET /plugin.json") || req.contains("GET /.well-known") {
-        let path = if req.contains("/plugin.json") { "plugin.json" } else { ".well-known/plugin.json" };
+    if req.contains("GET /health")
+        || req.contains("GET /plugin.json")
+        || req.contains("GET /.well-known")
+    {
+        let path = if req.contains("/plugin.json") {
+            "plugin.json"
+        } else {
+            ".well-known/plugin.json"
+        };
         // Try plugin.json, else minimal manifest
         let body = std::fs::read_to_string("plugin.json")
             .or_else(|_| std::fs::read_to_string(path))
@@ -43,10 +50,20 @@ fn handle_stream(mut stream: TcpStream) {
     // Serve extensions static (sidebar/panel/viewer)
     if req.starts_with("GET /extensions/") {
         let line = req.lines().next().unwrap_or("");
-        let p = line.split(' ').nth(1).unwrap_or("/").split('?').next().unwrap_or("/");
+        let p = line
+            .split(' ')
+            .nth(1)
+            .unwrap_or("/")
+            .split('?')
+            .next()
+            .unwrap_or("/");
         let safe = p.trim_start_matches('/').replace("..", "");
         let body = std::fs::read_to_string(&safe).unwrap_or_else(|_| "<h1>not found</h1>".into());
-        let ctype = if safe.ends_with(".html") { "text/html" } else { "application/json" };
+        let ctype = if safe.ends_with(".html") {
+            "text/html"
+        } else {
+            "application/json"
+        };
         http_response(&mut stream, "200 OK", ctype, &body);
         return;
     }
@@ -56,17 +73,23 @@ fn handle_stream(mut stream: TcpStream) {
         let body_start = req.find("\r\n\r\n").map(|i| i + 4).unwrap_or(req.len());
         let body = &req[body_start..];
         // Bodies may be truncated by single read; try to read Content-Length remainder
-        let parsed: serde_json::Value = serde_json::from_str(body.trim()).unwrap_or(serde_json::Value::Null);
+        let parsed: serde_json::Value =
+            serde_json::from_str(body.trim()).unwrap_or(serde_json::Value::Null);
         let reply: String = if parsed.is_null() {
             serde_json::to_string(&RpcResponse {
                 jsonrpc: "2.0".into(),
                 id: None,
                 result: None,
                 error: Some(serde_json::json!({"code": -32700, "message": "Parse error"})),
-            }).unwrap()
+            })
+            .unwrap()
         } else if let Some(arr) = parsed.as_array() {
             // batch
-            let out: Vec<RpcResponse> = arr.iter().filter_map(|v| serde_json::from_value::<RpcRequest>(v.clone()).ok()).map(|r| handle_request(&r)).collect();
+            let out: Vec<RpcResponse> = arr
+                .iter()
+                .filter_map(|v| serde_json::from_value::<RpcRequest>(v.clone()).ok())
+                .map(|r| handle_request(&r))
+                .collect();
             serde_json::to_string(&out).unwrap()
         } else {
             match serde_json::from_value::<RpcRequest>(parsed) {
@@ -76,7 +99,8 @@ fn handle_stream(mut stream: TcpStream) {
                     id: None,
                     result: None,
                     error: Some(serde_json::json!({"code": -32700, "message": "Parse error"})),
-                }).unwrap(),
+                })
+                .unwrap(),
             }
         };
         http_response(&mut stream, "200 OK", "application/json", &reply);
@@ -93,7 +117,9 @@ pub fn run_plugin_bridge(addr: &str) -> anyhow::Result<()> {
     eprintln!("jev-seo plugin bridge listening on http://{addr}  POST /mcp");
     for stream in listener.incoming() {
         match stream {
-            Ok(s) => { thread::spawn(move || handle_stream(s)); }
+            Ok(s) => {
+                thread::spawn(move || handle_stream(s));
+            }
             Err(e) => eprintln!("accept error: {e}"),
         }
     }

@@ -54,7 +54,8 @@ pub fn validate_content(target_label: &str, content: &str) -> Result<SchemaValid
     }
 
     // 2. Try extracting <script type="application/ld+json">...</script>
-    let re = Regex::new(r#"(?is)<script[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
+    let re =
+        Regex::new(r#"(?is)<script[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
     for cap in re.captures_iter(content) {
         if let Some(mat) = cap.get(1) {
             let body = mat.as_str().trim();
@@ -151,7 +152,11 @@ fn audit_schema_item(item: &Value) -> (SchemaDetail, Vec<String>, Vec<String>, u
     }
 
     // Verify @type
-    let schema_type = item.get("@type").and_then(|t| t.as_str()).unwrap_or("Unknown").to_string();
+    let schema_type = item
+        .get("@type")
+        .and_then(|t| t.as_str())
+        .unwrap_or("Unknown")
+        .to_string();
     if schema_type == "Unknown" {
         errors.push("Missing @type definition in schema object".into());
         score = score.saturating_sub(MISSING_TYPE_PENALTY);
@@ -164,22 +169,49 @@ fn audit_schema_item(item: &Value) -> (SchemaDetail, Vec<String>, Vec<String>, u
 
     match schema_type.as_str() {
         "SoftwareApplication" => {
-            validate_software_app(item, &mut missing_required, &mut missing_recommended, &mut score);
+            validate_software_app(
+                item,
+                &mut missing_required,
+                &mut missing_recommended,
+                &mut score,
+            );
         }
         "Article" | "TechArticle" | "BlogPosting" | "NewsArticle" => {
-            validate_article(item, &mut missing_required, &mut missing_recommended, &mut score);
+            validate_article(
+                item,
+                &mut missing_required,
+                &mut missing_recommended,
+                &mut score,
+            );
         }
         "Organization" | "Corporation" => {
-            validate_organization(item, &mut missing_required, &mut missing_recommended, &mut score);
+            validate_organization(
+                item,
+                &mut missing_required,
+                &mut missing_recommended,
+                &mut score,
+            );
         }
         "WebSite" => {
             validate_website(item, &mut missing_required, &mut score);
         }
         "Product" => {
-            validate_product(item, &mut missing_required, &mut missing_recommended, &mut score);
+            validate_product(
+                item,
+                &mut missing_required,
+                &mut missing_recommended,
+                &mut score,
+            );
         }
         "FAQPage" => {
-            check_field(item, "mainEntity", true, &mut missing_required, &mut score, 40);
+            check_field(
+                item,
+                "mainEntity",
+                true,
+                &mut missing_required,
+                &mut score,
+                40,
+            );
             warnings.push("Google restricted FAQPage rich results primarily to authoritative health and government domains (Sept 2023)".into());
         }
         "HowTo" => {
@@ -191,21 +223,37 @@ fn audit_schema_item(item: &Value) -> (SchemaDetail, Vec<String>, Vec<String>, u
         }
         "SpecialAnnouncement" => {
             is_deprecated = true;
-            let msg = "SpecialAnnouncement schema is deprecated by Google Search post-COVID.".to_string();
+            let msg =
+                "SpecialAnnouncement schema is deprecated by Google Search post-COVID.".to_string();
             deprecation_notice = Some(msg.clone());
             warnings.push(msg);
             score = score.saturating_sub(DEPRECATED_SCHEMA_PENALTY);
         }
         _ => {
-            check_field(item, "name", false, &mut missing_recommended, &mut score, 10);
+            check_field(
+                item,
+                "name",
+                false,
+                &mut missing_recommended,
+                &mut score,
+                10,
+            );
         }
     }
 
     if !missing_required.is_empty() {
-        errors.push(format!("{}: missing required properties [{}]", schema_type, missing_required.join(", ")));
+        errors.push(format!(
+            "{}: missing required properties [{}]",
+            schema_type,
+            missing_required.join(", ")
+        ));
     }
     if !missing_recommended.is_empty() {
-        warnings.push(format!("{}: missing recommended properties [{}]", schema_type, missing_recommended.join(", ")));
+        warnings.push(format!(
+            "{}: missing recommended properties [{}]",
+            schema_type,
+            missing_recommended.join(", ")
+        ));
     }
 
     let detail = SchemaDetail {
@@ -220,7 +268,12 @@ fn audit_schema_item(item: &Value) -> (SchemaDetail, Vec<String>, Vec<String>, u
     (detail, errors, warnings, score)
 }
 
-fn validate_software_app(item: &Value, required: &mut Vec<String>, recommended: &mut Vec<String>, score: &mut u32) {
+fn validate_software_app(
+    item: &Value,
+    required: &mut Vec<String>,
+    recommended: &mut Vec<String>,
+    score: &mut u32,
+) {
     check_field(item, "name", true, required, score, 20);
     if item.get("operatingSystem").is_none() && item.get("applicationCategory").is_none() {
         required.push("operatingSystem or applicationCategory".into());
@@ -230,7 +283,12 @@ fn validate_software_app(item: &Value, required: &mut Vec<String>, recommended: 
     check_field(item, "description", false, recommended, score, 10);
 }
 
-fn validate_article(item: &Value, required: &mut Vec<String>, recommended: &mut Vec<String>, score: &mut u32) {
+fn validate_article(
+    item: &Value,
+    required: &mut Vec<String>,
+    recommended: &mut Vec<String>,
+    score: &mut u32,
+) {
     check_field(item, "headline", true, required, score, 20);
     check_field(item, "author", true, required, score, 20);
     check_field(item, "datePublished", true, required, score, 15);
@@ -238,7 +296,12 @@ fn validate_article(item: &Value, required: &mut Vec<String>, recommended: &mut 
     check_field(item, "image", false, recommended, score, 10);
 }
 
-fn validate_organization(item: &Value, required: &mut Vec<String>, recommended: &mut Vec<String>, score: &mut u32) {
+fn validate_organization(
+    item: &Value,
+    required: &mut Vec<String>,
+    recommended: &mut Vec<String>,
+    score: &mut u32,
+) {
     check_field(item, "name", true, required, score, 30);
     check_field(item, "url", true, required, score, 25);
     check_field(item, "logo", false, recommended, score, 15);
@@ -249,7 +312,12 @@ fn validate_website(item: &Value, required: &mut Vec<String>, score: &mut u32) {
     check_field(item, "url", true, required, score, 35);
 }
 
-fn validate_product(item: &Value, required: &mut Vec<String>, recommended: &mut Vec<String>, score: &mut u32) {
+fn validate_product(
+    item: &Value,
+    required: &mut Vec<String>,
+    recommended: &mut Vec<String>,
+    score: &mut u32,
+) {
     check_field(item, "name", true, required, score, 25);
     check_field(item, "offers", true, required, score, 25);
     check_field(item, "description", false, recommended, score, 10);
@@ -277,7 +345,9 @@ fn pod_to_json(pod: &gray_matter::Pod) -> Value {
     match pod {
         gray_matter::Pod::String(s) => Value::String(s.clone()),
         gray_matter::Pod::Integer(i) => Value::Number((*i).into()),
-        gray_matter::Pod::Float(f) => serde_json::Number::from_f64(*f).map(Value::Number).unwrap_or(Value::Null),
+        gray_matter::Pod::Float(f) => serde_json::Number::from_f64(*f)
+            .map(Value::Number)
+            .unwrap_or(Value::Null),
         gray_matter::Pod::Boolean(b) => Value::Bool(*b),
         gray_matter::Pod::Array(arr) => Value::Array(arr.iter().map(pod_to_json).collect()),
         gray_matter::Pod::Hash(map) => {
@@ -290,4 +360,3 @@ fn pod_to_json(pod: &gray_matter::Pod) -> Value {
         gray_matter::Pod::Null => Value::Null,
     }
 }
-

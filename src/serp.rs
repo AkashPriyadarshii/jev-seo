@@ -13,7 +13,10 @@ pub struct SerpItem {
 }
 
 pub fn get_autocomplete(query: &str) -> Result<Vec<String>> {
-    let url = format!("https://duckduckgo.com/ac/?q={}&type=list", urlencoding::encode(query));
+    let url = format!(
+        "https://duckduckgo.com/ac/?q={}&type=list",
+        urlencoding::encode(query)
+    );
     let resp = ureq::get(&url)
         .set("User-Agent", USER_AGENT)
         .timeout(std::time::Duration::from_secs(5))
@@ -66,7 +69,11 @@ pub fn select_provider(want: Provider) -> Provider {
     }
 }
 
-pub fn scrape_serp_with(query: &str, limit: usize, want: Provider) -> Result<(Vec<SerpItem>, Provider)> {
+pub fn scrape_serp_with(
+    query: &str,
+    limit: usize,
+    want: Provider,
+) -> Result<(Vec<SerpItem>, Provider)> {
     scrape_serp_opts(query, limit, want, &SearchOpts::default())
 }
 
@@ -80,7 +87,11 @@ pub struct SearchOpts {
 
 impl Default for SearchOpts {
     fn default() -> Self {
-        Self { depth: "advanced".into(), topic: "general".into(), answer: false }
+        Self {
+            depth: "advanced".into(),
+            topic: "general".into(),
+            answer: false,
+        }
     }
 }
 
@@ -93,19 +104,30 @@ pub fn effective_limit(served: Provider, limit: usize) -> usize {
     }
 }
 
-pub fn scrape_serp_opts(query: &str, limit: usize, want: Provider, opts: &SearchOpts) -> Result<(Vec<SerpItem>, Provider)> {
+pub fn scrape_serp_opts(
+    query: &str,
+    limit: usize,
+    want: Provider,
+    opts: &SearchOpts,
+) -> Result<(Vec<SerpItem>, Provider)> {
     match select_provider(want) {
         Provider::Tavily => match tavily_search_with(query, limit, opts) {
             Ok(items) => Ok((items, Provider::Tavily)),
             Err(e) => {
-                eprintln!("[jev-seo] paid search failed ({}); falling back to free scrape", e);
+                eprintln!(
+                    "[jev-seo] paid search failed ({}); falling back to free scrape",
+                    e
+                );
                 Ok((scrape_ddg(query, limit)?, Provider::Ddg))
             }
         },
         Provider::Dfs => match dfs_search_with(query, limit) {
             Ok(items) => Ok((items, Provider::Dfs)),
             Err(e) => {
-                eprintln!("[jev-seo] DataForSEO failed ({}); falling back to free scrape", e);
+                eprintln!(
+                    "[jev-seo] DataForSEO failed ({}); falling back to free scrape",
+                    e
+                );
                 Ok((scrape_ddg(query, limit)?, Provider::Ddg))
             }
         },
@@ -117,7 +139,9 @@ pub fn scrape_serp_opts(query: &str, limit: usize, want: Provider, opts: &Search
 /// TAVILY_API_KEY (enables it), TAVILY_API_URL (optional proxy override).
 /// Paid gate: true only with a non-empty key. Decides before any network.
 pub fn tavily_enabled() -> bool {
-    std::env::var("TAVILY_API_KEY").map(|k| !k.trim().is_empty()).unwrap_or(false)
+    std::env::var("TAVILY_API_KEY")
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false)
 }
 
 fn tavily_search_with(query: &str, limit: usize, opts: &SearchOpts) -> Result<Vec<SerpItem>> {
@@ -158,11 +182,19 @@ fn tavily_search_with(query: &str, limit: usize, opts: &SearchOpts) -> Result<Ve
         .unwrap_or_default();
     let mut items = Vec::new();
     for r in arr.iter() {
-        let url = r.get("url").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let url = r
+            .get("url")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
         if url.is_empty() {
             continue;
         }
-        let title = r.get("title").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let title = r
+            .get("title")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
         let snippet: String = r
             .get("content")
             .and_then(|x| x.as_str())
@@ -170,7 +202,12 @@ fn tavily_search_with(query: &str, limit: usize, opts: &SearchOpts) -> Result<Ve
             .chars()
             .take(400)
             .collect();
-        items.push(SerpItem { position: items.len() + 1, title, url, snippet });
+        items.push(SerpItem {
+            position: items.len() + 1,
+            title,
+            url,
+            snippet,
+        });
     }
     if items.is_empty() {
         anyhow::bail!("search API returned zero results");
@@ -183,8 +220,12 @@ fn tavily_search_with(query: &str, limit: usize, opts: &SearchOpts) -> Result<Ve
 /// DATAFORSEO_API_URL (optional proxy override).
 /// Paid gate: true only with both values non-empty. Checked before network.
 pub fn dfs_enabled() -> bool {
-    let user = std::env::var("DATAFORSEO_USERNAME").map(|k| !k.trim().is_empty()).unwrap_or(false);
-    let pass = std::env::var("DATAFORSEO_PASSWORD").map(|k| !k.trim().is_empty()).unwrap_or(false);
+    let user = std::env::var("DATAFORSEO_USERNAME")
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false);
+    let pass = std::env::var("DATAFORSEO_PASSWORD")
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false);
     user && pass
 }
 
@@ -232,12 +273,23 @@ fn dfs_search_with(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
         .cloned()
         .unwrap_or_default();
     let mut out = Vec::new();
-    for r in items.iter().filter(|r| r.get("type").and_then(|t| t.as_str()) == Some("organic")) {
-        let url = r.get("url").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    for r in items
+        .iter()
+        .filter(|r| r.get("type").and_then(|t| t.as_str()) == Some("organic"))
+    {
+        let url = r
+            .get("url")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
         if url.is_empty() {
             continue;
         }
-        let title = r.get("title").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let title = r
+            .get("title")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
         let snippet: String = r
             .get("description")
             .and_then(|x| x.as_str())
@@ -245,7 +297,12 @@ fn dfs_search_with(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
             .chars()
             .take(400)
             .collect();
-        out.push(SerpItem { position: out.len() + 1, title, url, snippet });
+        out.push(SerpItem {
+            position: out.len() + 1,
+            title,
+            url,
+            snippet,
+        });
         if out.len() >= limit {
             break;
         }
@@ -362,7 +419,10 @@ fn scrape_ddg(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
     let resp = ureq::post("https://html.duckduckgo.com/html/")
         .set("User-Agent", USER_AGENT)
         .set("Content-Type", "application/x-www-form-urlencoded")
-        .set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+        .set(
+            "Accept",
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        )
         .set("Accept-Language", "en-US,en;q=0.9")
         .set("Referer", "https://html.duckduckgo.com/")
         .set("Origin", "https://html.duckduckgo.com")
@@ -382,10 +442,17 @@ fn scrape_ddg(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
     }
     let mut items = Vec::new();
 
-    let result_re = Regex::new(r#"(?s)<div[^>]*class="[^"]*result\b[^"]*"[^>]*>(.*?)</div>\s*</div>"#)?;
-    let title_re = Regex::new(r#"(?s)<a[^>]*class="[^"]*result__url[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#)?;
-    let title_fallback_re = Regex::new(r#"(?s)<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#)?;
-    let link_re = Regex::new(r#"(?s)<a[^>]*class="[^"]*result__title[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#)?;
+    let result_re =
+        Regex::new(r#"(?s)<div[^>]*class="[^"]*result\b[^"]*"[^>]*>(.*?)</div>\s*</div>"#)?;
+    let title_re = Regex::new(
+        r#"(?s)<a[^>]*class="[^"]*result__url[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#,
+    )?;
+    let title_fallback_re = Regex::new(
+        r#"(?s)<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#,
+    )?;
+    let link_re = Regex::new(
+        r#"(?s)<a[^>]*class="[^"]*result__title[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#,
+    )?;
     let snippet_re = Regex::new(r#"(?s)<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>"#)?;
     let strip_html = Regex::new(r#"<[^>]+>"#)?;
 
@@ -395,7 +462,8 @@ fn scrape_ddg(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
         }
 
         let block = &cap[1];
-        let link_match = link_re.captures(block)
+        let link_match = link_re
+            .captures(block)
             .or_else(|| title_re.captures(block))
             .or_else(|| title_fallback_re.captures(block));
 
@@ -433,7 +501,9 @@ fn extract_actual_url(raw: &str) -> String {
         let remainder = &raw[pos + 5..];
         let end_pos = remainder.find('&').unwrap_or(remainder.len());
         let encoded = &remainder[..end_pos];
-        return urlencoding::decode(encoded).unwrap_or_else(|_| encoded.into()).to_string();
+        return urlencoding::decode(encoded)
+            .unwrap_or_else(|_| encoded.into())
+            .to_string();
     }
     raw.to_string()
 }

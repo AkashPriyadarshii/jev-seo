@@ -41,7 +41,11 @@ pub fn ask(prompt: &str) -> Result<(String, Vec<String>)> {
     let cites = body
         .get("citations")
         .and_then(|c| c.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default();
     Ok((text, cites))
 }

@@ -117,13 +117,19 @@ fn has_dot_component(canon: &std::path::Path) -> bool {
 /// True when a SERP result URL belongs to the tracked domain (exact host or
 /// subdomain), so evilcrates.io never counts for crates.io.
 pub fn url_matches_domain(result_url: &str, domain: &str) -> bool {
-    let domain = domain.trim().trim_start_matches("https://").trim_start_matches("http://");
+    let domain = domain
+        .trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://");
     let domain = domain.split('/').next().unwrap_or(domain);
     let host = url::Url::parse(result_url)
         .ok()
         .and_then(|u| u.host_str().map(|h| h.to_ascii_lowercase()));
     match host {
-        Some(h) => h == domain.to_ascii_lowercase() || h.ends_with(&format!(".{}", domain.to_ascii_lowercase())),
+        Some(h) => {
+            h == domain.to_ascii_lowercase()
+                || h.ends_with(&format!(".{}", domain.to_ascii_lowercase()))
+        }
         None => false,
     }
 }

@@ -52,7 +52,10 @@ pub fn shape_grade(body: &str) -> (u8, Vec<String>) {
     let mut score = 0u8;
     let mut notes = Vec::new();
     let lines: Vec<&str> = body.lines().map(str::trim).collect();
-    if lines.iter().any(|l| l.starts_with("# ") && !l.starts_with("##")) {
+    if lines
+        .iter()
+        .any(|l| l.starts_with("# ") && !l.starts_with("##"))
+    {
         score += 25;
     } else {
         notes.push("missing H1 title".into());
@@ -62,12 +65,19 @@ pub fn shape_grade(body: &str) -> (u8, Vec<String>) {
     } else {
         notes.push("missing blockquote summary".into());
     }
-    if lines.iter().any(|l| l.starts_with("- [") && l.contains("](")) {
+    if lines
+        .iter()
+        .any(|l| l.starts_with("- [") && l.contains("]("))
+    {
         score += 25;
     } else {
         notes.push("missing markdown link bullets".into());
     }
-    if lines.iter().any(|l| l.trim_start_matches('#').trim().eq_ignore_ascii_case("optional")) {
+    if lines.iter().any(|l| {
+        l.trim_start_matches('#')
+            .trim()
+            .eq_ignore_ascii_case("optional")
+    }) {
         score += 25;
     } else {
         notes.push("missing Optional section".into());
@@ -94,30 +104,50 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     let llms_url = format!("{}://{}/llms.txt", base.scheme(), domain);
 
     let (status, body) = match crate::fetch::with_extra_headers(
-        ureq::get(&llms_url)
-            .timeout(Duration::from_secs(8))
-            .set("User-Agent", concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Agent Readiness Check)")),
+        ureq::get(&llms_url).timeout(Duration::from_secs(8)).set(
+            "User-Agent",
+            concat!(
+                "jev-seo/",
+                env!("CARGO_PKG_VERSION"),
+                " (TypeSafe Jev Agent Readiness Check)"
+            ),
+        ),
     )
     .call()
     {
-        Ok(r) => (r.status(), crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default()),
-        Err(ureq::Error::Status(code, r)) => (code, crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default()),
+        Ok(r) => (
+            r.status(),
+            crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default(),
+        ),
+        Err(ureq::Error::Status(code, r)) => (
+            code,
+            crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).unwrap_or_default(),
+        ),
         Err(_) => (0, String::new()),
     };
     let present = status == 200 && !body.trim().is_empty();
-    let (bytes, sections) = if present { parse_llms_txt(&body) } else { (0, Vec::new()) };
-    let (shape_score, shape_notes) = if present { shape_grade(&body) } else { (0, vec!["no file to grade".into()]) };
+    let (bytes, sections) = if present {
+        parse_llms_txt(&body)
+    } else {
+        (0, Vec::new())
+    };
+    let (shape_score, shape_notes) = if present {
+        shape_grade(&body)
+    } else {
+        (0, vec!["no file to grade".into()])
+    };
 
-    let robots = crate::robots::inspect_robots(&domain).unwrap_or_else(|_| crate::robots::RobotsReport {
-        domain: domain.clone(),
-        robots_url: String::new(),
-        status_code: 0,
-        has_robots: false,
-        ai_bot_rules: Vec::new(),
-        sitemaps: Vec::new(),
-        disallow_all: false,
-        citation_bots_allowed: 0,
-    });
+    let robots =
+        crate::robots::inspect_robots(&domain).unwrap_or_else(|_| crate::robots::RobotsReport {
+            domain: domain.clone(),
+            robots_url: String::new(),
+            status_code: 0,
+            has_robots: false,
+            ai_bot_rules: Vec::new(),
+            sitemaps: Vec::new(),
+            disallow_all: false,
+            citation_bots_allowed: 0,
+        });
 
     let mut ai_allowed = Vec::new();
     let mut ai_default = Vec::new();
@@ -134,9 +164,17 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     let mut checks = Vec::new();
     if present {
         score += 40;
-        checks.push(check("llms.txt present", true, &format!("{} bytes, {} sections", bytes, sections.len())));
+        checks.push(check(
+            "llms.txt present",
+            true,
+            &format!("{} bytes, {} sections", bytes, sections.len()),
+        ));
     } else {
-        checks.push(check("llms.txt present", false, "No usable llms.txt at /llms.txt"));
+        checks.push(check(
+            "llms.txt present",
+            false,
+            "No usable llms.txt at /llms.txt",
+        ));
     }
     let explicit_allowed = robots
         .ai_bot_rules
@@ -148,17 +186,33 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     checks.push(check(
         "AI crawlers allowed",
         explicit_allowed > 0,
-        &format!("{} of {} tracked bots explicitly allowed", explicit_allowed, robots.ai_bot_rules.len()),
+        &format!(
+            "{} of {} tracked bots explicitly allowed",
+            explicit_allowed,
+            robots.ai_bot_rules.len()
+        ),
     ));
     if !robots.sitemaps.is_empty() {
         score += 15;
-        checks.push(check("Sitemap advertised", true, &format!("{} sitemap(s) in robots.txt", robots.sitemaps.len())));
+        checks.push(check(
+            "Sitemap advertised",
+            true,
+            &format!("{} sitemap(s) in robots.txt", robots.sitemaps.len()),
+        ));
     } else {
-        checks.push(check("Sitemap advertised", false, "No Sitemap line in robots.txt"));
+        checks.push(check(
+            "Sitemap advertised",
+            false,
+            "No Sitemap line in robots.txt",
+        ));
     }
     if robots.has_robots {
         score += 15;
-        checks.push(check("robots.txt present", true, "Crawler rules discoverable"));
+        checks.push(check(
+            "robots.txt present",
+            true,
+            "Crawler rules discoverable",
+        ));
     } else {
         checks.push(check("robots.txt present", false, "No robots.txt served"));
     }
@@ -167,7 +221,14 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     Ok(LlmsReport {
         domain,
         llms_url,
-        info: LlmsInfo { present, status, bytes, sections, shape_score, shape_notes },
+        info: LlmsInfo {
+            present,
+            status,
+            bytes,
+            sections,
+            shape_score,
+            shape_notes,
+        },
         ai_allowed,
         ai_default,
         ai_blocked,
@@ -179,24 +240,55 @@ pub fn check_llms(target: &str) -> Result<LlmsReport> {
     })
 }
 
-fn llms_actions(present: bool, explicit_allowed: usize, robots_present: bool, sitemap: bool) -> Vec<crate::actions::Action> {
+fn llms_actions(
+    present: bool,
+    explicit_allowed: usize,
+    robots_present: bool,
+    sitemap: bool,
+) -> Vec<crate::actions::Action> {
     let mut actions = Vec::new();
     let mut n = 1;
     let mut push = |priority: u8, effort: u8, title: String, evidence: String| {
-        actions.push(crate::actions::Action::new(&format!("LLMS-{:03}", n), priority, effort, &title, evidence));
+        actions.push(crate::actions::Action::new(
+            &format!("LLMS-{:03}", n),
+            priority,
+            effort,
+            &title,
+            evidence,
+        ));
         n += 1;
     };
     if !present {
-        push(1, 1, "Ship an llms.txt".into(), "answer engines cannot see the site".into());
+        push(
+            1,
+            1,
+            "Ship an llms.txt".into(),
+            "answer engines cannot see the site".into(),
+        );
     }
     if explicit_allowed == 0 {
-        push(2, 1, "Name AI crawlers in robots.txt".into(), "all bots on default policy".into());
+        push(
+            2,
+            1,
+            "Name AI crawlers in robots.txt".into(),
+            "all bots on default policy".into(),
+        );
     }
     if !robots_present {
-        push(2, 1, "Serve a robots.txt".into(), "crawler rules undiscoverable".into());
+        push(
+            2,
+            1,
+            "Serve a robots.txt".into(),
+            "crawler rules undiscoverable".into(),
+        );
     }
     if !sitemap {
-        push(3, 1, "Advertise the sitemap in robots.txt".into(), "no Sitemap line found".into());
+        push(
+            3,
+            1,
+            "Advertise the sitemap in robots.txt".into(),
+            "no Sitemap line found".into(),
+        );
     }
     crate::actions::rank(actions)
 }

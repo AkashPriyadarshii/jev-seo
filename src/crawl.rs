@@ -10,14 +10,19 @@ use std::sync::{mpsc, LazyLock};
 use std::time::{Duration, Instant};
 use url::Url;
 
-pub const CRAWL_UA: &str = concat!("jev-seo/", env!("CARGO_PKG_VERSION"), " (TypeSafe Jev Search Radar Crawler)");
+pub const CRAWL_UA: &str = concat!(
+    "jev-seo/",
+    env!("CARGO_PKG_VERSION"),
+    " (TypeSafe Jev Search Radar Crawler)"
+);
 pub const DEFAULT_MAX_PAGES: usize = 50;
 pub const SLOW_PAGE_MS: u128 = 800;
 /// Largest page body kept in memory. Bigger pages truncate, never OOM.
 pub const MAX_BODY_BYTES: usize = 2_000_000;
 
-static LINK_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"(?is)<a\b[^>]*\bhref\s*=\s*["']([^"']+?)["']"#).expect("link regex"));
+static LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?is)<a\b[^>]*\bhref\s*=\s*["']([^"']+?)["']"#).expect("link regex")
+});
 static LOC_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?is)<loc>(.*?)</loc>"#).expect("loc regex"));
 
@@ -171,7 +176,11 @@ pub fn robots_allows(body: &str, path: &str) -> bool {
             let val = clean[pos + 1..].trim().to_string();
             if key == "user-agent" {
                 if !disallows.is_empty() || !allows.is_empty() {
-                    groups.push((std::mem::take(&mut agents), std::mem::take(&mut disallows), std::mem::take(&mut allows)));
+                    groups.push((
+                        std::mem::take(&mut agents),
+                        std::mem::take(&mut disallows),
+                        std::mem::take(&mut allows),
+                    ));
                 }
                 agents.push(val.to_lowercase());
             } else if key == "disallow" {
@@ -257,8 +266,8 @@ fn fetch_sitemap_body(url: &str) -> Option<String> {
     )
     .call()
     .ok()
-        .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
-        .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
+    .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
+    .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
 }
 
 fn expand_sitemap_locs(xml: &str) -> Vec<String> {
@@ -268,8 +277,14 @@ fn expand_sitemap_locs(xml: &str) -> Vec<String> {
     }
     let low = xml.to_ascii_lowercase();
     // Index file: locs point at other sitemaps (.xml). Flatten one level.
-    let is_index = low.contains("<sitemapindex") || low.contains("<sitemap>")
-        || locs.iter().filter(|u| u.to_ascii_lowercase().ends_with(".xml")).count() * 2 >= locs.len();
+    let is_index = low.contains("<sitemapindex")
+        || low.contains("<sitemap>")
+        || locs
+            .iter()
+            .filter(|u| u.to_ascii_lowercase().ends_with(".xml"))
+            .count()
+            * 2
+            >= locs.len();
     if !is_index {
         return locs;
     }
@@ -322,8 +337,21 @@ fn fetch_page(url: &str) -> Fetch {
     let mut current = url.to_string();
     let mut hops = Vec::new();
     let start = Instant::now();
-    let done = |status: u16, final_url: String, body: String, bytes: usize, hops: Vec<(u16, String)>, encoding: Option<String>| {
-        Fetch { status, final_url, body, elapsed_ms: start.elapsed().as_millis(), bytes, hops, encoding }
+    let done = |status: u16,
+                final_url: String,
+                body: String,
+                bytes: usize,
+                hops: Vec<(u16, String)>,
+                encoding: Option<String>| {
+        Fetch {
+            status,
+            final_url,
+            body,
+            elapsed_ms: start.elapsed().as_millis(),
+            bytes,
+            hops,
+            encoding,
+        }
     };
     for _ in 0..6 {
         let resp = crate::fetch::with_extra_headers(
@@ -341,10 +369,15 @@ fn fetch_page(url: &str) -> Fetch {
                     .map(|c| c.contains("html"))
                     .unwrap_or(true);
                 let encoding = r.header("content-encoding").map(str::to_string);
-                let declared: Option<usize> = r.header("content-length").and_then(|v| v.parse().ok());
+                let declared: Option<usize> =
+                    r.header("content-length").and_then(|v| v.parse().ok());
                 // Bounded read: capped_string stops at the cap on a char
                 // boundary instead of loading a gzip-bomb into RAM first.
-                let body = if is_html { crate::fetch::capped_string(r, MAX_BODY_BYTES).unwrap_or_default() } else { String::new() };
+                let body = if is_html {
+                    crate::fetch::capped_string(r, MAX_BODY_BYTES).unwrap_or_default()
+                } else {
+                    String::new()
+                };
                 let bytes = declared.unwrap_or(body.len());
                 return done(200, final_url, body, bytes, hops, encoding);
             }
@@ -391,7 +424,9 @@ pub fn crawl_site_with_sitemap(
     let start = crate::paths::reject_private_url(start_url)?;
     let start_clean = canonicalize(start.as_str());
     if matches!(mode, crate::fetch::FetchMode::Firecrawl) && budget.max_credits == 0 {
-        eprintln!("Note: --fetch firecrawl with 0 fetch credits parks the paid backend; direct-only.");
+        eprintln!(
+            "Note: --fetch firecrawl with 0 fetch credits parks the paid backend; direct-only."
+        );
     }
     let t0 = Instant::now();
     let stamp = || {
@@ -406,10 +441,18 @@ pub fn crawl_site_with_sitemap(
     )
     .call()
     .ok()
-        .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
-        .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
-        .unwrap_or_default();
-    eprintln!("{} robots.txt {}", stamp(), if robots_body.is_empty() { "missing" } else { "ok" });
+    .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
+    .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
+    .unwrap_or_default();
+    eprintln!(
+        "{} robots.txt {}",
+        stamp(),
+        if robots_body.is_empty() {
+            "missing"
+        } else {
+            "ok"
+        }
+    );
 
     // --sitemap override wins; else robots.txt Sitemap: lines + host-root default.
     let mut sitemap_candidates: Vec<String> = Vec::new();
@@ -444,8 +487,8 @@ pub fn crawl_site_with_sitemap(
     }
     // Start URL itself is a sitemap (e.g. /fr/sitemap_index.xml passed as URL): parse it directly.
     if sitemap_urls.is_empty() {
-        let looks_like_sitemap = start_clean.to_ascii_lowercase().ends_with(".xml")
-            || start_clean.contains("sitemap");
+        let looks_like_sitemap =
+            start_clean.to_ascii_lowercase().ends_with(".xml") || start_clean.contains("sitemap");
         if looks_like_sitemap {
             if let Some(body) = fetch_sitemap_body(&start_clean) {
                 if is_sitemap_xml(&body) {
@@ -463,7 +506,12 @@ pub fn crawl_site_with_sitemap(
     // 301/308 (not 302/307) on scheme and www/apex variants.
     let mut probes: Vec<(String, String, String)> = Vec::new();
     let nohop: ureq::Agent = ureq::AgentBuilder::new().redirects(0).build();
-    let junk = format!("{}://{}/jev-seo-{}-not-found", start.scheme(), host, std::process::id());
+    let junk = format!(
+        "{}://{}/jev-seo-{}-not-found",
+        start.scheme(),
+        host,
+        std::process::id()
+    );
     if let Ok(r) = crate::fetch::with_extra_headers(
         nohop
             .get(&junk)
@@ -473,7 +521,29 @@ pub fn crawl_site_with_sitemap(
     .call()
     {
         if r.status() == 200 {
-            probes.push(("R56".into(), junk, "missing page returns 200".into()));
+            let body = crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES)
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            let soft = [
+                "not found",
+                "404",
+                "page does not exist",
+                "no longer available",
+            ]
+            .iter()
+            .any(|p| body.contains(*p));
+            if soft || body.len() < 2000 {
+                probes.push((
+                    "R56".into(),
+                    junk,
+                    if soft {
+                        "soft 404: 200 with not-found copy"
+                    } else {
+                        "soft 404: 200 on junk URL"
+                    }
+                    .into(),
+                ));
+            }
         }
     }
     if start.scheme() == "https" {
@@ -487,7 +557,11 @@ pub fn crawl_site_with_sitemap(
         .call()
         {
             if code == 302 || code == 307 {
-                probes.push(("R57".into(), http_url, format!("HTTP→HTTPS uses temporary {}", code)));
+                probes.push((
+                    "R57".into(),
+                    http_url,
+                    format!("HTTP→HTTPS uses temporary {}", code),
+                ));
             }
         }
     }
@@ -506,10 +580,18 @@ pub fn crawl_site_with_sitemap(
     .call()
     {
         Err(ureq::Error::Status(code, _)) if code == 302 || code == 307 => {
-            probes.push(("R57".into(), alt_url, format!("host variant uses temporary {}", code)));
+            probes.push((
+                "R57".into(),
+                alt_url,
+                format!("host variant uses temporary {}", code),
+            ));
         }
         Ok(r) if r.status() == 200 => {
-            probes.push(("R57".into(), alt_url, "both hosts serve 200 without redirect".into()));
+            probes.push((
+                "R57".into(),
+                alt_url,
+                "both hosts serve 200 without redirect".into(),
+            ));
         }
         _ => {}
     }
@@ -521,7 +603,12 @@ pub fn crawl_site_with_sitemap(
     if seeds.is_empty() {
         seeds.push(start_clean.clone());
     }
-    eprintln!("{} {} seed pages{}", stamp(), seeds.len(), if seeded { " (sitemap)" } else { " (start URL)" });
+    eprintln!(
+        "{} {} seed pages{}",
+        stamp(),
+        seeds.len(),
+        if seeded { " (sitemap)" } else { " (start URL)" }
+    );
 
     let mut queue: VecDeque<String> = seeds.into_iter().collect();
     let mut visited: HashSet<String> = HashSet::new();
@@ -600,10 +687,12 @@ pub fn crawl_site_with_sitemap(
                     // markdown-density on raw HTML always reads ~0.2 and
                     // escalated every page.
                     let mut words = body_words(&fetch.body);
-                    if !matches!(mode, crate::fetch::FetchMode::Direct)
-                        && words < MIN_UPGRADE_WORDS
+                    if !matches!(mode, crate::fetch::FetchMode::Direct) && words < MIN_UPGRADE_WORDS
                     {
-                        if matches!(mode, crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Jina) {
+                        if matches!(
+                            mode,
+                            crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Jina
+                        ) {
                             if let Ok(j) = crate::fetch::jina_fetch(url) {
                                 let jw = body_words(&j.body);
                                 if jw > words.max(50) {
@@ -619,14 +708,14 @@ pub fn crawl_site_with_sitemap(
                         }
                         // Re-check after Jina: a fixed page must not burn a
                         // Firecrawl credit on top.
-                        if matches!(mode, crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Firecrawl)
-                            && words < MIN_UPGRADE_WORDS
+                        if matches!(
+                            mode,
+                            crate::fetch::FetchMode::Auto | crate::fetch::FetchMode::Firecrawl
+                        ) && words < MIN_UPGRADE_WORDS
                         {
                             // Debit under a short lock, fetch outside it.
-                            let debited = budget_arc
-                                .lock()
-                                .map(|mut b| b.allow(1))
-                                .unwrap_or(false);
+                            let debited =
+                                budget_arc.lock().map(|mut b| b.allow(1)).unwrap_or(false);
                             if debited {
                                 match crate::fetch::firecrawl_fetch(url) {
                                     Ok(f) => {
@@ -652,7 +741,14 @@ pub fn crawl_site_with_sitemap(
                             }
                         }
                     }
-                    let _ = tx.send(Done { url: url.clone(), fetch, source, cost, upgraded, links });
+                    let _ = tx.send(Done {
+                        url: url.clone(),
+                        fetch,
+                        source,
+                        cost,
+                        upgraded,
+                        links,
+                    });
                 });
             }
         });
@@ -747,7 +843,11 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
         probes,
     } = parts;
     let mut broken: Vec<PageRecord> = Vec::new();
-    for p in pages.iter().filter(|p| p.status >= 400 || p.status == 0).cloned() {
+    for p in pages
+        .iter()
+        .filter(|p| p.status >= 400 || p.status == 0)
+        .cloned()
+    {
         // Auth, rate-limit, and block shapes are not broken pages: 401/403
         // need credentials, 429/999 need patience, and robots-blocked targets
         // are unknown, never broken.
@@ -758,7 +858,9 @@ pub fn finish_report(parts: ReportParts) -> CrawlReport {
     }
     let orphans: Vec<String> = pages
         .iter()
-        .filter(|p| p.status == 200 && p.url != start_url && inbound.get(&p.url).copied().unwrap_or(0) == 0)
+        .filter(|p| {
+            p.status == 200 && p.url != start_url && inbound.get(&p.url).copied().unwrap_or(0) == 0
+        })
         .map(|p| p.url.clone())
         .collect();
     let mut rep = CrawlReport {

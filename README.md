@@ -85,7 +85,7 @@ keywords:
   - no subscription seo
 ---
 
-**Support:** fuel the next build — [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
+**Support this project:** [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
 
 <!--
 SEO / GEO crawler block (do not strip)
@@ -283,7 +283,7 @@ Scores rank work. They do not predict rankings or traffic. Confidence gates prin
 
 ## What's new
 
-crates.io ships **v0.1.2** (26 September 2026). Local `Cargo.toml` is **v0.3.0 maxen half done** — automation bumped `0.1.3` after `0.1.2` wrongly; you corrected the map so `v0.3.0` absorbs former `0.1.3` + PRD `0.2.0` + both `0.3.0` scopes + `jev.md` evidence role. No `v0.1.3` publishes; half the code ships (bridge, capabilities, watch, fix-plan, crawl #3), half remains.
+crates.io ships **v0.1.2** (26 September 2026). Local `Cargo.toml` is **v0.3.0** (complete, not yet published). No `v0.1.3` publish. `v0.3.0` consolidates earlier unreleased work into one version.
 
 | Feature on `master` | Use it |
 |---|---|
@@ -326,7 +326,7 @@ cargo install --path .
 ## Quickstart
 
 ```bash
-# Published crate (v0.1.2) — local is v0.3.0 maxen half done
+# Published crate is v0.1.2; local Cargo.toml is v0.3.0
 cargo install jev-seo
 
 # Optional: TypeSafe key for Jev semantic scores
@@ -404,7 +404,7 @@ jev-seo robots example.com
 Reads `robots.txt` for GPTBot, ClaudeBot, anthropic-ai, PerplexityBot, Google-Extended, Bytespider. Prints allow/disallow and readiness actions.
 
 <details>
-<summary><strong>More workflows</strong> — briefs, GEO scoring, CI gate, sitemap, AI-slop radar, explain, baselines, narrative (click to expand)</summary>
+<summary><strong>More workflows</strong>: briefs, GEO scoring, CI gate, sitemap, AI-slop radar, explain, baselines, narrative (click to expand)</summary>
 
 ### 4. SERP-driven content brief
 
@@ -559,13 +559,13 @@ Optional `narrative.json` beside audit exports loads at report time: unknown act
 
 Real output in the repo, not mockups:
 
-- `examples/jevseo-site/crawl.json` — 10-page live crawl with health score, areas, findings, actions
-- `examples/jevseo-site/llms.json` — answer-engine readiness with checks and actions
-- `examples/local-docs/report.html`, `report.md`, `findings.csv` — one audit, three formats
-- `examples/narrative.example.json` — narrative contract shape for report embeds
-- `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md` — full portfolio sweep: 38 orphans, 11 empty pages, 100/100 readiness, GEO 5 with verify, brand entity collision, under $0.001 spend
+- `examples/jevseo-site/crawl.json`: 10-page live crawl with health score, areas, findings, and actions
+- `examples/jevseo-site/llms.json`: answer-engine readiness with checks and actions
+- `examples/local-docs/report.html`, `report.md`, `findings.csv`: one audit in three formats
+- `examples/narrative.example.json`: narrative contract shape for report embeds
+- `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md`: full portfolio sweep with 38 orphans, 11 empty pages, 100/100 readiness, GEO 5 with verify
 
-**Field report:** [Real audit: portfolio site, 50 pages, zero spend](https://jevseo.vercel.app/real-audit.html) — every number from one live run, pre-fix findings included.
+**Field report:** [Real audit: portfolio site, 50 pages, zero spend](https://jevseo.vercel.app/real-audit.html). Every number comes from one live run, including pre-fix findings.
 
 **Single-file report and session shots** (regenerated pack in `docs/assets/`):
 

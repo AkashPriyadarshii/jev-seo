@@ -52,7 +52,12 @@ pub(crate) struct StdioSampler<'a> {
 
 impl<'a> StdioSampler<'a> {
     fn new(lines: std::io::Lines<std::io::StdinLock<'a>>, stdout: &'a mut std::io::Stdout) -> Self {
-        Self { lines, stdout, next_id: 0, sampling_allowed: false }
+        Self {
+            lines,
+            stdout,
+            next_id: 0,
+            sampling_allowed: false,
+        }
     }
 
     /// Next non-empty client line, or None on EOF/error.
@@ -97,16 +102,20 @@ impl Sampler for StdioSampler<'_> {
                 Some(t) => t,
                 None => return Err("client closed the stream during sampling".into()),
             };
-            let msg: serde_json::Value =
-                serde_json::from_str(&text).map_err(|_| "client sent a non-JSON sampling reply".to_string())?;
+            let msg: serde_json::Value = serde_json::from_str(&text)
+                .map_err(|_| "client sent a non-JSON sampling reply".to_string())?;
             if msg.get("id") != Some(&json!(id)) {
                 continue; // notification or unrelated response: keep waiting
             }
             if let Some(err) = msg.get("error") {
-                let detail = err.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error");
+                let detail = err
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("unknown error");
                 return Err(format!("client declined sampling: {}", detail));
             }
-            return sample_text(msg.get("result")).ok_or_else(|| "client sent an unexpected sampling result shape".to_string());
+            return sample_text(msg.get("result"))
+                .ok_or_else(|| "client sent an unexpected sampling result shape".to_string());
         }
     }
 }
@@ -377,8 +386,14 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
         },
         "tools/call" => {
             let params = req.params.as_ref();
-            let tool_name = params.and_then(|p| p.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-            let args = params.and_then(|p| p.get("arguments")).cloned().unwrap_or(json!({}));
+            let tool_name = params
+                .and_then(|p| p.get("name"))
+                .and_then(|n| n.as_str())
+                .unwrap_or("");
+            let args = params
+                .and_then(|p| p.get("arguments"))
+                .cloned()
+                .unwrap_or(json!({}));
 
             let result_content = execute_tool_with(tool_name, &args, sampler);
             let is_error = result_content.starts_with("Error:");
@@ -415,9 +430,15 @@ fn safety_gate(tool: &str, target: &str) -> Option<String> {
     match crate::engine::JevClient::new() {
         None => None,
         Some(client) => match client.safety_block(tool, target) {
-            Some(true) => Some(format!("Error: blocked unsafe target for {}: {}", tool, target)),
+            Some(true) => Some(format!(
+                "Error: blocked unsafe target for {}: {}",
+                tool, target
+            )),
             Some(false) => None,
-            None => Some(format!("Error: safety check unreachable for {}: {}", tool, target)),
+            None => Some(format!(
+                "Error: safety check unreachable for {}: {}",
+                tool, target
+            )),
         },
     }
 }
@@ -434,11 +455,16 @@ fn cite_prompt(query: &str) -> String {
 
 /// Score one answer for a target citation and log the drift verdict.
 /// Best-effort ledger: a stuck database never fails the check.
-fn cite_verdict(target: &str, query: &str, answer: &str, source: &str, citations: &[String]) -> String {
+fn cite_verdict(
+    target: &str,
+    query: &str,
+    answer: &str,
+    source: &str,
+    citations: &[String],
+) -> String {
     let host = cite_host(target);
     let lower = answer.to_lowercase();
-    let cited = lower.contains(&host)
-        || citations.iter().any(|c| c.to_lowercase().contains(&host));
+    let cited = lower.contains(&host) || citations.iter().any(|c| c.to_lowercase().contains(&host));
     let prev = crate::rank::DbStore::open()
         .ok()
         .and_then(|db| db.record_cite(target, query, cited).ok())
@@ -477,8 +503,16 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
             }
         }
         "seo_cite_check" => {
-            let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("").trim();
-            let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("").trim();
+            let target = args
+                .get("target")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            let query = args
+                .get("query")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
             if target.is_empty() || query.is_empty() {
                 return "Error: seo_cite_check needs both \"target\" (domain or URL) and \"query\".".into();
             }
@@ -539,7 +573,10 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
             if let Some(err) = safety_gate("seo_geo", target) {
                 return err;
             }
-            let content = match crate::paths::read_user_file(target, &["md", "mdx", "markdown", "html", "htm", "txt"]) {
+            let content = match crate::paths::read_user_file(
+                target,
+                &["md", "mdx", "markdown", "html", "htm", "txt"],
+            ) {
                 Ok(c) => c,
                 Err(e) => return format!("Error: {}", e),
             };
@@ -553,13 +590,23 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                 };
                 let opening = is_html.then(|| crate::fetch::opening_after_h1(&content, 500));
                 let wc = text.split_whitespace().count();
-                let state = crate::engine::page_state(query, Some(target.to_string()), None, text, wc, opening);
+                let state = crate::engine::page_state(
+                    query,
+                    Some(target.to_string()),
+                    None,
+                    text,
+                    wc,
+                    opening,
+                );
                 match client.judge_page(state) {
                     Ok(eval) => {
                         if crate::policy::injection_blocked(&eval.extra) {
-                            return "Error: blocked: injection risk in content (Jev pre-screen).".into();
+                            return "Error: blocked: injection risk in content (Jev pre-screen)."
+                                .into();
                         }
-                        if crate::policy::gate("geo", eval.geo_confidence) == crate::policy::Verdict::Drop {
+                        if crate::policy::gate("geo", eval.geo_confidence)
+                            == crate::policy::Verdict::Drop
+                        {
                             return "Error: Jev unsure (low confidence), no score.".into();
                         }
                         serde_json::to_string_pretty(&eval).unwrap_or_default()
@@ -585,7 +632,9 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                         let state = json!({ "root_query": q, "suggestions": items });
                         let extras = crate::policy::keyword_value_extras(&items, 10);
                         if let Ok(eval) = client.fanout_eval_with(state, extras) {
-                            if crate::policy::gate("keywords", eval.confidence()) != crate::policy::Verdict::Drop {
+                            if crate::policy::gate("keywords", eval.confidence())
+                                != crate::policy::Verdict::Drop
+                            {
                                 let out = json!({
                                     "suggestions": items,
                                     "intent": eval.intent,
@@ -642,11 +691,27 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
             if let Some(err) = safety_gate("seo_crawl", url) {
                 return err;
             }
-            let max_pages = args.get("max_pages").and_then(|v| v.as_u64()).unwrap_or(crate::crawl::DEFAULT_MAX_PAGES as u64) as usize;
-            let sitemap = args.get("sitemap").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
-            if let Some(s) = sitemap { if let Some(err) = safety_gate("seo_crawl", s) { return err; } }
+            let max_pages =
+                args.get("max_pages")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(crate::crawl::DEFAULT_MAX_PAGES as u64) as usize;
+            let sitemap = args
+                .get("sitemap")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty());
+            if let Some(s) = sitemap {
+                if let Some(err) = safety_gate("seo_crawl", s) {
+                    return err;
+                }
+            }
             let mut budget = crate::fetch::Budget::default();
-            match crate::crawl::crawl_site_with_sitemap(url, max_pages, crate::fetch::FetchMode::Auto, &mut budget, sitemap) {
+            match crate::crawl::crawl_site_with_sitemap(
+                url,
+                max_pages,
+                crate::fetch::FetchMode::Auto,
+                &mut budget,
+                sitemap,
+            ) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }
@@ -662,7 +727,11 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
             let urls: Vec<String> = args
                 .get("urls")
                 .and_then(|v| v.as_array())
-                .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect()
+                })
                 .unwrap_or_default();
             let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
             match crate::serp::tavily_extract(&urls, query) {
@@ -680,7 +749,10 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
         "seo_report" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
             let baseline = args.get("baseline").and_then(|v| v.as_str()).unwrap_or("");
-            let baseline_label = args.get("baseline_label").and_then(|v| v.as_str()).unwrap_or("");
+            let baseline_label = args
+                .get("baseline_label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if let Some(err) = safety_gate("seo_report", path) {
                 return err;
             }
@@ -688,7 +760,12 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                 match crate::rank::DbStore::open() {
                     Ok(db) => match db.load_baseline(baseline_label.trim()) {
                         Ok(Some(src)) => src,
-                        Ok(None) => return format!("Error: no baseline '{}' stored.", baseline_label.trim()),
+                        Ok(None) => {
+                            return format!(
+                                "Error: no baseline '{}' stored.",
+                                baseline_label.trim()
+                            )
+                        }
                         Err(e) => return format!("Error: read baseline: {e:#}"),
                     },
                     Err(e) => return format!("Error: open drift store: {e:#}"),

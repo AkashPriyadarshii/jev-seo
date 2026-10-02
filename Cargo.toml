@@ -36,5 +36,14 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 colored = "2.1"
 anyhow = "1.0"
 
+[features]
+# Optional JS-rendered verification: `cargo run --features js -- crawl <url>`
+# headless Chromium via chromiumoxide. Default warns on JS-only shells without it.
+js = ["dep:chromiumoxide"]
+
+[dependencies.chromiumoxide]
+version = "0.7"
+optional = true
+
 [dev-dependencies]
 tempfile = "3.10"

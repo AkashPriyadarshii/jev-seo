@@ -76,7 +76,13 @@ pub fn fetch_home_vitals(raw_url: &str) -> Option<Vitals> {
     if lcp.is_none() && cls.is_none() && inp.is_none() && score.is_none() {
         return None;
     }
-    Some(Vitals { lcp_ms: lcp, cls_milli: cls, inp_ms: inp, score, field })
+    Some(Vitals {
+        lcp_ms: lcp,
+        cls_milli: cls,
+        inp_ms: inp,
+        score,
+        field,
+    })
 }
 
 pub fn cls_display(milli: u64) -> String {

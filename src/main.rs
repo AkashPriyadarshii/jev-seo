@@ -4,32 +4,33 @@ use colored::*;
 use serde_json::json;
 use std::collections::BTreeSet;
 
-mod audit;
 mod actions;
+mod audit;
 mod brief;
+mod capabilities;
 mod crawl;
 mod engine;
 mod fetch;
+mod fix_plan;
 mod geo_keyless;
 mod gsc;
+mod js_render;
 mod llm;
 mod llms;
 mod manifest;
-mod narrative;
 mod mcp;
+mod narrative;
 mod paths;
+mod plugin_bridge;
 mod policy;
 mod rank;
 mod robots;
 mod rules;
 mod schema;
-mod capabilities;
-mod fix_plan;
-mod plugin_bridge;
-mod watch;
 mod serp;
 mod sitemap;
 mod vitals;
+mod watch;
 
 #[cfg(test)]
 mod tests;
@@ -358,6 +359,9 @@ enum Commands {
         label: Option<String>,
         #[arg(long)]
         json: bool,
+        /// Only print on regression/improve, silence clean
+        #[arg(long)]
+        diff_only: bool,
         /// Skip Jev semantic calls
         #[arg(long)]
         no_jev: bool,
@@ -390,7 +394,10 @@ fn write_actions_csv(
 }
 
 /// Diff two DirectoryAuditReport JSONs: score delta, rule set changes.
-fn diff_audit_reports(current: &audit::DirectoryAuditReport, base: &audit::DirectoryAuditReport) -> serde_json::Value {
+fn diff_audit_reports(
+    current: &audit::DirectoryAuditReport,
+    base: &audit::DirectoryAuditReport,
+) -> serde_json::Value {
     use std::collections::BTreeSet;
     let score = |r: &audit::DirectoryAuditReport| r.pass_rate.round().clamp(0.0, 100.0) as u32;
     let rules = |r: &audit::DirectoryAuditReport| -> BTreeSet<String> {
@@ -446,7 +453,12 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("{}", format!("Keyword Autocomplete for \"{}\":", query).cyan().bold());
+            println!(
+                "{}",
+                format!("Keyword Autocomplete for \"{}\":", query)
+                    .cyan()
+                    .bold()
+            );
             for (idx, item) in suggestions.iter().enumerate() {
                 println!("  {}. {}", idx + 1, item);
             }
@@ -458,14 +470,30 @@ fn main() -> Result<()> {
             let extras = policy::keyword_value_extras(&suggestions, 10);
             if let Some((eval, v)) = gated_eval_with("keywords", state, extras) {
                 println!("\n{}", "Intent & Semantic Classification:".cyan().bold());
-                println!("  Primary Intent: {} (confidence: {:.2}){}{}", eval.intent.green(), eval.intent_confidence, policy::marker(v), runner_up_suffix(&eval.extra, v).dimmed());
+                println!(
+                    "  Primary Intent: {} (confidence: {:.2}){}{}",
+                    eval.intent.green(),
+                    eval.intent_confidence,
+                    policy::marker(v),
+                    runner_up_suffix(&eval.extra, v).dimmed()
+                );
                 println!("  Content Gap:    {}", eval.content_gap.yellow());
                 print_keyword_values(&eval.extra, &suggestions);
-                println!("  Suggested Next: jev-seo {}", policy::route_for_intent(&eval.intent));
+                println!(
+                    "  Suggested Next: jev-seo {}",
+                    policy::route_for_intent(&eval.intent)
+                );
                 print_jev_spend_line();
             }
         }
-        Commands::Query { query, limit, provider, depth, topic, json } => {
+        Commands::Query {
+            query,
+            limit,
+            provider,
+            depth,
+            topic,
+            json,
+        } => {
             let backend = match provider.as_str() {
                 "ddg" => serp::Provider::Ddg,
                 "tavily" => serp::Provider::Tavily,
@@ -473,14 +501,29 @@ fn main() -> Result<()> {
                 "auto" => serp::Provider::Auto,
                 other => anyhow::bail!("unknown --provider '{other}' (auto, ddg, tavily, dfs)"),
             };
-            let opts = serp::SearchOpts { depth, topic, answer: false };
+            let opts = serp::SearchOpts {
+                depth,
+                topic,
+                answer: false,
+            };
             if backend == serp::Provider::Dfs && !serp::dfs_enabled() {
-                eprintln!("{}", "Note: DATAFORSEO keys missing; explicit dfs falls back to free scrape.".yellow());
+                eprintln!(
+                    "{}",
+                    "Note: DATAFORSEO keys missing; explicit dfs falls back to free scrape."
+                        .yellow()
+                );
             }
             if backend == serp::Provider::Tavily && !serp::tavily_enabled() {
-                eprintln!("{}", "Note: TAVILY_API_KEY missing; explicit tavily falls back to free scrape.".yellow());
+                eprintln!(
+                    "{}",
+                    "Note: TAVILY_API_KEY missing; explicit tavily falls back to free scrape."
+                        .yellow()
+                );
             }
-            eprintln!("{}", format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed());
+            eprintln!(
+                "{}",
+                format!("Scraping live SERP for \"{}\" (limit: {})...", query, limit).dimmed()
+            );
             let (items, served) = serp::scrape_serp_opts(&query, limit, backend, &opts)?;
 
             if json {
@@ -493,9 +536,19 @@ fn main() -> Result<()> {
                 serp::Provider::Dfs => "DataForSEO",
                 _ => "DuckDuckGo",
             };
-            println!("\n{}", format!("Top Competitors on {}:", source_label).cyan().bold());
+            println!(
+                "\n{}",
+                format!("Top Competitors on {}:", source_label)
+                    .cyan()
+                    .bold()
+            );
             for item in &items {
-                println!("  #{:<2} {} - {}", item.position.to_string().green().bold(), item.title, item.url.dimmed());
+                println!(
+                    "  #{:<2} {} - {}",
+                    item.position.to_string().green().bold(),
+                    item.title,
+                    item.url.dimmed()
+                );
                 if !item.snippet.is_empty() {
                     println!("      {}", item.snippet);
                 }
@@ -517,7 +570,9 @@ fn main() -> Result<()> {
                 "target_query": query,
                 "competitor_serp": items
             });
-            match engine::JevClient::new().map(|c| c.fanout_eval_with(state, serde_json::Value::Object(rel_questions))) {
+            match engine::JevClient::new()
+                .map(|c| c.fanout_eval_with(state, serde_json::Value::Object(rel_questions)))
+            {
                 Some(Ok(eval)) => {
                     // Rerank gated on its own answers, not the gap verdict.
                     let rel_conf: f64 = (0..items.len())
@@ -544,11 +599,19 @@ fn main() -> Result<()> {
                                 (i, s)
                             })
                             .collect();
-                        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                        ranked.sort_by(|a, b| {
+                            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+                        });
                         println!("\n{}", "Relevance Ranking (TypeSafe Jev):".cyan().bold());
                         for (rank, (i, score)) in ranked.iter().enumerate() {
                             let item = &items[*i];
-                            println!("  #{:<2} (rel {:.1}) {} - {}", rank + 1, score, item.title, item.url.dimmed());
+                            println!(
+                                "  #{:<2} (rel {:.1}) {} - {}",
+                                rank + 1,
+                                score,
+                                item.title,
+                                item.url.dimmed()
+                            );
                         }
                     }
                     match policy::gate("query", eval.confidence()) {
@@ -562,11 +625,24 @@ fn main() -> Result<()> {
                     }
                     print_jev_spend_line();
                 }
-                Some(Err(e)) => eprintln!("{}", format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow()),
-                None => eprintln!("{}", "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()),
+                Some(Err(e)) => eprintln!(
+                    "{}",
+                    format!("Warning: Jev scoring failed ({e:#}), showing local-only output.")
+                        .yellow()
+                ),
+                None => eprintln!(
+                    "{}",
+                    "Note: TYPESAFE_API_KEY not set, showing local-only output.".yellow()
+                ),
             }
         }
-        Commands::Link { path, limit, json, no_jev, jev_budget } => {
+        Commands::Link {
+            path,
+            limit,
+            json,
+            no_jev,
+            jev_budget,
+        } => {
             let dir_report = audit::audit_path(&path)?;
             manifest::set_jev_budget_usd(jev_budget);
             let client = match (no_jev, engine::JevClient::new()) {
@@ -593,7 +669,10 @@ fn main() -> Result<()> {
             let mut rows: Vec<serde_json::Value> = Vec::new();
             let mut suggested = 0usize;
             if !json {
-                println!("{}", "Internal-Link Suggestions (TypeSafe Jev):".cyan().bold());
+                println!(
+                    "{}",
+                    "Internal-Link Suggestions (TypeSafe Jev):".cyan().bold()
+                );
             }
             for src in pages.iter().take(limit.max(1)) {
                 let src_stem = stem_of(&src.file_path);
@@ -627,8 +706,14 @@ fn main() -> Result<()> {
                 match client.fanout_eval_with(state, policy::link_question(&cands)) {
                     Ok(eval) => {
                         let ans = eval.extra.get("link_target");
-                        let target = ans.and_then(|a| a.get("choice")).and_then(|c| c.as_str()).unwrap_or("no_link");
-                        let conf = ans.and_then(|a| a.get("confidence")).and_then(|c| c.as_f64()).unwrap_or(0.5);
+                        let target = ans
+                            .and_then(|a| a.get("choice"))
+                            .and_then(|c| c.as_str())
+                            .unwrap_or("no_link");
+                        let conf = ans
+                            .and_then(|a| a.get("confidence"))
+                            .and_then(|c| c.as_f64())
+                            .unwrap_or(0.5);
                         let v = policy::gate("link", conf);
                         if v == policy::Verdict::Drop {
                             continue;
@@ -645,17 +730,44 @@ fn main() -> Result<()> {
                         }
                         suggested += 1;
                     }
-                    Err(e) => eprintln!("{}", format!("Warning: link judge failed for {} ({e:#})", src.file_path).yellow()),
+                    Err(e) => eprintln!(
+                        "{}",
+                        format!("Warning: link judge failed for {} ({e:#})", src.file_path)
+                            .yellow()
+                    ),
                 }
             }
             if json {
                 println!("{}", serde_json::to_string_pretty(&rows)?);
             } else if suggested == 0 {
-                println!("  {}", "no suggestions: every page answered no_link or dropped below confidence.".dimmed());
+                println!(
+                    "  {}",
+                    "no suggestions: every page answered no_link or dropped below confidence."
+                        .dimmed()
+                );
             }
             print_jev_spend_line();
         }
-        Commands::Audit { path, target_query, json, min_pass, fail_on, forbid, max_critical, html, pdf, md, csv, digest, actions_csv, pairs_csv, rescore, manifest, no_jev, jev_budget: _ } => {
+        Commands::Audit {
+            path,
+            target_query,
+            json,
+            min_pass,
+            fail_on,
+            forbid,
+            max_critical,
+            html,
+            pdf,
+            md,
+            csv,
+            digest,
+            actions_csv,
+            pairs_csv,
+            rescore,
+            manifest,
+            no_jev,
+            jev_budget: _,
+        } => {
             let t0 = std::time::Instant::now();
             let is_rescore = rescore.is_some();
             let dir_report = match rescore {
@@ -681,10 +793,17 @@ fn main() -> Result<()> {
             } else {
                 Vec::new()
             };
-            let jev_used = !jev_pages.is_empty() || (!no_jev && target_query.is_some() && manifest::jev_key_present());
-            let mut completeness = manifest::completeness_audit(dir_report.total_files, false, !jev_pages.is_empty() || (!no_jev && target_query.is_some()));
+            let jev_used = !jev_pages.is_empty()
+                || (!no_jev && target_query.is_some() && manifest::jev_key_present());
+            let mut completeness = manifest::completeness_audit(
+                dir_report.total_files,
+                false,
+                !jev_pages.is_empty() || (!no_jev && target_query.is_some()),
+            );
             if !jev_pages.is_empty() {
-                completeness.notes.push(format!("Jev judged {} pages (sample)", jev_pages.len()));
+                completeness
+                    .notes
+                    .push(format!("Jev judged {} pages (sample)", jev_pages.len()));
                 completeness.full = false;
             }
 
@@ -698,7 +817,10 @@ fn main() -> Result<()> {
             ]);
             if let Some(dir) = &manifest {
                 export_dirs = vec![std::path::PathBuf::from(dir)];
-            } else if !export_dirs.iter().any(|d| d.join("narrative.json").is_file()) {
+            } else if !export_dirs
+                .iter()
+                .any(|d| d.join("narrative.json").is_file())
+            {
                 let cwd = std::path::PathBuf::from(".");
                 if cwd.join("narrative.json").is_file() {
                     export_dirs.push(cwd);
@@ -743,15 +865,25 @@ fn main() -> Result<()> {
 
             // Build report bodies once, gate every citation, then write.
             let body_html = html.as_ref().map(|_| audit::to_html(&dir_report) + &n_html);
-            let body_pdf = pdf.as_ref().map(|_| audit::to_pdf_with_narrative(&dir_report, n));
+            let body_pdf = pdf
+                .as_ref()
+                .map(|_| audit::to_pdf_with_narrative(&dir_report, n));
             let body_md = md.as_ref().map(|_| audit::to_markdown(&dir_report) + &n_md);
-            let body_csv = csv.as_ref().map(|_| crate::rules::to_csv(&dir_report.findings));
-            let body_digest = digest.as_ref().map(|_| audit::digest(&dir_report, &actions));
+            let body_csv = csv
+                .as_ref()
+                .map(|_| crate::rules::to_csv(&dir_report.findings));
+            let body_digest = digest
+                .as_ref()
+                .map(|_| audit::digest(&dir_report, &actions));
             if let Some(body) = &body_html {
                 manifest::gate_report(body, &dir_report.findings, &actions)?;
             }
             if let Some(body) = &body_pdf {
-                manifest::gate_report(&String::from_utf8_lossy(body), &dir_report.findings, &actions)?;
+                manifest::gate_report(
+                    &String::from_utf8_lossy(body),
+                    &dir_report.findings,
+                    &actions,
+                )?;
             }
             if let Some(body) = &body_md {
                 manifest::gate_report(body, &dir_report.findings, &actions)?;
@@ -808,7 +940,8 @@ fn main() -> Result<()> {
             }
             let score = manifest::ScoreCard {
                 score: dir_report.pass_rate.round().clamp(0.0, 100.0) as u32,
-                grade: crate::actions::grade(dir_report.pass_rate.round().clamp(0.0, 100.0) as u32).to_string(),
+                grade: crate::actions::grade(dir_report.pass_rate.round().clamp(0.0, 100.0) as u32)
+                    .to_string(),
                 kind: "pass-rate".into(),
             };
             let run_manifest = manifest::ManifestInput {
@@ -832,14 +965,27 @@ fn main() -> Result<()> {
             let mut wrote_manifest = false;
             for d in &export_dirs {
                 let (run_p, led_p) = manifest::write_pair(d, &run_manifest)?;
-                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
-                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
+                println!(
+                    "Run manifest written to {}",
+                    run_p.display().to_string().dimmed()
+                );
+                println!(
+                    "Spend ledger written to {}",
+                    led_p.display().to_string().dimmed()
+                );
                 wrote_manifest = true;
             }
             if !wrote_manifest && (force || !json) {
-                let (run_p, led_p) = manifest::write_pair(std::path::Path::new("."), &run_manifest)?;
-                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
-                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
+                let (run_p, led_p) =
+                    manifest::write_pair(std::path::Path::new("."), &run_manifest)?;
+                println!(
+                    "Run manifest written to {}",
+                    run_p.display().to_string().dimmed()
+                );
+                println!(
+                    "Spend ledger written to {}",
+                    led_p.display().to_string().dimmed()
+                );
             }
 
             // Contract first: agents parsing stdout must receive the report
@@ -875,7 +1021,10 @@ fn main() -> Result<()> {
                 }
                 "all" => {
                     if !dir_report.findings.is_empty() {
-                        anyhow::bail!("{} findings fail the gate (--fail-on all)", dir_report.findings.len());
+                        anyhow::bail!(
+                            "{} findings fail the gate (--fail-on all)",
+                            dir_report.findings.len()
+                        );
                     }
                 }
                 other => anyhow::bail!("unknown --fail-on '{other}' (blocking, all)"),
@@ -915,7 +1064,11 @@ fn main() -> Result<()> {
             }
 
             if dir_report.total_files > 1 {
-                println!("\n{} {}", "Batch Directory SEO Audit:".cyan().bold(), dir_report.dir_path);
+                println!(
+                    "\n{} {}",
+                    "Batch Directory SEO Audit:".cyan().bold(),
+                    dir_report.dir_path
+                );
                 println!("  Total Files Audited: {}", dir_report.total_files);
                 println!("  Total Word Count:    {}", dir_report.total_words);
                 println!("  Avg Words per File:  {}", dir_report.avg_words_per_file);
@@ -938,7 +1091,11 @@ fn main() -> Result<()> {
                 if !dir_report.keyword_cannibalization.is_empty() {
                     println!("\n{}", "Keyword Cannibalization Detected:".yellow().bold());
                     for item in &dir_report.keyword_cannibalization {
-                        println!("  - Target Stem: \"{}\" in {} pages:", item.keyword_stem.cyan(), item.colliding_files.len());
+                        println!(
+                            "  - Target Stem: \"{}\" in {} pages:",
+                            item.keyword_stem.cyan(),
+                            item.colliding_files.len()
+                        );
                         for f in &item.colliding_files {
                             println!("      {}", f.dimmed());
                         }
@@ -948,11 +1105,18 @@ fn main() -> Result<()> {
                         // Jev pair judge: one batched Noul per top pair, keep vs
                         // merge. Skipped on rescore (no spend) and --no-jev.
                         let verdicts = judge_pairs(&pairs, is_rescore || no_jev);
-                        println!("\n{}", format!("Conflict pairs ({}):", pairs.len()).yellow().bold());
+                        println!(
+                            "\n{}",
+                            format!("Conflict pairs ({}):", pairs.len()).yellow().bold()
+                        );
                         for (i, p) in pairs.iter().take(10).enumerate() {
                             let mark = match verdicts.get(i).copied().flatten() {
-                                Some((true, c)) => format!(" [jev distinct {:.2}]", c).green().to_string(),
-                                Some((false, c)) => format!(" [jev merge? {:.2}]", c).yellow().to_string(),
+                                Some((true, c)) => {
+                                    format!(" [jev distinct {:.2}]", c).green().to_string()
+                                }
+                                Some((false, c)) => {
+                                    format!(" [jev merge? {:.2}]", c).yellow().to_string()
+                                }
                                 None => String::new(),
                             };
                             println!(
@@ -993,7 +1157,15 @@ fn main() -> Result<()> {
                 }
 
                 if !dir_report.orphan_pages.is_empty() {
-                    println!("\n{}", format!("Orphan Pages (0 incoming internal links, {} files):", dir_report.orphan_pages.len()).yellow().bold());
+                    println!(
+                        "\n{}",
+                        format!(
+                            "Orphan Pages (0 incoming internal links, {} files):",
+                            dir_report.orphan_pages.len()
+                        )
+                        .yellow()
+                        .bold()
+                    );
                     for f in dir_report.orphan_pages.iter().take(5) {
                         println!("  - {}", f.yellow());
                     }
@@ -1005,7 +1177,15 @@ fn main() -> Result<()> {
                 }
 
                 if !dir_report.thin_pages.is_empty() {
-                    println!("\n{}", format!("Thin Pages (<300 words, {} files):", dir_report.thin_pages.len()).yellow().bold());
+                    println!(
+                        "\n{}",
+                        format!(
+                            "Thin Pages (<300 words, {} files):",
+                            dir_report.thin_pages.len()
+                        )
+                        .yellow()
+                        .bold()
+                    );
                     for (f, wc) in dir_report.thin_pages.iter().take(5) {
                         println!("  - {} ({} words)", f, wc);
                     }
@@ -1015,9 +1195,15 @@ fn main() -> Result<()> {
                 }
 
                 if !dir_report.missing_canonicals.is_empty() {
-                    println!("  Missing Canonicals:  {} files", dir_report.missing_canonicals.len().to_string().yellow());
+                    println!(
+                        "  Missing Canonicals:  {} files",
+                        dir_report.missing_canonicals.len().to_string().yellow()
+                    );
                 }
-                println!("\n{}", "Summary Status: Audit complete across directory.".green());
+                println!(
+                    "\n{}",
+                    "Summary Status: Audit complete across directory.".green()
+                );
 
                 let actions = crate::rules::actions_for(&dir_report.findings);
                 println!("  Rule findings: {}", dir_report.findings.len());
@@ -1027,23 +1213,50 @@ fn main() -> Result<()> {
                     print_top_actions(&actions);
                 }
             } else if let Some(report) = dir_report.reports.first() {
-                println!("\n{} {}", "On-Page SEO Audit:".cyan().bold(), report.file_path);
+                println!(
+                    "\n{} {}",
+                    "On-Page SEO Audit:".cyan().bold(),
+                    report.file_path
+                );
                 manifest::print_banner(&completeness);
-                println!("  Title:       {}", report.title.as_deref().unwrap_or("N/A"));
-                println!("  Description: {}", report.description.as_deref().unwrap_or("N/A"));
-                println!("  Headings:    H1: {}, H2: {}, H3: {}", report.h1_count, report.h2_count, report.h3_count);
+                println!(
+                    "  Title:       {}",
+                    report.title.as_deref().unwrap_or("N/A")
+                );
+                println!(
+                    "  Description: {}",
+                    report.description.as_deref().unwrap_or("N/A")
+                );
+                println!(
+                    "  Headings:    H1: {}, H2: {}, H3: {}",
+                    report.h1_count, report.h2_count, report.h3_count
+                );
                 if !report.heading_skipped_levels.is_empty() {
-                    println!("  Skipped H*:  {}", report.heading_skipped_levels.join(", ").yellow());
+                    println!(
+                        "  Skipped H*:  {}",
+                        report.heading_skipped_levels.join(", ").yellow()
+                    );
                 }
                 println!("  Word Count:  {}", report.word_count);
                 if report.em_dash_count > 0 || !report.ai_slop_words_found.is_empty() {
-                    println!("  AI Tells:    {} em-dashes, words: [{}]", report.em_dash_count, report.ai_slop_words_found.join(", "));
+                    println!(
+                        "  AI Tells:    {} em-dashes, words: [{}]",
+                        report.em_dash_count,
+                        report.ai_slop_words_found.join(", ")
+                    );
                 }
-                println!("  Links:       Internal: {}, External: {}", report.internal_links, report.external_links);
+                println!(
+                    "  Links:       Internal: {}, External: {}",
+                    report.internal_links, report.external_links
+                );
 
                 println!("\n{}", "Check Results:".bold());
                 for check in &report.checks {
-                    let badge = if check.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
+                    let badge = if check.passed {
+                        "PASS".green().bold()
+                    } else {
+                        "WARN".yellow().bold()
+                    };
                     println!("  [{}] {:<20} - {}", badge, check.name, check.message);
                 }
                 let file_findings: Vec<crate::rules::Finding> = dir_report
@@ -1060,24 +1273,43 @@ fn main() -> Result<()> {
                 if let Some(query) = target_query {
                     if no_jev {
                         // rules-only run: never post to Jev for the single-file gate.
-                    } else if let Some((eval, v)) = gated_eval_with("audit", json!({
-                        "target_query": query,
-                        "page_title": report.title,
-                        "description": report.description,
-                        "checks": report.checks,
-                        "page": {
-                            "title": report.title,
+                    } else if let Some((eval, v)) = gated_eval_with(
+                        "audit",
+                        json!({
+                            "target_query": query,
+                            "page_title": report.title,
                             "description": report.description,
-                            "text": excerpt_local(&report.file_path),
-                            "word_count": report.word_count
-                        }
-                    }), merge_extras(policy::geo_questions(), policy::page_audit_extras())) {
-                        println!("\n{}", "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold());
-                        println!("  GEO Score:       {}/10{}", eval.geo_score, policy::marker(v));
+                            "checks": report.checks,
+                            "page": {
+                                "title": report.title,
+                                "description": report.description,
+                                "text": excerpt_local(&report.file_path),
+                                "word_count": report.word_count
+                            }
+                        }),
+                        merge_extras(policy::geo_questions(), policy::page_audit_extras()),
+                    ) {
+                        println!(
+                            "\n{}",
+                            "Semantic Gap Evaluation (TypeSafe Jev):".cyan().bold()
+                        );
+                        println!(
+                            "  GEO Score:       {}/10{}",
+                            eval.geo_score,
+                            policy::marker(v)
+                        );
                         if let Some((comp, cconf)) = policy::composite_geo(&eval.extra) {
                             println!("  Composite GEO:   {}/10 (confidence {:.2})", comp, cconf);
                         }
-                        println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
+                        println!(
+                            "  Direct Answer:   {} (p={:.2})",
+                            if eval.direct_answer {
+                                "YES".green()
+                            } else {
+                                "NO".red()
+                            },
+                            eval.direct_answer_p
+                        );
                         println!("  Content Gap:     {}", eval.content_gap.yellow());
                         print_page_extras(&eval.extra);
                     }
@@ -1086,8 +1318,16 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Geo { target, query, json, jev_budget: _ } => {
-            let raw = match crate::paths::read_user_file(&target, &["md", "mdx", "markdown", "html", "htm", "txt"]) {
+        Commands::Geo {
+            target,
+            query,
+            json,
+            jev_budget: _,
+        } => {
+            let raw = match crate::paths::read_user_file(
+                &target,
+                &["md", "mdx", "markdown", "html", "htm", "txt"],
+            ) {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("{}", format!("Error: {e:#}").red());
@@ -1107,11 +1347,16 @@ fn main() -> Result<()> {
             let opening = is_html.then(|| crate::fetch::opening_after_h1(&raw, 500));
             if let Some(client) = engine::JevClient::new() {
                 let wc = text.split_whitespace().count();
-                let state = engine::page_state(&query, Some(target.clone()), None, text, wc, opening);
+                let state =
+                    engine::page_state(&query, Some(target.clone()), None, text, wc, opening);
                 match client.judge_page(state) {
                     Ok(eval) => {
                         if policy::injection_blocked(&eval.extra) {
-                            eprintln!("{}", "Jev blocked: injection risk in content (preflight); no score.".yellow());
+                            eprintln!(
+                                "{}",
+                                "Jev blocked: injection risk in content (preflight); no score."
+                                    .yellow()
+                            );
                             print_jev_spend_line();
                             return Ok(());
                         }
@@ -1119,7 +1364,14 @@ fn main() -> Result<()> {
                         // homepage must not veto its own citation score.
                         let v = policy::gate("geo", eval.geo_confidence);
                         if v == policy::Verdict::Drop {
-                            eprintln!("{}", format!("Jev unsure (confidence {:.2}), no score.", eval.geo_confidence).yellow());
+                            eprintln!(
+                                "{}",
+                                format!(
+                                    "Jev unsure (confidence {:.2}), no score.",
+                                    eval.geo_confidence
+                                )
+                                .yellow()
+                            );
                             print_jev_spend_line();
                             return Ok(());
                         }
@@ -1127,26 +1379,53 @@ fn main() -> Result<()> {
                         if json {
                             println!("{}", serde_json::to_string_pretty(&eval)?);
                         } else {
-                            println!("\n{}", "Generative Engine Optimization (GEO) Report:".cyan().bold());
+                            println!(
+                                "\n{}",
+                                "Generative Engine Optimization (GEO) Report:".cyan().bold()
+                            );
                             println!("  Target Query:    {}", query);
                             println!("  GEO Score:       {}/10{}", eval.geo_score, m);
                             if let Some((composite, cconf)) = policy::composite_geo(&eval.extra) {
-                                println!("  Composite:       {}/10 (confidence: {:.2})", composite, cconf);
+                                println!(
+                                    "  Composite:       {}/10 (confidence: {:.2})",
+                                    composite, cconf
+                                );
                             }
                             let review = policy::needs_review(&eval.extra, "geo");
                             if !review.is_empty() {
-                                println!("  Needs review:    {} [{}]", review.len().to_string().yellow(), review.join(", ").dimmed());
+                                println!(
+                                    "  Needs review:    {} [{}]",
+                                    review.len().to_string().yellow(),
+                                    review.join(", ").dimmed()
+                                );
                             }
-                            println!("  Direct Answer:   {} (p={:.2})", if eval.direct_answer { "YES".green() } else { "NO".red() }, eval.direct_answer_p);
+                            println!(
+                                "  Direct Answer:   {} (p={:.2})",
+                                if eval.direct_answer {
+                                    "YES".green()
+                                } else {
+                                    "NO".red()
+                                },
+                                eval.direct_answer_p
+                            );
                             println!("  Primary Gap:     {}", eval.content_gap.yellow());
                             print_page_extras(&eval.extra);
                             if let Ok(db) = rank::DbStore::open() {
                                 match db.record_geo(&target, &query, eval.geo_score) {
                                     Ok(Some(prev)) if prev != eval.geo_score => {
-                                        let arrow = if eval.geo_score > prev { "▲".green() } else { "▼".red() };
-                                        println!("  Since Last:      {} {} → {}", arrow, prev, eval.geo_score);
+                                        let arrow = if eval.geo_score > prev {
+                                            "▲".green()
+                                        } else {
+                                            "▼".red()
+                                        };
+                                        println!(
+                                            "  Since Last:      {} {} → {}",
+                                            arrow, prev, eval.geo_score
+                                        );
                                     }
-                                    Ok(Some(prev)) => println!("  Since Last:      {} (no change)", prev),
+                                    Ok(Some(prev)) => {
+                                        println!("  Since Last:      {} (no change)", prev)
+                                    }
                                     _ => println!("  Since Last:      first recorded check"),
                                 }
                             }
@@ -1163,11 +1442,17 @@ fn main() -> Result<()> {
                 } else {
                     println!("\n{}", "GEO Report (keyless deterministic):".cyan().bold());
                     println!("  Target Query:    {}", query);
-                    println!("  GEO Score:       {}/10 ({} / 100)", k.score_10, k.score_100);
+                    println!(
+                        "  GEO Score:       {}/10 ({} / 100)",
+                        k.score_10, k.score_100
+                    );
                     for s in &k.signals {
                         println!("  - {}", s.dimmed());
                     }
-                    println!("  {}", "Set TYPESAFE_API_KEY for Jev semantic judgment.".dimmed());
+                    println!(
+                        "  {}",
+                        "Set TYPESAFE_API_KEY for Jev semantic judgment.".dimmed()
+                    );
                 }
                 if let Ok(db) = rank::DbStore::open() {
                     let _ = db.record_geo(&target, &query, k.score_10);
@@ -1181,22 +1466,50 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{} {}", "Schema.org Structured Data Audit:".cyan().bold(), report.target);
+            println!(
+                "\n{} {}",
+                "Schema.org Structured Data Audit:".cyan().bold(),
+                report.target
+            );
             println!("  Schemas Found:       {}", report.schemas_found);
-            println!("  Detected Types:      {}", if report.types.is_empty() { "None".to_string() } else { report.types.join(", ") });
+            println!(
+                "  Detected Types:      {}",
+                if report.types.is_empty() {
+                    "None".to_string()
+                } else {
+                    report.types.join(", ")
+                }
+            );
             println!("  Completeness Score:  {}/100", report.completeness_score);
-            println!("  Validation Status:   {}", if report.is_valid { "VALID".green().bold() } else { "INVALID".red().bold() });
+            println!(
+                "  Validation Status:   {}",
+                if report.is_valid {
+                    "VALID".green().bold()
+                } else {
+                    "INVALID".red().bold()
+                }
+            );
 
             if !report.details.is_empty() {
                 println!("\n{}", "Schema Details:".bold());
                 for d in &report.details {
-                    let status = if d.is_valid { "PASS".green() } else { "FAIL".red() };
+                    let status = if d.is_valid {
+                        "PASS".green()
+                    } else {
+                        "FAIL".red()
+                    };
                     println!("  [{}] @type: {}", status, d.schema_type.bold());
                     if !d.missing_required.is_empty() {
-                        println!("      Missing required: {}", d.missing_required.join(", ").red());
+                        println!(
+                            "      Missing required: {}",
+                            d.missing_required.join(", ").red()
+                        );
                     }
                     if !d.missing_recommended.is_empty() {
-                        println!("      Missing recommended: {}", d.missing_recommended.join(", ").yellow());
+                        println!(
+                            "      Missing recommended: {}",
+                            d.missing_recommended.join(", ").yellow()
+                        );
                     }
                     if let Some(dep) = &d.deprecation_notice {
                         println!("      DEPRECATION: {}", dep.yellow());
@@ -1224,11 +1537,26 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{} {}", "robots.txt & AI Crawler Audit:".cyan().bold(), report.domain);
+            println!(
+                "\n{} {}",
+                "robots.txt & AI Crawler Audit:".cyan().bold(),
+                report.domain
+            );
             println!("  Robots URL:     {}", report.robots_url.dimmed());
             println!("  HTTP Status:    {}", report.status_code);
-            println!("  Has robots.txt: {}", if report.has_robots { "YES".green() } else { "NO".red() });
-            println!("  Citation bots:  {}/{} search crawlers unblocked", report.citation_bots_allowed, robots::CITATION_BOTS.len());
+            println!(
+                "  Has robots.txt: {}",
+                if report.has_robots {
+                    "YES".green()
+                } else {
+                    "NO".red()
+                }
+            );
+            println!(
+                "  Citation bots:  {}/{} search crawlers unblocked",
+                report.citation_bots_allowed,
+                robots::CITATION_BOTS.len()
+            );
 
             if !report.sitemaps.is_empty() {
                 println!("\n{}", "Sitemaps Discovered:".cyan().bold());
@@ -1244,11 +1572,22 @@ fn main() -> Result<()> {
                     robots::BotStatus::Disallowed => "BLOCK".red().bold(),
                     robots::BotStatus::DefaultStar => "DEFAULT(*)".yellow(),
                 };
-                println!("  [{:<10}] {:<16} ({})", badge, rule.bot_name.bold(), rule.purpose.dimmed());
+                println!(
+                    "  [{:<10}] {:<16} ({})",
+                    badge,
+                    rule.bot_name.bold(),
+                    rule.purpose.dimmed()
+                );
                 println!("               {}", rule.rule_snippet.dimmed());
             }
         }
-        Commands::Brief { topic, limit, provider, markdown, json } => {
+        Commands::Brief {
+            topic,
+            limit,
+            provider,
+            markdown,
+            json,
+        } => {
             let backend = match provider.as_str() {
                 "ddg" => serp::Provider::Ddg,
                 "tavily" => serp::Provider::Tavily,
@@ -1267,8 +1606,15 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{} \"{}\"", "Content Brief Blueprint:".cyan().bold(), brief.topic);
-            println!("  Suggested Title: {}", brief.suggested_title.green().bold());
+            println!(
+                "\n{} \"{}\"",
+                "Content Brief Blueprint:".cyan().bold(),
+                brief.topic
+            );
+            println!(
+                "  Suggested Title: {}",
+                brief.suggested_title.green().bold()
+            );
             println!("  Target Length:   {}", brief.target_word_count);
             println!("  Search Intent:   {}", brief.search_intent);
             println!("  Audience:        {}", brief.target_audience);
@@ -1288,11 +1634,23 @@ fn main() -> Result<()> {
             }
         }
         Commands::Rank { domain, query } => {
-            println!("{}", format!("Searching rank for domain: \"{}\" on query: \"{}\"...", domain, query).dimmed());
+            println!(
+                "{}",
+                format!(
+                    "Searching rank for domain: \"{}\" on query: \"{}\"...",
+                    domain, query
+                )
+                .dimmed()
+            );
             let (items, served) = serp::scrape_serp(&query, 30)?;
             let depth = serp::effective_limit(served, 30);
-            let position = items.iter().position(|i| paths::url_matches_domain(&i.url, &domain)).map(|p| p + 1);
-            let target_url = position.and_then(|p| items.get(p - 1)).map(|i| i.url.as_str());
+            let position = items
+                .iter()
+                .position(|i| paths::url_matches_domain(&i.url, &domain))
+                .map(|p| p + 1);
+            let target_url = position
+                .and_then(|p| items.get(p - 1))
+                .map(|i| i.url.as_str());
 
             let mut db = rank::DbStore::open()?;
             let (prov_name, engine_name) = match served {
@@ -1300,7 +1658,14 @@ fn main() -> Result<()> {
                 serp::Provider::Dfs => ("dfs", "dataforseo-serp"),
                 _ => ("ddg", "duckduckgo-html"),
             };
-            let delta = db.track_keyword(&domain, &query, position, target_url, prov_name, engine_name)?;
+            let delta = db.track_keyword(
+                &domain,
+                &query,
+                position,
+                target_url,
+                prov_name,
+                engine_name,
+            )?;
 
             println!("\n{}", "Rank Tracking Result:".cyan().bold());
             println!("  Domain:   {}", delta.domain);
@@ -1332,7 +1697,12 @@ fn main() -> Result<()> {
                         Some(r) => format!("#{}", r),
                         None => "miss".to_string(),
                     };
-                    println!("  Trail:    {} via {} ({})", at.dimmed(), prov.dimmed(), eng.dimmed());
+                    println!(
+                        "  Trail:    {} via {} ({})",
+                        at.dimmed(),
+                        prov.dimmed(),
+                        eng.dimmed()
+                    );
                 }
             }
         }
@@ -1343,21 +1713,46 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{} {}", "XML Sitemap & Hreflang Audit:".cyan().bold(), report.target);
-            println!("  Valid Sitemap:   {}", if report.is_valid { "YES".green().bold() } else { "NO".red().bold() });
+            println!(
+                "\n{} {}",
+                "XML Sitemap & Hreflang Audit:".cyan().bold(),
+                report.target
+            );
+            println!(
+                "  Valid Sitemap:   {}",
+                if report.is_valid {
+                    "YES".green().bold()
+                } else {
+                    "NO".red().bold()
+                }
+            );
             println!("  Total URLs:      {}", report.total_urls);
-            println!("  HTTPS URLs:      {}/{} ({:.1}%)", 
-                report.https_urls, 
+            println!(
+                "  HTTPS URLs:      {}/{} ({:.1}%)",
+                report.https_urls,
                 report.total_urls,
-                if report.total_urls > 0 { (report.https_urls as f64 / report.total_urls as f64) * 100.0 } else { 0.0 }
+                if report.total_urls > 0 {
+                    (report.https_urls as f64 / report.total_urls as f64) * 100.0
+                } else {
+                    0.0
+                }
             );
             if report.insecure_http_urls > 0 {
-                println!("  Insecure HTTP:   {}", format!("{} URLs", report.insecure_http_urls).red().bold());
+                println!(
+                    "  Insecure HTTP:   {}",
+                    format!("{} URLs", report.insecure_http_urls).red().bold()
+                );
             }
             if report.urls_with_params > 0 {
-                println!("  Query Params:    {}", format!("{} URLs with '?'", report.urls_with_params).yellow());
+                println!(
+                    "  Query Params:    {}",
+                    format!("{} URLs with '?'", report.urls_with_params).yellow()
+                );
             }
-            println!("  With <lastmod>:  {}/{}", report.urls_with_lastmod, report.total_urls);
+            println!(
+                "  With <lastmod>:  {}/{}",
+                report.urls_with_lastmod, report.total_urls
+            );
             println!("  Hreflang Tags:   {}", report.hreflang_count);
 
             if !report.sample_urls.is_empty() {
@@ -1380,7 +1775,21 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Crawl { url, sitemap, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest, no_jev, jev_budget: _, vitals } => {
+        Commands::Crawl {
+            url,
+            sitemap,
+            max_pages,
+            fetch,
+            max_credits,
+            json,
+            diff,
+            csv,
+            rescore,
+            manifest,
+            no_jev,
+            jev_budget: _,
+            vitals,
+        } => {
             if let Some(path) = rescore {
                 if csv.is_some() || diff || manifest.is_some() || vitals {
                     eprintln!("{}", "Note: --rescore rebuilds from saved pages; --csv/--diff/--manifest/--vitals are ignored.".yellow());
@@ -1403,7 +1812,11 @@ fn main() -> Result<()> {
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 } else {
-                    println!("  Rescored:      {}/100 ({})", report.score, crate::actions::grade(report.score));
+                    println!(
+                        "  Rescored:      {}/100 ({})",
+                        report.score,
+                        crate::actions::grade(report.score)
+                    );
                     manifest::print_banner(&completeness);
                 }
                 return Ok(());
@@ -1412,28 +1825,50 @@ fn main() -> Result<()> {
                 eprintln!("{}", "Error: provide a start URL or --rescore PATH.".red());
                 std::process::exit(2);
             });
-            eprintln!("{}", format!("Crawling {} (max {} pages)...", url, max_pages).dimmed());
+            eprintln!(
+                "{}",
+                format!("Crawling {} (max {} pages)...", url, max_pages).dimmed()
+            );
             let mode = match fetch.as_str() {
                 "direct" => crate::fetch::FetchMode::Direct,
                 "jina" => crate::fetch::FetchMode::Jina,
                 "firecrawl" => crate::fetch::FetchMode::Firecrawl,
                 _ => crate::fetch::FetchMode::Auto,
             };
-            let mut budget = crate::fetch::Budget { max_credits, spent: 0 };
-            let mut report = crawl::crawl_site_with_sitemap(&url, max_pages, mode, &mut budget, sitemap.as_deref())?;
+            let mut budget = crate::fetch::Budget {
+                max_credits,
+                spent: 0,
+            };
+            let mut report = crawl::crawl_site_with_sitemap(
+                &url,
+                max_pages,
+                mode,
+                &mut budget,
+                sitemap.as_deref(),
+            )?;
             if !report.seeded_from_sitemap && report.pages_crawled <= 1 {
                 eprintln!("{} no sitemap seed — crawl has only the start URL (try --sitemap <url> or fix robots.txt Sitemap: / sitemap_index)", "warn".yellow());
             }
             if vitals {
-                eprintln!("{}", "Fetching PageSpeed vitals for start URL (free, keyless)...".dimmed());
+                eprintln!(
+                    "{}",
+                    "Fetching PageSpeed vitals for start URL (free, keyless)...".dimmed()
+                );
                 let v = crate::vitals::fetch_home_vitals(&report.start_url);
                 if v.is_none() {
-                    eprintln!("{}", "Note: PageSpeed unreachable or rate-limited; vitals skipped.".yellow());
+                    eprintln!(
+                        "{}",
+                        "Note: PageSpeed unreachable or rate-limited; vitals skipped.".yellow()
+                    );
                 }
                 crate::crawl::apply_vitals(&mut report, v);
             }
             // Max Jev: one site+GEO fan-out on the homepage before any ledger snapshot.
-            let site_jev = if no_jev { None } else { judge_crawl_site(&report.start_url) };
+            let site_jev = if no_jev {
+                None
+            } else {
+                judge_crawl_site(&report.start_url)
+            };
             let mut completeness_pre = manifest::completeness_crawl(&report, max_pages);
             if site_jev.is_some() {
                 completeness_pre
@@ -1464,7 +1899,10 @@ fn main() -> Result<()> {
                 }
                 .build();
                 if !run_manifest.validation.ok {
-                    anyhow::bail!("run manifest citation gate failed: {:?}", run_manifest.validation);
+                    anyhow::bail!(
+                        "run manifest citation gate failed: {:?}",
+                        run_manifest.validation
+                    );
                 }
                 let dirs = match &manifest {
                     Some(dir) => vec![std::path::PathBuf::from(dir)],
@@ -1484,15 +1922,29 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
-            println!("\n{} {}", "Live Site Crawl:".cyan().bold(), report.start_url);
+            println!(
+                "\n{} {}",
+                "Live Site Crawl:".cyan().bold(),
+                report.start_url
+            );
             println!("  Pages crawled: {}", report.pages_crawled);
-            println!("  Health:        {}/100 ({})", report.score, crate::actions::grade(report.score).green().bold());
+            println!(
+                "  Health:        {}/100 ({})",
+                report.score,
+                crate::actions::grade(report.score).green().bold()
+            );
             let upgraded = report.pages.iter().filter(|p| p.upgraded).count();
             if upgraded > 0 {
-                println!("  Upgraded:      {} pages via alt backends", upgraded.to_string().yellow());
+                println!(
+                    "  Upgraded:      {} pages via alt backends",
+                    upgraded.to_string().yellow()
+                );
             }
             if budget.spent > 0 {
-                println!("  Paid spend:    {} fetch credits", budget.spent.to_string().yellow());
+                println!(
+                    "  Paid spend:    {} fetch credits",
+                    budget.spent.to_string().yellow()
+                );
             }
             println!(
                 "  Areas:         {}",
@@ -1506,26 +1958,44 @@ fn main() -> Result<()> {
             );
             match &report.vitals {
                 Some(v) => {
-                    let lcp = v.lcp_ms.map(|x| format!("{}ms", x)).unwrap_or_else(|| "-".into());
-                    let cls = v.cls_milli.map(crate::vitals::cls_display).unwrap_or_else(|| "-".into());
+                    let lcp = v
+                        .lcp_ms
+                        .map(|x| format!("{}ms", x))
+                        .unwrap_or_else(|| "-".into());
+                    let cls = v
+                        .cls_milli
+                        .map(crate::vitals::cls_display)
+                        .unwrap_or_else(|| "-".into());
                     let inp = match v.inp_ms {
                         Some(x) if x > crate::vitals::INP_MS => format!("{}ms over", x),
                         Some(x) => format!("{}ms", x),
                         None => "-".into(),
                     };
                     let lab = if v.field { "field+lab" } else { "lab only" };
-                    println!("  Vitals:        LCP {}  CLS {}  INP {}  ({})", lcp, cls, inp, lab.dimmed());
+                    println!(
+                        "  Vitals:        LCP {}  CLS {}  INP {}  ({})",
+                        lcp,
+                        cls,
+                        inp,
+                        lab.dimmed()
+                    );
                 }
                 None => {
                     if vitals {
-                        println!("  Vitals:        {}", "unavailable (PageSpeed skipped)".yellow());
+                        println!(
+                            "  Vitals:        {}",
+                            "unavailable (PageSpeed skipped)".yellow()
+                        );
                     }
                 }
             }
             if report.broken.is_empty() {
                 println!("  Broken links:  {}", "0 (Clean)".green());
             } else {
-                println!("  Broken links:  {}", report.broken.len().to_string().red().bold());
+                println!(
+                    "  Broken links:  {}",
+                    report.broken.len().to_string().red().bold()
+                );
                 for p in report.broken.iter().take(5) {
                     println!("    ✖ [{}] {}", p.status, p.url.dimmed());
                 }
@@ -1541,7 +2011,10 @@ fn main() -> Result<()> {
             if slow.is_empty() {
                 println!("  Slow pages:    {}", "0".green());
             } else {
-                println!("  Slow pages:    {}", format!("{} over {}ms", slow.len(), crawl::SLOW_PAGE_MS).yellow());
+                println!(
+                    "  Slow pages:    {}",
+                    format!("{} over {}ms", slow.len(), crawl::SLOW_PAGE_MS).yellow()
+                );
                 for p in slow.iter().take(5) {
                     println!("      {}ms {}", p.elapsed_ms, p.url.dimmed());
                 }
@@ -1549,7 +2022,10 @@ fn main() -> Result<()> {
             if report.redirects.is_empty() {
                 println!("  Redirects:     {}", "0".green());
             } else {
-                println!("  Redirects:     {}", report.redirects.len().to_string().yellow());
+                println!(
+                    "  Redirects:     {}",
+                    report.redirects.len().to_string().yellow()
+                );
                 for (from, to) in report.redirects.iter().take(3) {
                     println!("      {} -> {}", from.dimmed(), to.dimmed());
                 }
@@ -1557,13 +2033,19 @@ fn main() -> Result<()> {
             if report.orphans.is_empty() {
                 println!("  Orphans:       {}", "0".green());
             } else {
-                println!("  Orphans:       {}", report.orphans.len().to_string().yellow());
+                println!(
+                    "  Orphans:       {}",
+                    report.orphans.len().to_string().yellow()
+                );
                 for f in report.orphans.iter().take(5) {
                     println!("      {}", f.yellow());
                 }
             }
             if !report.errors.is_empty() {
-                println!("  Fetch errors:  {}", report.errors.len().to_string().yellow());
+                println!(
+                    "  Fetch errors:  {}",
+                    report.errors.len().to_string().yellow()
+                );
                 for e in report.errors.iter().take(3) {
                     println!("      {}", e.dimmed());
                 }
@@ -1582,7 +2064,10 @@ fn main() -> Result<()> {
                     Some((prev_pages, prev_broken)) => {
                         println!(
                             "  Since last:    {} pages (was {}), {} broken (was {})",
-                            report.pages_crawled, prev_pages, report.broken.len(), prev_broken
+                            report.pages_crawled,
+                            prev_pages,
+                            report.broken.len(),
+                            prev_broken
                         );
                     }
                     None => println!("  Since last:    first recorded snapshot"),
@@ -1630,7 +2115,10 @@ fn main() -> Result<()> {
             let backends = paid_backend_sources(&report.pages);
             ledger.with_fetch(budget.spent, budget.max_credits, backends);
             if budget.spent > 0 {
-                ledger.note(format!("{} paid fetch credits spent (cap {})", budget.spent, budget.max_credits));
+                ledger.note(format!(
+                    "{} paid fetch credits spent (cap {})",
+                    budget.spent, budget.max_credits
+                ));
             }
             let run_manifest = manifest::ManifestInput {
                 command: "crawl",
@@ -1648,7 +2136,10 @@ fn main() -> Result<()> {
             }
             .build();
             if !run_manifest.validation.ok {
-                anyhow::bail!("run manifest citation gate failed: {:?}", run_manifest.validation);
+                anyhow::bail!(
+                    "run manifest citation gate failed: {:?}",
+                    run_manifest.validation
+                );
             }
             let mut export_dirs = manifest::auto_dirs(&[csv.as_deref()]);
             if let Some(dir) = &manifest {
@@ -1658,14 +2149,27 @@ fn main() -> Result<()> {
             let mut wrote_manifest = false;
             for d in &export_dirs {
                 let (run_p, led_p) = manifest::write_pair(d, &run_manifest)?;
-                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
-                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
+                println!(
+                    "Run manifest written to {}",
+                    run_p.display().to_string().dimmed()
+                );
+                println!(
+                    "Spend ledger written to {}",
+                    led_p.display().to_string().dimmed()
+                );
                 wrote_manifest = true;
             }
             if !wrote_manifest && (force || !json) {
-                let (run_p, led_p) = manifest::write_pair(std::path::Path::new("."), &run_manifest)?;
-                println!("Run manifest written to {}", run_p.display().to_string().dimmed());
-                println!("Spend ledger written to {}", led_p.display().to_string().dimmed());
+                let (run_p, led_p) =
+                    manifest::write_pair(std::path::Path::new("."), &run_manifest)?;
+                println!(
+                    "Run manifest written to {}",
+                    run_p.display().to_string().dimmed()
+                );
+                println!(
+                    "Spend ledger written to {}",
+                    led_p.display().to_string().dimmed()
+                );
             }
         }
         Commands::Llms { domain, json } => {
@@ -1683,12 +2187,29 @@ fn main() -> Result<()> {
             }
 
             println!("\n{} {}", "Agent Readiness:".cyan().bold(), report.domain);
-            println!("  llms.txt:      {}", if report.info.present { "YES".green() } else { "NO".red() });
+            println!(
+                "  llms.txt:      {}",
+                if report.info.present {
+                    "YES".green()
+                } else {
+                    "NO".red()
+                }
+            );
             if report.info.present {
                 println!("  Sections:      {}", report.info.sections.len());
             }
-            println!("  AI explicit:   {}", if report.ai_allowed.is_empty() { "none".yellow().to_string() } else { report.ai_allowed.join(", ").green().to_string() });
-            println!("  AI default:    {} bots inherit allow (*)", report.ai_default.len());
+            println!(
+                "  AI explicit:   {}",
+                if report.ai_allowed.is_empty() {
+                    "none".yellow().to_string()
+                } else {
+                    report.ai_allowed.join(", ").green().to_string()
+                }
+            );
+            println!(
+                "  AI default:    {} bots inherit allow (*)",
+                report.ai_default.len()
+            );
             if !report.ai_blocked.is_empty() {
                 println!("  AI blocked:    {}", report.ai_blocked.join(", ").red());
             }
@@ -1703,12 +2224,18 @@ fn main() -> Result<()> {
             println!("  {}", "Scores plumbing for ChatGPT, Perplexity, and Claude. Google Search ignores llms.txt.".dimmed());
             println!("\n{}", "Checks:".bold());
             for c in &report.checks {
-                let badge = if c.passed { "PASS".green().bold() } else { "WARN".yellow().bold() };
+                let badge = if c.passed {
+                    "PASS".green().bold()
+                } else {
+                    "WARN".yellow().bold()
+                };
                 println!("  [{}] {:<22} - {}", badge, c.name, c.message);
             }
         }
         Commands::Doctor { json } => {
-            let key_set = std::env::var("TYPESAFE_API_KEY").map(|k| !k.trim().is_empty()).unwrap_or(false);
+            let key_set = std::env::var("TYPESAFE_API_KEY")
+                .map(|k| !k.trim().is_empty())
+                .unwrap_or(false);
             let db_ok = rank::DbStore::open().is_ok();
             let report = serde_json::json!({
                 "version": env!("CARGO_PKG_VERSION"),
@@ -1725,13 +2252,25 @@ fn main() -> Result<()> {
             println!("  Platform:      {}", std::env::consts::OS);
             println!(
                 "  Jev API key:   {}",
-                if key_set { "set (value hidden)".green().to_string() } else { "missing, Jev scores will skip".yellow().to_string() }
+                if key_set {
+                    "set (value hidden)".green().to_string()
+                } else {
+                    "missing, Jev scores will skip".yellow().to_string()
+                }
             );
-            println!("  Database:      {}", if db_ok { "writable".green().to_string() } else { "ERROR".red().to_string() });
+            println!(
+                "  Database:      {}",
+                if db_ok {
+                    "writable".green().to_string()
+                } else {
+                    "ERROR".red().to_string()
+                }
+            );
         }
         Commands::Explain { id, json } => {
-            let text = rules::explain(&id)
-                .ok_or_else(|| anyhow::anyhow!("unknown rule id: {id} (try R01..R57 or RULE-R01..RULE-R57)"))?;
+            let text = rules::explain(&id).ok_or_else(|| {
+                anyhow::anyhow!("unknown rule id: {id} (try R01..R57 or RULE-R01..RULE-R57)")
+            })?;
             if json {
                 let bare = id.strip_prefix("RULE-").unwrap_or(&id).to_string();
                 let r = rules::rule(&bare).expect("explain found it");
@@ -1754,7 +2293,12 @@ fn main() -> Result<()> {
             }
             println!("{}", text.cyan());
         }
-        Commands::Report { path, baseline, actions_csv, json } => {
+        Commands::Report {
+            path,
+            baseline,
+            actions_csv,
+            json,
+        } => {
             let cur_src = crate::paths::read_user_file(&path, &["json"])?;
             let base_src = crate::paths::read_user_file(&baseline, &["json"])?;
             let cur: audit::DirectoryAuditReport = serde_json::from_str(&cur_src)?;
@@ -1765,10 +2309,13 @@ fn main() -> Result<()> {
                 write_actions_csv(out, &cur.findings, &actions)?;
             }
             if json {
-                println!("{}", serde_json::to_string_pretty(&json!({
-                    "diff": diff,
-                    "actions": actions,
-                }))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json!({
+                        "diff": diff,
+                        "actions": actions,
+                    }))?
+                );
                 return Ok(());
             }
             let delta = diff["delta"].as_i64().unwrap_or(0);
@@ -1776,9 +2323,7 @@ fn main() -> Result<()> {
             println!("\n{}", "Report diff (baseline → current):".cyan().bold());
             println!(
                 "  Score:  {} → {} ({sign}{delta}) grade {}",
-                diff["baseline_score"],
-                diff["current_score"],
-                diff["grade"]
+                diff["baseline_score"], diff["current_score"], diff["grade"]
             );
             println!(
                 "  Findings: {} → {}",
@@ -1805,7 +2350,11 @@ fn main() -> Result<()> {
                         a.id.bold(),
                         a.title,
                         a.impact,
-                        if a.quick_win { "  quick-win".green().to_string() } else { String::new() }
+                        if a.quick_win {
+                            "  quick-win".green().to_string()
+                        } else {
+                            String::new()
+                        }
                     );
                 }
             }
@@ -1824,7 +2373,12 @@ fn main() -> Result<()> {
             std::fs::write(&out, body)?;
             println!("Bundle written to {}", out.dimmed());
         }
-        Commands::Drift { op, report, label, json } => {
+        Commands::Drift {
+            op,
+            report,
+            label,
+            json,
+        } => {
             let label = label.unwrap_or_else(|| "latest".into());
             let db = rank::DbStore::open()?;
             match op.as_str() {
@@ -1837,11 +2391,19 @@ fn main() -> Result<()> {
                     let parsed: audit::DirectoryAuditReport = serde_json::from_str(&src)?;
                     db.save_baseline(&label, &src)?;
                     if json {
-                        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                            "saved": label, "files": parsed.total_files, "score": parsed.pass_rate,
-                        }))?);
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "saved": label, "files": parsed.total_files, "score": parsed.pass_rate,
+                            }))?
+                        );
                     } else {
-                        println!("Baseline '{}' saved: {} files, pass {:.1}%", label.dimmed(), parsed.total_files, parsed.pass_rate);
+                        println!(
+                            "Baseline '{}' saved: {} files, pass {:.1}%",
+                            label.dimmed(),
+                            parsed.total_files,
+                            parsed.pass_rate
+                        );
                     }
                 }
                 "compare" => {
@@ -1850,7 +2412,10 @@ fn main() -> Result<()> {
                         std::process::exit(2);
                     });
                     let base_src = db.load_baseline(&label)?.unwrap_or_else(|| {
-                        eprintln!("{}", format!("Error: no baseline '{}' stored.", label).red());
+                        eprintln!(
+                            "{}",
+                            format!("Error: no baseline '{}' stored.", label).red()
+                        );
                         std::process::exit(2);
                     });
                     let cur_src = crate::paths::read_user_file(&path, &["json"])?;
@@ -1859,10 +2424,13 @@ fn main() -> Result<()> {
                     let diff = diff_audit_reports(&cur, &base);
                     let actions = crate::rules::actions_for(&cur.findings);
                     if json {
-                        println!("{}", serde_json::to_string_pretty(&serde_json::json!({
-                            "diff": diff, "actions": actions,
-                            "pairs": crate::audit::cannibalization_pairs(&cur),
-                        }))?);
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "diff": diff, "actions": actions,
+                                "pairs": crate::audit::cannibalization_pairs(&cur),
+                            }))?
+                        );
                         return Ok(());
                     }
                     let delta = diff["delta"].as_i64().unwrap_or(0);
@@ -1893,83 +2461,105 @@ fn main() -> Result<()> {
                     }
                 }
                 other => {
-                    eprintln!("{}", format!("Error: unknown drift action '{}', use baseline, compare, or history.", other).red());
+                    eprintln!(
+                        "{}",
+                        format!(
+                            "Error: unknown drift action '{}', use baseline, compare, or history.",
+                            other
+                        )
+                        .red()
+                    );
                     std::process::exit(2);
                 }
             }
         }
-        Commands::Gsc { op, site, code, limit, json } => {
-            match op.as_str() {
-                "auth" => {
-                    if let Some(device) = code {
-                        gsc::auth_poll(&device)?;
-                    } else {
-                        gsc::auth_start()?;
-                    }
-                }
-                "sites" => {
-                    let sites = gsc::sites()?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&sites)?);
-                    } else {
-                        println!("\n{}", "Verified sites:".cyan().bold());
-                        for s in &sites {
-                            println!("  - {}", s);
-                        }
-                    }
-                }
-                "query" => {
-                    let site = site.unwrap_or_else(|| {
-                        eprintln!("{}", "Error: query needs --site <verified URL>.".red());
-                        std::process::exit(2);
-                    });
-                    let rows = gsc::top_queries(&site, limit)?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&rows)?);
-                    } else {
-                        println!("\n{} {}", "Top queries:".cyan().bold(), site.dimmed());
-                        for r in &rows {
-                            println!(
-                                "  {:<40} clicks {:>6.0} pos {:>5.1}",
-                                r.query.chars().take(40).collect::<String>(),
-                                r.clicks,
-                                r.position
-                            );
-                        }
-                    }
-                }
-                "gap" => {
-                    let site = site.unwrap_or_else(|| {
-                        eprintln!("{}", "Error: gap needs --site <verified URL>.".red());
-                        std::process::exit(2);
-                    });
-                    let rows = gsc::gap(&site, limit)?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&rows)?);
-                    } else {
-                        println!("\n{} {}", "Gap queue (impressions x weak position):".cyan().bold(), site.dimmed());
-                        for r in &rows {
-                            let cited = match r.cited_before {
-                                Some(true) => "cited".green().to_string(),
-                                Some(false) => "missed".yellow().to_string(),
-                                None => "unchecked".dimmed().to_string(),
-                            };
-                            println!(
-                                "  {:<40} imp {:>7.0} pos {:>5.1} {}",
-                                r.query.chars().take(40).collect::<String>(),
-                                r.impressions,
-                                r.position,
-                                cited
-                            );
-                        }
-                    }
-                }
-                other => {
-                    eprintln!("{}", format!("Error: unknown gsc action '{}', use auth, sites, gap, or query.", other).red());
-                    std::process::exit(2);
+        Commands::Gsc {
+            op,
+            site,
+            code,
+            limit,
+            json,
+        } => match op.as_str() {
+            "auth" => {
+                if let Some(device) = code {
+                    gsc::auth_poll(&device)?;
+                } else {
+                    gsc::auth_start()?;
                 }
             }
-        }
+            "sites" => {
+                let sites = gsc::sites()?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&sites)?);
+                } else {
+                    println!("\n{}", "Verified sites:".cyan().bold());
+                    for s in &sites {
+                        println!("  - {}", s);
+                    }
+                }
+            }
+            "query" => {
+                let site = site.unwrap_or_else(|| {
+                    eprintln!("{}", "Error: query needs --site <verified URL>.".red());
+                    std::process::exit(2);
+                });
+                let rows = gsc::top_queries(&site, limit)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&rows)?);
+                } else {
+                    println!("\n{} {}", "Top queries:".cyan().bold(), site.dimmed());
+                    for r in &rows {
+                        println!(
+                            "  {:<40} clicks {:>6.0} pos {:>5.1}",
+                            r.query.chars().take(40).collect::<String>(),
+                            r.clicks,
+                            r.position
+                        );
+                    }
+                }
+            }
+            "gap" => {
+                let site = site.unwrap_or_else(|| {
+                    eprintln!("{}", "Error: gap needs --site <verified URL>.".red());
+                    std::process::exit(2);
+                });
+                let rows = gsc::gap(&site, limit)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&rows)?);
+                } else {
+                    println!(
+                        "\n{} {}",
+                        "Gap queue (impressions x weak position):".cyan().bold(),
+                        site.dimmed()
+                    );
+                    for r in &rows {
+                        let cited = match r.cited_before {
+                            Some(true) => "cited".green().to_string(),
+                            Some(false) => "missed".yellow().to_string(),
+                            None => "unchecked".dimmed().to_string(),
+                        };
+                        println!(
+                            "  {:<40} imp {:>7.0} pos {:>5.1} {}",
+                            r.query.chars().take(40).collect::<String>(),
+                            r.impressions,
+                            r.position,
+                            cited
+                        );
+                    }
+                }
+            }
+            other => {
+                eprintln!(
+                    "{}",
+                    format!(
+                        "Error: unknown gsc action '{}', use auth, sites, gap, or query.",
+                        other
+                    )
+                    .red()
+                );
+                std::process::exit(2);
+            }
+        },
         Commands::Mcp => {
             mcp::run_stdio_server()?;
         }
@@ -1977,47 +2567,151 @@ fn main() -> Result<()> {
             plugin_bridge::run_plugin_bridge(&addr)?;
         }
         Commands::Capabilities { json: _ } => {
-            println!("{}", serde_json::to_string_pretty(&capabilities::as_json())?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&capabilities::as_json())?
+            );
         }
         Commands::FixPlan { audit, limit, json } => {
-            let mut src = std::fs::read_to_string(audit.trim()).or_else(|_| crate::paths::read_user_file(&audit, &["json"]))?;
-            if let Some(s) = src.find('{') { if let Some(e) = src.rfind('}') { src = src[s..=e].to_string(); } else { src = src[s..].to_string(); } }
-            if src.trim().is_empty() { anyhow::bail!("empty audit JSON: {}", audit); }
-            let rep: crate::audit::DirectoryAuditReport = serde_json::from_str(&src).map_err(|e| anyhow::anyhow!("parse audit JSON: {e}"))?;
+            let mut src = std::fs::read_to_string(audit.trim())
+                .or_else(|_| crate::paths::read_user_file(&audit, &["json"]))?;
+            if let Some(s) = src.find('{') {
+                if let Some(e) = src.rfind('}') {
+                    src = src[s..=e].to_string();
+                } else {
+                    src = src[s..].to_string();
+                }
+            }
+            if src.trim().is_empty() {
+                anyhow::bail!("empty audit JSON: {}", audit);
+            }
+            let rep: crate::audit::DirectoryAuditReport =
+                serde_json::from_str(&src).map_err(|e| anyhow::anyhow!("parse audit JSON: {e}"))?;
             if rep.findings.is_empty() && rep.reports.is_empty() {
                 anyhow::bail!("audit JSON has no findings/reports; re-run `jev-seo audit --json`");
             }
             let mut items = fix_plan::from_findings(&rep.findings);
-            if limit > 0 && items.len() > limit { items.truncate(limit); }
+            if limit > 0 && items.len() > limit {
+                items.truncate(limit);
+            }
             if json {
                 println!("{}", serde_json::to_string_pretty(&items)?);
             } else {
-                println!("{} {} findings -> {} fixes", "Fix plan".cyan().bold(), rep.findings.len(), items.len());
+                println!(
+                    "{} {} findings -> {} fixes",
+                    "Fix plan".cyan().bold(),
+                    rep.findings.len(),
+                    items.len()
+                );
                 for it in &items {
-                    let k = if it.kind == "heuristic" { "heuristic".yellow().to_string() } else { "fact".green().to_string() };
-                    println!("  [{} {:.2}] {} -> {} ({}) {}", it.rule.bold(), it.confidence, it.target.dimmed(), it.patch.field, k, it.patch.hint.dimmed());
+                    let k = if it.kind == "heuristic" {
+                        "heuristic".yellow().to_string()
+                    } else {
+                        "fact".green().to_string()
+                    };
+                    println!(
+                        "  [{} {:.2}] {} -> {} ({}) {}",
+                        it.rule.bold(),
+                        it.confidence,
+                        it.target.dimmed(),
+                        it.patch.field,
+                        k,
+                        it.patch.hint.dimmed()
+                    );
                     println!("       verify: {}", it.verification.dimmed());
                 }
             }
         }
-        Commands::Watch { target, repo, site, once, every, label, json, no_jev } => {
+        Commands::Watch {
+            target,
+            repo,
+            site,
+            once,
+            every,
+            label,
+            json,
+            diff_only,
+            no_jev,
+        } => {
             let t = repo.or(site).or(target).unwrap_or_else(|| {
-                eprintln!("{}", "Error: watch needs a target: jev-seo watch <path-or-url> or --repo/--site".red());
+                eprintln!(
+                    "{}",
+                    "Error: watch needs a target: jev-seo watch <path-or-url> or --repo/--site"
+                        .red()
+                );
                 std::process::exit(2);
             });
             let is_site = t.starts_with("http://") || t.starts_with("https://");
             let run_once = || -> anyhow::Result<watch::WatchResult> {
-                if is_site { watch::watch_site_once(&t, label.as_deref(), no_jev) } else { watch::watch_repo_once(&t, label.as_deref(), no_jev) }
+                if is_site {
+                    watch::watch_site_once(&t, label.as_deref(), no_jev)
+                } else {
+                    watch::watch_repo_once(&t, label.as_deref(), no_jev)
+                }
+            };
+            let is_interesting = |r: &watch::WatchResult| {
+                r.status != "clean" || r.delta != 0 || r.blocking_now != r.blocking_before
             };
             if once {
                 let r = run_once()?;
-                if json { println!("{}", serde_json::to_string_pretty(&r)?); } else {
+                if diff_only && !is_interesting(&r) {
+                    return Ok(());
+                }
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&r)?);
+                } else {
                     let sign = if r.delta > 0 { "+" } else { "" };
-                    let status_c = match r.status.as_str() { "regressed" => r.status.red().bold().to_string(), "improved" => r.status.green().bold().to_string(), _ => r.status.dimmed().to_string() };
-                    println!("{} {} -> {} ({}{}) {}", "Watch".cyan().bold(), r.target.dimmed(), format!("{}/100", r.score_now).bold(), sign, r.delta, status_c);
-                    println!("  {} blocking {}->{} warnings {}->{} findings {}->{}", "Gate:".bold(), r.blocking_before, r.blocking_now, r.warnings_before, r.warnings_now, r.findings_before, r.findings_now);
-                    if !r.drift.is_empty() { println!("  Drift: {} alerts", r.drift.len()); for d in &r.drift { println!("    - {} {} `{}` {}->{}", d.kind.yellow(), d.target.dimmed(), d.term, d.from, d.to); } }
-                    if !r.top_actions.is_empty() { println!("  Actions:"); for a in &r.top_actions { println!("    [P{}] {} {}", a.priority, a.id, a.title.dimmed()); } }
+                    let status_c = match r.status.as_str() {
+                        "regressed" => r.status.red().bold().to_string(),
+                        "improved" => r.status.green().bold().to_string(),
+                        _ => r.status.dimmed().to_string(),
+                    };
+                    println!(
+                        "{} {} -> {} ({}{}) {}",
+                        "Watch".cyan().bold(),
+                        r.target.dimmed(),
+                        format!("{}/100", r.score_now).bold(),
+                        sign,
+                        r.delta,
+                        status_c
+                    );
+                    println!(
+                        "  {} blocking {}->{} warnings {}->{} findings {}->{}",
+                        "Gate:".bold(),
+                        r.blocking_before,
+                        r.blocking_now,
+                        r.warnings_before,
+                        r.warnings_now,
+                        r.findings_before,
+                        r.findings_now
+                    );
+                    if !r.drift.is_empty() {
+                        println!("  Drift: {} alerts", r.drift.len());
+                        for d in &r.drift {
+                            println!(
+                                "    - {} {} `{}` {}->{}",
+                                d.kind.yellow(),
+                                d.target.dimmed(),
+                                d.term,
+                                d.from,
+                                d.to
+                            );
+                        }
+                    }
+                    if !r.top_actions.is_empty() {
+                        println!("  Actions:");
+                        for a in &r.top_actions {
+                            println!("    [P{}] {} {}", a.priority, a.id, a.title.dimmed());
+                        }
+                    }
+                    if let Ok(db) = crate::rank::DbStore::open() {
+                        if let Ok(vals) = db.geo_trend(&r.target, 12) {
+                            let svg = crate::audit::sparkline_svg(&vals, 120);
+                            if !svg.is_empty() {
+                                println!("  Trend: {}", svg);
+                            }
+                        }
+                    }
                 }
                 return Ok(());
             }
@@ -2025,9 +2719,23 @@ fn main() -> Result<()> {
             let secs = every.max(1) * 60;
             loop {
                 let r = run_once()?;
-                if json { println!("{}", serde_json::to_string(&r)?); } else {
+                if diff_only && !is_interesting(&r) {
+                    std::thread::sleep(std::time::Duration::from_secs(secs));
+                    continue;
+                }
+                if json {
+                    println!("{}", serde_json::to_string(&r)?);
+                } else {
                     let sign = if r.delta > 0 { "+" } else { "" };
-                    println!("[{}] {} {}/100 ({}{}) {}", r.at.dimmed(), r.target, r.score_now, sign, r.delta, r.status);
+                    println!(
+                        "[{}] {} {}/100 ({}{}) {}",
+                        r.at.dimmed(),
+                        r.target,
+                        r.score_now,
+                        sign,
+                        r.delta,
+                        r.status
+                    );
                 }
                 std::thread::sleep(std::time::Duration::from_secs(secs));
             }
@@ -2047,14 +2755,24 @@ fn gated_eval_with(
         Ok(eval) => {
             let v = policy::gate(command, eval.confidence());
             if v == policy::Verdict::Drop {
-                eprintln!("{}", format!("Note: Jev unsure (confidence {:.2}), showing local-only output.", eval.confidence()).yellow());
+                eprintln!(
+                    "{}",
+                    format!(
+                        "Note: Jev unsure (confidence {:.2}), showing local-only output.",
+                        eval.confidence()
+                    )
+                    .yellow()
+                );
                 print_jev_spend_line();
                 return None;
             }
             Some((eval, v))
         }
         Err(e) => {
-            eprintln!("{}", format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow());
+            eprintln!(
+                "{}",
+                format!("Warning: Jev scoring failed ({e:#}), showing local-only output.").yellow()
+            );
             None
         }
     }
@@ -2081,7 +2799,10 @@ fn judge_pairs(pairs: &[audit::CannibalizationPair], skip: bool) -> Vec<Option<(
     let client = match engine::JevClient::new() {
         Some(c) => c,
         None => {
-            eprintln!("{}", "Note: pair judging needs TYPESAFE_API_KEY; word-count winners stand.".yellow());
+            eprintln!(
+                "{}",
+                "Note: pair judging needs TYPESAFE_API_KEY; word-count winners stand.".yellow()
+            );
             return vec![None; n];
         }
     };
@@ -2095,7 +2816,10 @@ fn judge_pairs(pairs: &[audit::CannibalizationPair], skip: bool) -> Vec<Option<(
     let eval = match client.fanout_eval_with(state, policy::pair_questions(n)) {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("{}", format!("Warning: pair judge failed ({e:#}).").yellow());
+            eprintln!(
+                "{}",
+                format!("Warning: pair judge failed ({e:#}).").yellow()
+            );
             return vec![None; n];
         }
     };
@@ -2136,7 +2860,10 @@ fn excerpt_local(path: &str) -> String {
             }
         }
         let after: String = body.lines().skip(start).collect::<Vec<_>>().join("\n");
-        crate::audit::md_plain_text(&after).chars().take(6000).collect()
+        crate::audit::md_plain_text(&after)
+            .chars()
+            .take(6000)
+            .collect()
     } else {
         cleaned.chars().take(6000).collect()
     }
@@ -2188,7 +2915,10 @@ fn judge_audit_sample(
             None,
         );
         if let Some(obj) = state.as_object_mut() {
-            obj.insert("checks".into(), serde_json::to_value(&report.checks).unwrap_or_default());
+            obj.insert(
+                "checks".into(),
+                serde_json::to_value(&report.checks).unwrap_or_default(),
+            );
             if let Some(q) = target_query {
                 obj.insert("query".into(), serde_json::Value::String(q.to_string()));
             }
@@ -2212,12 +2942,20 @@ fn judge_audit_sample(
                 } else {
                     eprintln!(
                         "{}",
-                        format!("Note: Jev unsure on {} (confidence {:.2}), local checks stand.", report.file_path, eval.confidence()).yellow()
+                        format!(
+                            "Note: Jev unsure on {} (confidence {:.2}), local checks stand.",
+                            report.file_path,
+                            eval.confidence()
+                        )
+                        .yellow()
                     );
                 }
             }
             Err(e) => {
-                eprintln!("{}", format!("Jev page judge failed for {}: {e:#}", report.file_path).yellow());
+                eprintln!(
+                    "{}",
+                    format!("Jev page judge failed for {}: {e:#}", report.file_path).yellow()
+                );
             }
         }
     }
@@ -2228,7 +2966,12 @@ fn print_jev_page_suite(pages: &[(String, engine::AnalysisResult, policy::Verdic
     if pages.is_empty() {
         return;
     }
-    println!("\n{}", format!("Jev page suite ({} pages, full fan-out):", pages.len()).cyan().bold());
+    println!(
+        "\n{}",
+        format!("Jev page suite ({} pages, full fan-out):", pages.len())
+            .cyan()
+            .bold()
+    );
     for (path, eval, v) in pages {
         let name = std::path::Path::new(path)
             .file_name()
@@ -2274,7 +3017,21 @@ fn paid_backend_sources(pages: &[crawl::PageRecord]) -> Vec<String> {
 fn print_top_actions(actions: &[crate::actions::Action]) {
     println!("\n{}", "Top Actions:".cyan().bold());
     for a in crate::actions::top(actions, 5) {
-        println!("  [P{}|e{}|i{:>3}] {} {} {} {} - {}", a.priority, a.effort, a.impact, if a.quick_win { "QUICK".green().bold().to_string() } else { String::new() }, action_tags(a), a.id.bold(), a.title, a.evidence.dimmed());
+        println!(
+            "  [P{}|e{}|i{:>3}] {} {} {} {} - {}",
+            a.priority,
+            a.effort,
+            a.impact,
+            if a.quick_win {
+                "QUICK".green().bold().to_string()
+            } else {
+                String::new()
+            },
+            action_tags(a),
+            a.id.bold(),
+            a.title,
+            a.evidence.dimmed()
+        );
     }
 }
 
@@ -2295,7 +3052,10 @@ fn action_tags(action: &crate::actions::Action) -> String {
     format!("{} {}", gate, rules::truth_kind(r.id))
 }
 
-fn runner_up_suffix(extra: &serde_json::Map<String, serde_json::Value>, v: policy::Verdict) -> String {
+fn runner_up_suffix(
+    extra: &serde_json::Map<String, serde_json::Value>,
+    v: policy::Verdict,
+) -> String {
     if v == policy::Verdict::Flag {
         if let Some(r) = policy::intent_runner_up(extra) {
             return format!(" ← runner-up {r}");
@@ -2304,7 +3064,8 @@ fn runner_up_suffix(extra: &serde_json::Map<String, serde_json::Value>, v: polic
     String::new()
 }
 
-fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {    let keys = [
+fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {
+    let keys = [
         "page_helpfulness",
         "page_trust",
         "page_specificity",
@@ -2328,7 +3089,11 @@ fn print_page_extras(extra: &serde_json::Map<String, serde_json::Value>) {    le
                 let c = a.get("confidence").and_then(|x| x.as_f64()).unwrap_or(0.0);
                 let norm = normalize_score(a).unwrap_or(s);
                 parts.push(format!("{k}={norm:.2}({c:.2})"));
-            } else if let Some(n) = a.get("noul").or_else(|| a.get("probability")).and_then(|x| x.as_f64()) {
+            } else if let Some(n) = a
+                .get("noul")
+                .or_else(|| a.get("probability"))
+                .and_then(|x| x.as_f64())
+            {
                 parts.push(format!("{k}=P{n:.2}"));
             } else if let Some(ch) = a.get("choice").and_then(|x| x.as_str()) {
                 parts.push(format!("{k}={ch}"));
@@ -2357,7 +3122,10 @@ fn normalize_score(a: &serde_json::Value) -> Option<f64> {
     Some((s / top).clamp(0.0, 1.0))
 }
 
-fn print_keyword_values(extra: &serde_json::Map<String, serde_json::Value>, suggestions: &[String]) {
+fn print_keyword_values(
+    extra: &serde_json::Map<String, serde_json::Value>,
+    suggestions: &[String],
+) {
     let mut rows = Vec::new();
     for (i, s) in suggestions.iter().take(10).enumerate() {
         if let Some(a) = extra.get(format!("kw_value_{i}").as_str()) {

@@ -5,21 +5,18 @@ All notable changes to `jev-seo` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v0.3.0 maxen (half done)
+## [Unreleased] - v0.3.0
 
 ### Added
 - Plugin bridge `jev-seo serve` (Streamable HTTP `POST /mcp` + `GET /plugin.json` + `extensions/`), `capabilities --json` single source (`58 rules / 15 tools`), `watch --once/--every` sqlite baseline `watch-<slug>` (closes former unreleased v0.1.3 — merged into v0.3.0, no separate 0.1.3).
 - Deterministic `fix-plan audit.json --json`: one `rule→patch→verify` per Finding, `fact/heuristic` `truth_kind`, heuristic confidence capped 0.65, sorted blocking first.
 - Crawl sitemap seeding via `robots.txt Sitemap:` directives + `/sitemap.xml` fallback, `sitemapindex` 1-level expand, `--sitemap <url>` override, start URL `*.xml/*sitemap*` detection, `warn: no sitemap seed` on single-page fallback (closes #3). `seo_crawl {sitemap}` MCP param.
+- Rule breadth: R32 rich-result required props per `@type` via `schema_missing_required`, R08 JS-only shell flag (`readable_text <300w && script>2×`, advisory, `ponytail: warn only`), R56 soft-404 hardened on body copy (`not found/404` phrase), R03 loop via hop dedup already shipped.
+- JS-rendered verification gate: `src/js_render.rs` behind optional `--features js` (`chromiumoxide` 0.7 optional), default is warn-only with no dep.
+- Memory & trends: `geo_history` per-target trend (`geo_trend`, `record_geo`), `watch --diff-only`, `<svg>` sparkline (`sparkline_svg`) in HTML + PDF deck `pdf_trend`, offline `--rescore` already on audit/crawl (serde defaults keep old JSON compatible), `--rescore` hint in Markdown.
 
 ### Changed
-- After `v0.1.2`, versioning was bumped wrongly by automation. You corrected the map: `v0.1.2 -> v0.2` was wrong, `v0.3.0 maxen` is the merged next version that absorbs former 0.1.3 + PRD 0.2.0 + both 0.3.0 scopes + `jev.md` evidence role. `Cargo.toml` is `0.3.0` locally; no publish until you say go.
-
-### Planned (remaining half of v0.3.0 — not yet coded)
-- Rule breadth finish: R56 hardened, JS-only shell flag, rich-result required props per `@type`, R03 loop hardened.
-- JS-rendered verification: optional `--features js` (`chromiumoxide`) headless, default warns `unrendered shell?`.
-- Memory & trends: per-engine GEO `geo_history` sqlite, `watch --diff-only`, `<svg>` sparklines, offline `--rescore` for every command.
-- No new dep until you opt in; ponytail order stays reuse then stdlib then native.
+- After `v0.1.2`, versioning was bumped wrongly by automation. You corrected the map: `v0.1.2 -> v0.2` was wrong, `v0.3.0` is the merged next version that absorbs former 0.1.3 + PRD 0.2.0 + both 0.3.0 scopes + `jev.md` evidence role. `Cargo.toml` is `0.3.0` locally; no publish until you say go.
 
 ## [0.1.2] - 2026-09-26
 

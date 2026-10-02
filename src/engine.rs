@@ -85,11 +85,7 @@ impl JevClient {
         });
         let body: serde_json::Value = match self
             .post(payload)
-            .and_then(|(r, est)| {
-                r.into_json()
-                    .map_err(anyhow::Error::from)
-                    .map(|b| (b, est))
-            })
+            .and_then(|(r, est)| r.into_json().map_err(anyhow::Error::from).map(|b| (b, est)))
         {
             Ok((b, est)) => {
                 record_usage(&b, est);
@@ -330,10 +326,7 @@ impl JevClient {
     /// request: base intent/GEO/gap + geo dimensions + page quality.
     /// Runs injection preflight first; blocked content returns a Drop-tier result
     /// without asking quality questions.
-    pub fn judge_page(
-        &self,
-        state: serde_json::Value,
-    ) -> Result<AnalysisResult> {
+    pub fn judge_page(&self, state: serde_json::Value) -> Result<AnalysisResult> {
         if self.injection_preflight(&state)? {
             return Ok(AnalysisResult {
                 intent: "unclear".into(),
@@ -383,10 +376,25 @@ impl JevClient {
             let query = state.get("query").and_then(|q| q.as_str()).unwrap_or("");
             let stem = query.rsplit(['/', '\\']).next().unwrap_or(query);
             let stem = stem.split('.').next().unwrap_or(stem).to_ascii_lowercase();
-            if ["privacy", "terms", "terms-of-service", "contact", "legal", "cookies", "cookie-policy", "disclaimer"]
-                .contains(&stem.as_str())
+            if [
+                "privacy",
+                "terms",
+                "terms-of-service",
+                "contact",
+                "legal",
+                "cookies",
+                "cookie-policy",
+                "disclaimer",
+            ]
+            .contains(&stem.as_str())
             {
-                for id in ["page_helpfulness", "page_trust", "page_specificity", "geo_density", "geo_statistics"] {
+                for id in [
+                    "page_helpfulness",
+                    "page_trust",
+                    "page_specificity",
+                    "geo_density",
+                    "geo_statistics",
+                ] {
                     dst.remove(id);
                 }
             }
@@ -505,7 +513,9 @@ fn truncate_state(value: serde_json::Value) -> serde_json::Value {
             serde_json::Value::Array(items.into_iter().map(truncate_state).collect())
         }
         serde_json::Value::Object(map) => serde_json::Value::Object(
-            map.into_iter().map(|(k, v)| (k, truncate_state(v))).collect(),
+            map.into_iter()
+                .map(|(k, v)| (k, truncate_state(v)))
+                .collect(),
         ),
         other => other,
     }

@@ -8,7 +8,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 pub const SCHEMA_VERSION: &str = "1.0";
 /// TypeSafe list price, USD per million input tokens (docs.typesafe.ai).
@@ -25,7 +25,8 @@ static JEV_RESERVED_TOKENS: AtomicU64 = AtomicU64::new(0);
 /// Responses that arrived without a usage block, charged at estimate.
 static JEV_ESTIMATED_TOKENS: AtomicU64 = AtomicU64::new(0);
 /// Budget in micro-USD (u64) so we can compare without floats in the hot path.
-static JEV_BUDGET_MICROUSD: AtomicU64 = AtomicU64::new((DEFAULT_JEV_BUDGET_USD * 1_000_000.0) as u64);
+static JEV_BUDGET_MICROUSD: AtomicU64 =
+    AtomicU64::new((DEFAULT_JEV_BUDGET_USD * 1_000_000.0) as u64);
 static JEV_SKIPPED_BUDGET: AtomicU32 = AtomicU32::new(0);
 
 pub fn set_jev_budget_usd(usd: f64) {
@@ -60,12 +61,19 @@ pub fn reserve_jev_tokens(est_tokens: u64) -> bool {
 
 /// Drop a reservation without charging: transport failures spent nothing.
 pub fn release_jev_tokens(est_tokens: u64) {
-    JEV_RESERVED_TOKENS.fetch_sub(est_tokens.min(JEV_RESERVED_TOKENS.load(Ordering::Relaxed)), Ordering::Relaxed);
+    JEV_RESERVED_TOKENS.fetch_sub(
+        est_tokens.min(JEV_RESERVED_TOKENS.load(Ordering::Relaxed)),
+        Ordering::Relaxed,
+    );
 }
 
 /// Release a reservation after the real usage landed. When the response
 /// carried no usage block, the estimate stands as the charge instead of zero.
-pub fn settle_jev_tokens(est_tokens: u64, actual_tokens: Option<u64>) {    JEV_RESERVED_TOKENS.fetch_sub(est_tokens.min(JEV_RESERVED_TOKENS.load(Ordering::Relaxed)), Ordering::Relaxed);
+pub fn settle_jev_tokens(est_tokens: u64, actual_tokens: Option<u64>) {
+    JEV_RESERVED_TOKENS.fetch_sub(
+        est_tokens.min(JEV_RESERVED_TOKENS.load(Ordering::Relaxed)),
+        Ordering::Relaxed,
+    );
     match actual_tokens {
         Some(t) => {
             JEV_INPUT_TOKENS.fetch_add(t, Ordering::Relaxed);
@@ -214,7 +222,9 @@ pub struct ValidationReport {
 }
 
 pub fn jev_key_present() -> bool {
-    std::env::var("TYPESAFE_API_KEY").map(|k| !k.trim().is_empty()).unwrap_or(false)
+    std::env::var("TYPESAFE_API_KEY")
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false)
 }
 
 pub fn jev_cost_usd(input_tokens: u64) -> f64 {
@@ -251,7 +261,11 @@ pub fn action_id_shape_ok(id: &str) -> bool {
         if !part.chars().all(|c| c.is_ascii_alphanumeric()) {
             return false;
         }
-        if i == 0 && !part.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
+        if i == 0
+            && !part
+                .chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        {
             return false;
         }
         if part.chars().any(|c| c.is_ascii_digit()) && i > 0 {
@@ -293,7 +307,14 @@ pub fn extract_citations(text: &str) -> BTreeSet<String> {
                     .next()
                     .map(|tail| tail.len() >= 2 && tail.chars().all(|c| c.is_ascii_digit()))
                     .unwrap_or(false)
-                && trimmed.split('-').next().map(|h| h.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())).unwrap_or(false))
+                && trimmed
+                    .split('-')
+                    .next()
+                    .map(|h| {
+                        h.chars()
+                            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+                    })
+                    .unwrap_or(false))
             || (trimmed.len() == 3
                 && trimmed.starts_with('R')
                 && trimmed[1..].chars().all(|c| c.is_ascii_digit()));
@@ -398,7 +419,10 @@ pub fn validate_report(
     validate_core(findings, actions, texts)
 }
 
-fn citations(findings: &[crate::rules::Finding], actions: &[crate::actions::Action]) -> CitationsOut {
+fn citations(
+    findings: &[crate::rules::Finding],
+    actions: &[crate::actions::Action],
+) -> CitationsOut {
     let rules: BTreeSet<String> = findings.iter().map(|f| f.rule_id.clone()).collect();
     let acts: BTreeSet<String> = actions.iter().map(|a| a.id.clone()).collect();
     CitationsOut {
@@ -443,7 +467,11 @@ impl<'a> ManifestInput<'a> {
 }
 
 /// Hard gate: refuse to write a report whose citations are unknown.
-pub fn gate_report(text: &str, findings: &[crate::rules::Finding], actions: &[crate::actions::Action]) -> Result<()> {
+pub fn gate_report(
+    text: &str,
+    findings: &[crate::rules::Finding],
+    actions: &[crate::actions::Action],
+) -> Result<()> {
     validate(findings, actions, &[text]).map(|_| ())
 }
 
@@ -452,7 +480,9 @@ fn export_dir(path: &Path) -> PathBuf {
     if path.is_dir() {
         path.to_path_buf()
     } else {
-        path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."))
+        path.parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."))
     }
 }
 
@@ -462,7 +492,8 @@ fn export_dir(path: &Path) -> PathBuf {
 pub fn write_pair(dir: &Path, manifest: &RunManifest) -> Result<(PathBuf, PathBuf)> {
     std::fs::create_dir_all(dir)?;
     let run_json = serde_json::to_string_pretty(manifest).context("serialize run.json")?;
-    let ledger_json = serde_json::to_string_pretty(&manifest.ledger).context("serialize ledger.json")?;
+    let ledger_json =
+        serde_json::to_string_pretty(&manifest.ledger).context("serialize ledger.json")?;
     let run_path = dir.join("run.json");
     let ledger_path = dir.join("ledger.json");
     atomic_write(&run_path, run_json.as_bytes())?;
@@ -508,30 +539,53 @@ pub fn completeness_crawl(rep: &crate::crawl::CrawlReport, max_pages: usize) -> 
     let mut notes = Vec::new();
     notes.push(format!(
         "seed {}",
-        if rep.seeded_from_sitemap { "sitemap" } else { "start-URL" }
+        if rep.seeded_from_sitemap {
+            "sitemap"
+        } else {
+            "start-URL"
+        }
     ));
     notes.push(format!(
         "robots {}",
-        if rep.robots_honored { "honored" } else { "missing" }
+        if rep.robots_honored {
+            "honored"
+        } else {
+            "missing"
+        }
     ));
     notes.push(format!("{} pages", rep.pages_crawled));
     if rep.capped {
-        notes.push(format!("capped at {} (raise --max-pages)", max_pages.min(rep.pages_crawled.max(max_pages))));
+        notes.push(format!(
+            "capped at {} (raise --max-pages)",
+            max_pages.min(rep.pages_crawled.max(max_pages))
+        ));
         notes.push("sample, not full-site verdict".into());
     }
     if !rep.errors.is_empty() {
         notes.push(format!("{} fetch errors", rep.errors.len()));
     }
-    let full = !rep.capped && rep.errors.is_empty() && rep.robots_honored && rep.seeded_from_sitemap;
+    let full =
+        !rep.capped && rep.errors.is_empty() && rep.robots_honored && rep.seeded_from_sitemap;
     Completeness { full, notes }
 }
 
 pub fn completeness_llms(rep: &crate::llms::LlmsReport) -> Completeness {
     let mut notes = Vec::new();
-    notes.push(format!("llms.txt {}", if rep.info.present { "present" } else { "missing" }));
+    notes.push(format!(
+        "llms.txt {}",
+        if rep.info.present {
+            "present"
+        } else {
+            "missing"
+        }
+    ));
     notes.push(format!(
         "robots {}",
-        if rep.robots_present { "present" } else { "missing" }
+        if rep.robots_present {
+            "present"
+        } else {
+            "missing"
+        }
     ));
     notes.push("live single-domain check".into());
     Completeness {
@@ -548,9 +602,9 @@ fn jev_home_dir() -> Option<std::path::PathBuf> {
             .map(|p| p.to_path_buf())
             .filter(|p| !p.as_os_str().is_empty());
     }
-    std::env::var("HOME").ok().map(|h| {
-        std::path::Path::new(&h).join(".jev-seo")
-    })
+    std::env::var("HOME")
+        .ok()
+        .map(|h| std::path::Path::new(&h).join(".jev-seo"))
 }
 
 /// Append-only eval trace: one JSON line per Jev fan-out (question version,
@@ -563,11 +617,19 @@ pub fn append_eval_log(entry: serde_json::Value) {
         return;
     }
     let path = dir.join("eval.jsonl");
-    if path.metadata().map(|m| m.len() > CAP_BYTES).unwrap_or(false) {
+    if path
+        .metadata()
+        .map(|m| m.len() > CAP_BYTES)
+        .unwrap_or(false)
+    {
         let _ = std::fs::remove_file(&path);
     }
     use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
         let _ = writeln!(f, "{}", entry);
     }
 }
@@ -698,7 +760,10 @@ mod manifest_tests {
         assert!(m.validation.ok);
         assert!(!m.citations.action_ids.is_empty());
         let json = serde_json::to_string(&m).unwrap();
-        assert!(json.contains("\"schema_version\":\"1.0\"") || json.contains("\"schema_version\": \"1.0\""));
+        assert!(
+            json.contains("\"schema_version\":\"1.0\"")
+                || json.contains("\"schema_version\": \"1.0\"")
+        );
         assert!(json.contains("\"ledger\""));
     }
 
@@ -712,7 +777,10 @@ mod manifest_tests {
 
     #[test]
     fn completeness_banners() {
-        let full = Completeness { full: true, notes: vec![] };
+        let full = Completeness {
+            full: true,
+            notes: vec![],
+        };
         assert_eq!(full.banner(), "Completeness:  full");
         let part = Completeness {
             full: false,
@@ -734,13 +802,17 @@ mod manifest_tests {
             actions: &actions,
             texts: &[],
             score: None,
-            completeness: Completeness { full: true, notes: vec![] },
+            completeness: Completeness {
+                full: true,
+                notes: vec![],
+            },
             ledger: Ledger::new("audit", "docs/"),
         }
         .build();
         let (run_p, led_p) = write_pair(dir.path(), &m).unwrap();
         assert!(run_p.exists() && led_p.exists());
-        let back: RunManifest = serde_json::from_str(&std::fs::read_to_string(&run_p).unwrap()).unwrap();
+        let back: RunManifest =
+            serde_json::from_str(&std::fs::read_to_string(&run_p).unwrap()).unwrap();
         assert_eq!(back.schema_version, SCHEMA_VERSION);
         let led: Ledger = serde_json::from_str(&std::fs::read_to_string(&led_p).unwrap()).unwrap();
         assert_eq!(led.command, "audit");

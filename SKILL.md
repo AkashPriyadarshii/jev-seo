@@ -20,7 +20,7 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 
 - `Health`, `Score`, and `Grade` lines are deterministic 0-100 values with A-F grades.
 - `Top Actions` are ranked by impact with effort bands; ids like `RULE-R01` map to the rule registry (R01-R58) in `src/rules.rs`.
-- New in v0.1.2: `explain` any rule id, `report --baseline` diffs, `crawl --vitals` PageSpeed checks, `query --provider dfs` opt-in DataForSEO, `seo_cite_check`, `seo_gap`, keyless GEO scores, drift gates. Local is v0.3.0 maxen half done — `serve`, `capabilities`, `watch`, `fix-plan`, crawl sitemap `#3` ship; JS-rendered, per-engine trends, offline rescore remain.
+- New in v0.1.2: `explain` any rule id, `report --baseline` diffs, `crawl --vitals` PageSpeed checks, `query --provider dfs` opt-in DataForSEO, `seo_cite_check`, `seo_gap`, keyless GEO scores, drift gates. Local is v0.3.0 (complete, not pushed): `serve`, `capabilities`, `watch --diff-only`, `fix-plan`, crawl sitemap `#3`, R32/R08/R56 breadth, JS feature gate, GEO trends, and rescore ship.
 - Jev contract: Choices offer `insufficient_context`, Flags print the runner-up, every fan-out appends to `~/.jev-seo/eval.jsonl`. Question version rides the spend line.
 - `Completeness` says what was skipped (caps, missing sitemap, missing robots). A capped crawl is a sample, not a verdict.
 - `Needs review` marks Jev answers below the confidence bar. Treat those lines as unverified.
@@ -51,7 +51,7 @@ Agentic loop: `seo_gap` ranks the Search Console queue (needs site auth once via
 
 ## Capabilities
 
-`jev-seo capabilities --json` reports `{version, rule_set, rules, mcp_tools, mcp_tool_names[], commands[]}` — machine source of truth, never parse README counts.
+`jev-seo capabilities --json` reports `{version, rule_set, rules, mcp_tools, mcp_tool_names[], commands[]}`. This is the machine source of truth. Do not parse counts from the README.
 
 ## Plugin bridge
 
@@ -59,7 +59,7 @@ Agentic loop: `seo_gap` ranks the Search Console queue (needs site auth once via
 
 ## Fix plan
 
-`jev-seo audit docs/ --json > audit.json && jev-seo fix-plan audit.json --json` — deterministic `rule→patch→verify` per finding (fact/heuristic, confidence-capped), sorted blocking first. Non-LLM, one hint per finding, `verify: jev-seo audit <file> --json | jq '.findings | no RULE-Rxx'`.
+`jev-seo audit docs/ --json > audit.json && jev-seo fix-plan audit.json --json`: deterministic `rule to patch to verify` per finding (fact or heuristic, confidence capped), sorted blocking first. One hint per finding. Verify with `jev-seo audit <file> --json | jq '.findings | no RULE-Rxx'`.
 
 ## Watch
 

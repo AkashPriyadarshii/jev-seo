@@ -30,7 +30,11 @@ pub fn generate_brief(topic: &str, limit: usize) -> Result<ContentBrief> {
     generate_brief_with(topic, limit, serp::Provider::Auto)
 }
 
-pub fn generate_brief_with(topic: &str, limit: usize, provider: serp::Provider) -> Result<ContentBrief> {
+pub fn generate_brief_with(
+    topic: &str,
+    limit: usize,
+    provider: serp::Provider,
+) -> Result<ContentBrief> {
     let (competitors, _) = serp::scrape_serp_with(topic, limit, provider)?;
 
     // Excluded domains: encyclopedias, social feeds, marketplaces, job boards,
@@ -94,10 +98,17 @@ pub fn generate_brief_with(topic: &str, limit: usize, provider: serp::Provider) 
                         .and_then(|c| c.as_str())
                     {
                         winning_angle = match angle {
-                            "benchmarks" => "Lead with empirical benchmarks and reproducible numbers".to_string(),
-                            "step_by_step" => "Lead with a copy-pasteable step-by-step implementation".to_string(),
+                            "benchmarks" => {
+                                "Lead with empirical benchmarks and reproducible numbers"
+                                    .to_string()
+                            }
+                            "step_by_step" => {
+                                "Lead with a copy-pasteable step-by-step implementation".to_string()
+                            }
                             "comparison" => "Lead with a trade-off comparison matrix".to_string(),
-                            "unique_data" => "Lead with first-hand data or a case study".to_string(),
+                            "unique_data" => {
+                                "Lead with first-hand data or a case study".to_string()
+                            }
                             other => format!("Angle: {}", other),
                         };
                     }
@@ -159,11 +170,20 @@ impl ContentBrief {
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
         md.push_str(&format!("# Content Brief: {}\n\n", self.topic));
-        md.push_str(&format!("- **Suggested Title**: {}\n", self.suggested_title));
-        md.push_str(&format!("- **Target Length**: {}\n", self.target_word_count));
+        md.push_str(&format!(
+            "- **Suggested Title**: {}\n",
+            self.suggested_title
+        ));
+        md.push_str(&format!(
+            "- **Target Length**: {}\n",
+            self.target_word_count
+        ));
         md.push_str(&format!("- **Search Intent**: {}\n", self.search_intent));
         md.push_str(&format!("- **Audience**: {}\n", self.target_audience));
-        md.push_str(&format!("- **Primary Differentiator**: {}\n\n", self.winning_angle));
+        md.push_str(&format!(
+            "- **Primary Differentiator**: {}\n\n",
+            self.winning_angle
+        ));
 
         md.push_str("## GEO Opening Prescription (134-167 Words)\n\n");
         md.push_str(&format!("> {}\n\n", self.geo_opening_prescription));

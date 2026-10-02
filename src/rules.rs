@@ -90,73 +90,480 @@ pub const RULE_SET_VERSION: &str = "2026.09b";
 /// The registry. Ids are stable API: reports, docs, and tests cite them.
 pub const RULES: &[Rule] = &[
     // Crawl (8)
-    Rule { id: "R01", area: Area::Crawl, severity: Severity::High, effort: 1, title: "Broken link", fix: "Restore the target or point the link at a live page." },
-    Rule { id: "R02", area: Area::Crawl, severity: Severity::Critical, effort: 2, title: "Fetch failure", fix: "Fix DNS, TLS, or server errors blocking the crawl." },
-    Rule { id: "R03", area: Area::Crawl, severity: Severity::Medium, effort: 2, title: "Redirect chain", fix: "Point the source at the final URL in one hop." },
-    Rule { id: "R04", area: Area::Crawl, severity: Severity::Critical, effort: 2, title: "Redirect loop", fix: "Break the cycle so the chain terminates." },
-    Rule { id: "R05", area: Area::Crawl, severity: Severity::Medium, effort: 1, title: "No sitemap seed", fix: "Publish /sitemap.xml so crawlers find every page." },
-    Rule { id: "R06", area: Area::Crawl, severity: Severity::Medium, effort: 1, title: "No robots.txt", fix: "Serve robots.txt so crawler rules are discoverable." },
-    Rule { id: "R07", area: Area::Crawl, severity: Severity::Low, effort: 1, title: "Crawl capped", fix: "Raise --max-pages for full coverage." },
-    Rule { id: "R08", area: Area::Crawl, severity: Severity::Low, effort: 2, title: "Empty page body", fix: "Ship renderable content or noindex the shell." },
-    Rule { id: "R56", area: Area::Crawl, severity: Severity::High, effort: 1, title: "Soft 404", fix: "Return 404 for missing pages instead of 200." },
-    Rule { id: "R57", area: Area::Crawl, severity: Severity::Low, effort: 1, title: "Temporary host redirect", fix: "Use 301 for www/apex and HTTP→HTTPS moves, not 302/307." },
+    Rule {
+        id: "R01",
+        area: Area::Crawl,
+        severity: Severity::High,
+        effort: 1,
+        title: "Broken link",
+        fix: "Restore the target or point the link at a live page.",
+    },
+    Rule {
+        id: "R02",
+        area: Area::Crawl,
+        severity: Severity::Critical,
+        effort: 2,
+        title: "Fetch failure",
+        fix: "Fix DNS, TLS, or server errors blocking the crawl.",
+    },
+    Rule {
+        id: "R03",
+        area: Area::Crawl,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Redirect chain",
+        fix: "Point the source at the final URL in one hop.",
+    },
+    Rule {
+        id: "R04",
+        area: Area::Crawl,
+        severity: Severity::Critical,
+        effort: 2,
+        title: "Redirect loop",
+        fix: "Break the cycle so the chain terminates.",
+    },
+    Rule {
+        id: "R05",
+        area: Area::Crawl,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "No sitemap seed",
+        fix: "Publish /sitemap.xml so crawlers find every page.",
+    },
+    Rule {
+        id: "R06",
+        area: Area::Crawl,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "No robots.txt",
+        fix: "Serve robots.txt so crawler rules are discoverable.",
+    },
+    Rule {
+        id: "R07",
+        area: Area::Crawl,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Crawl capped",
+        fix: "Raise --max-pages for full coverage.",
+    },
+    Rule {
+        id: "R08",
+        area: Area::Crawl,
+        severity: Severity::Low,
+        effort: 2,
+        title: "Empty page body",
+        fix: "Ship renderable content or noindex the shell.",
+    },
+    Rule {
+        id: "R56",
+        area: Area::Crawl,
+        severity: Severity::High,
+        effort: 1,
+        title: "Soft 404",
+        fix: "Return 404 for missing pages instead of 200.",
+    },
+    Rule {
+        id: "R57",
+        area: Area::Crawl,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Temporary host redirect",
+        fix: "Use 301 for www/apex and HTTP→HTTPS moves, not 302/307.",
+    },
     // On-page (9)
-    Rule { id: "R09", area: Area::OnPage, severity: Severity::High, effort: 1, title: "Missing title", fix: "Write a unique title under 60 characters." },
-    Rule { id: "R10", area: Area::OnPage, severity: Severity::Medium, effort: 1, title: "Title length", fix: "Keep titles 30-60 characters so nothing truncates." },
-    Rule { id: "R11", area: Area::OnPage, severity: Severity::High, effort: 1, title: "Missing meta description", fix: "Write a 120-160 character summary." },
-    Rule { id: "R12", area: Area::OnPage, severity: Severity::Medium, effort: 1, title: "Meta description length", fix: "Trim or expand into the 120-160 window." },
-    Rule { id: "R13", area: Area::OnPage, severity: Severity::High, effort: 1, title: "Missing H1", fix: "Give the page one H1 stating its topic." },
-    Rule { id: "R14", area: Area::OnPage, severity: Severity::Medium, effort: 1, title: "Multiple H1", fix: "Keep one H1, demote the rest to H2." },
-    Rule { id: "R15", area: Area::OnPage, severity: Severity::Medium, effort: 1, title: "Skipped heading level", fix: "Nest headings in order without jumps." },
-    Rule { id: "R16", area: Area::OnPage, severity: Severity::Low, effort: 2, title: "Images missing alt", fix: "Describe every informative image." },
-    Rule { id: "R17", area: Area::OnPage, severity: Severity::Low, effort: 1, title: "Missing favicon signal", fix: "Link an icon so tabs and bookmarks render." },
+    Rule {
+        id: "R09",
+        area: Area::OnPage,
+        severity: Severity::High,
+        effort: 1,
+        title: "Missing title",
+        fix: "Write a unique title under 60 characters.",
+    },
+    Rule {
+        id: "R10",
+        area: Area::OnPage,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Title length",
+        fix: "Keep titles 30-60 characters so nothing truncates.",
+    },
+    Rule {
+        id: "R11",
+        area: Area::OnPage,
+        severity: Severity::High,
+        effort: 1,
+        title: "Missing meta description",
+        fix: "Write a 120-160 character summary.",
+    },
+    Rule {
+        id: "R12",
+        area: Area::OnPage,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Meta description length",
+        fix: "Trim or expand into the 120-160 window.",
+    },
+    Rule {
+        id: "R13",
+        area: Area::OnPage,
+        severity: Severity::High,
+        effort: 1,
+        title: "Missing H1",
+        fix: "Give the page one H1 stating its topic.",
+    },
+    Rule {
+        id: "R14",
+        area: Area::OnPage,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Multiple H1",
+        fix: "Keep one H1, demote the rest to H2.",
+    },
+    Rule {
+        id: "R15",
+        area: Area::OnPage,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Skipped heading level",
+        fix: "Nest headings in order without jumps.",
+    },
+    Rule {
+        id: "R16",
+        area: Area::OnPage,
+        severity: Severity::Low,
+        effort: 2,
+        title: "Images missing alt",
+        fix: "Describe every informative image.",
+    },
+    Rule {
+        id: "R17",
+        area: Area::OnPage,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Missing favicon signal",
+        fix: "Link an icon so tabs and bookmarks render.",
+    },
     // Content (7)
-    Rule { id: "R18", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Thin page", fix: "Expand past 300 words or merge into a parent." },
-    Rule { id: "R19", area: Area::Content, severity: Severity::Medium, effort: 2, title: "AI slop markers", fix: "Rewrite flagged boilerplate in plain words." },
-    Rule { id: "R20", area: Area::Content, severity: Severity::Low, effort: 2, title: "Em-dash density", fix: "Hold em-dashes under 2 per 500 words." },
-    Rule { id: "R21", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Duplicate titles", fix: "Give every page a unique title." },
-    Rule { id: "R22", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Duplicate descriptions", fix: "Give every page a unique summary." },
-    Rule { id: "R23", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Keyword cannibalization", fix: "One winner per stem; merge or re-target the rest." },
-    Rule { id: "R24", area: Area::Content, severity: Severity::Low, effort: 2, title: "No direct answer opening", fix: "Open with the answer before the background." },
-    Rule { id: "R54", area: Area::Content, severity: Severity::Medium, effort: 1, title: "Templated metadata", fix: "Write descriptions that describe the page, not echo the title with a stock CTA." },
-    Rule { id: "R55", area: Area::Content, severity: Severity::Medium, effort: 2, title: "Uncited claims", fix: "Attach a source, study, or link within sight of every statistic." },
+    Rule {
+        id: "R18",
+        area: Area::Content,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Thin page",
+        fix: "Expand past 300 words or merge into a parent.",
+    },
+    Rule {
+        id: "R19",
+        area: Area::Content,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "AI slop markers",
+        fix: "Rewrite flagged boilerplate in plain words.",
+    },
+    Rule {
+        id: "R20",
+        area: Area::Content,
+        severity: Severity::Low,
+        effort: 2,
+        title: "Em-dash density",
+        fix: "Hold em-dashes under 2 per 500 words.",
+    },
+    Rule {
+        id: "R21",
+        area: Area::Content,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Duplicate titles",
+        fix: "Give every page a unique title.",
+    },
+    Rule {
+        id: "R22",
+        area: Area::Content,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Duplicate descriptions",
+        fix: "Give every page a unique summary.",
+    },
+    Rule {
+        id: "R23",
+        area: Area::Content,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Keyword cannibalization",
+        fix: "One winner per stem; merge or re-target the rest.",
+    },
+    Rule {
+        id: "R24",
+        area: Area::Content,
+        severity: Severity::Low,
+        effort: 2,
+        title: "No direct answer opening",
+        fix: "Open with the answer before the background.",
+    },
+    Rule {
+        id: "R54",
+        area: Area::Content,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Templated metadata",
+        fix: "Write descriptions that describe the page, not echo the title with a stock CTA.",
+    },
+    Rule {
+        id: "R55",
+        area: Area::Content,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Uncited claims",
+        fix: "Attach a source, study, or link within sight of every statistic.",
+    },
     // Links (6)
-    Rule { id: "R25", area: Area::Links, severity: Severity::Medium, effort: 2, title: "Orphan page", fix: "Link inward from a related page." },
-    Rule { id: "R26", area: Area::Links, severity: Severity::Low, effort: 1, title: "No outbound links", fix: "Cite at least one source or next step." },
-    Rule { id: "R27", area: Area::Links, severity: Severity::Medium, effort: 1, title: "HTTP outbound link", fix: "Point outbound links at HTTPS targets." },
-    Rule { id: "R28", area: Area::Links, severity: Severity::Low, effort: 1, title: "Empty anchor text", fix: "Write anchors that describe the target." },
-    Rule { id: "R29", area: Area::Links, severity: Severity::Low, effort: 2, title: "Nofollow-heavy page", fix: "Let internal links pass value; save nofollow for untrusted." },
-    Rule { id: "R30", area: Area::Links, severity: Severity::Low, effort: 1, title: "Fragment-only links", fix: "Point navigation at real pages, not anchors." },
+    Rule {
+        id: "R25",
+        area: Area::Links,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Orphan page",
+        fix: "Link inward from a related page.",
+    },
+    Rule {
+        id: "R26",
+        area: Area::Links,
+        severity: Severity::Low,
+        effort: 1,
+        title: "No outbound links",
+        fix: "Cite at least one source or next step.",
+    },
+    Rule {
+        id: "R27",
+        area: Area::Links,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "HTTP outbound link",
+        fix: "Point outbound links at HTTPS targets.",
+    },
+    Rule {
+        id: "R28",
+        area: Area::Links,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Empty anchor text",
+        fix: "Write anchors that describe the target.",
+    },
+    Rule {
+        id: "R29",
+        area: Area::Links,
+        severity: Severity::Low,
+        effort: 2,
+        title: "Nofollow-heavy page",
+        fix: "Let internal links pass value; save nofollow for untrusted.",
+    },
+    Rule {
+        id: "R30",
+        area: Area::Links,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Fragment-only links",
+        fix: "Point navigation at real pages, not anchors.",
+    },
     // Structured (6)
-    Rule { id: "R31", area: Area::Structured, severity: Severity::Medium, effort: 2, title: "No JSON-LD", fix: "Add Schema.org markup matching the page type." },
-    Rule { id: "R32", area: Area::Structured, severity: Severity::Medium, effort: 1, title: "Missing rich-result props", fix: "Fill the properties search requires for rich results." },
-    Rule { id: "R33", area: Area::Structured, severity: Severity::High, effort: 1, title: "Invalid JSON-LD", fix: "Fix the syntax so parsers accept the block." },
-    Rule { id: "R34", area: Area::Structured, severity: Severity::Medium, effort: 1, title: "Deprecated schema type", fix: "Migrate to the current type." },
-    Rule { id: "R35", area: Area::Structured, severity: Severity::Low, effort: 1, title: "Missing Open Graph tags", fix: "Add og:title, description, and image." },
-    Rule { id: "R36", area: Area::Canonical, severity: Severity::Low, effort: 1, title: "Missing canonical", fix: "Point every page at its canonical URL." },
-    Rule { id: "R58", area: Area::OnPage, severity: Severity::Medium, effort: 2, title: "Broken hreflang cluster", fix: "Make every hreflang pair reciprocal and never point at a noindexed target." },
+    Rule {
+        id: "R31",
+        area: Area::Structured,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "No JSON-LD",
+        fix: "Add Schema.org markup matching the page type.",
+    },
+    Rule {
+        id: "R32",
+        area: Area::Structured,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Missing rich-result props",
+        fix: "Fill the properties search requires for rich results.",
+    },
+    Rule {
+        id: "R33",
+        area: Area::Structured,
+        severity: Severity::High,
+        effort: 1,
+        title: "Invalid JSON-LD",
+        fix: "Fix the syntax so parsers accept the block.",
+    },
+    Rule {
+        id: "R34",
+        area: Area::Structured,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Deprecated schema type",
+        fix: "Migrate to the current type.",
+    },
+    Rule {
+        id: "R35",
+        area: Area::Structured,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Missing Open Graph tags",
+        fix: "Add og:title, description, and image.",
+    },
+    Rule {
+        id: "R36",
+        area: Area::Canonical,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Missing canonical",
+        fix: "Point every page at its canonical URL.",
+    },
+    Rule {
+        id: "R58",
+        area: Area::OnPage,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Broken hreflang cluster",
+        fix: "Make every hreflang pair reciprocal and never point at a noindexed target.",
+    },
     // AI access (5)
-    Rule { id: "R37", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "No llms.txt", fix: "Ship /llms.txt for ChatGPT/Perplexity/Claude plumbing; Google Search ignores the file." },
-    Rule { id: "R38", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "AI crawlers unnamed", fix: "Name AI crawlers explicitly in robots.txt." },
-    Rule { id: "R39", area: Area::AiAccess, severity: Severity::High, effort: 1, title: "AI training blocked", fix: "Allow the crawlers whose citations are wanted." },
-    Rule { id: "R40", area: Area::AiAccess, severity: Severity::Low, effort: 1, title: "Sitemap not advertised", fix: "Add the Sitemap line to robots.txt." },
-    Rule { id: "R41", area: Area::AiAccess, severity: Severity::Low, effort: 2, title: "Low citation density", fix: "Raise facts per paragraph with numbers and definitions." },
+    Rule {
+        id: "R37",
+        area: Area::AiAccess,
+        severity: Severity::Low,
+        effort: 1,
+        title: "No llms.txt",
+        fix:
+            "Ship /llms.txt for ChatGPT/Perplexity/Claude plumbing; Google Search ignores the file.",
+    },
+    Rule {
+        id: "R38",
+        area: Area::AiAccess,
+        severity: Severity::Low,
+        effort: 1,
+        title: "AI crawlers unnamed",
+        fix: "Name AI crawlers explicitly in robots.txt.",
+    },
+    Rule {
+        id: "R39",
+        area: Area::AiAccess,
+        severity: Severity::High,
+        effort: 1,
+        title: "AI training blocked",
+        fix: "Allow the crawlers whose citations are wanted.",
+    },
+    Rule {
+        id: "R40",
+        area: Area::AiAccess,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Sitemap not advertised",
+        fix: "Add the Sitemap line to robots.txt.",
+    },
+    Rule {
+        id: "R41",
+        area: Area::AiAccess,
+        severity: Severity::Low,
+        effort: 2,
+        title: "Low citation density",
+        fix: "Raise facts per paragraph with numbers and definitions.",
+    },
     // Performance (5)
-    Rule { id: "R42", area: Area::Performance, severity: Severity::Medium, effort: 2, title: "Slow page over 800ms", fix: "Cut server time and payload below the budget." },
-    Rule { id: "R43", area: Area::Performance, severity: Severity::Low, effort: 2, title: "Oversize page body", fix: "Trim pages past 2MB or paginate." },
-    Rule { id: "R44", area: Area::Performance, severity: Severity::Low, effort: 1, title: "No compression signal", fix: "Serve gzip or brotli with a content-encoding header." },
-    Rule { id: "R45", area: Area::Performance, severity: Severity::Low, effort: 2, title: "Render-blocking weight", fix: "Defer non-critical scripts and styles." },
-    Rule { id: "R46", area: Area::Performance, severity: Severity::Low, effort: 1, title: "Images without dimensions", fix: "Set width and height to stop layout shift." },
+    Rule {
+        id: "R42",
+        area: Area::Performance,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Slow page over 800ms",
+        fix: "Cut server time and payload below the budget.",
+    },
+    Rule {
+        id: "R43",
+        area: Area::Performance,
+        severity: Severity::Low,
+        effort: 2,
+        title: "Oversize page body",
+        fix: "Trim pages past 2MB or paginate.",
+    },
+    Rule {
+        id: "R44",
+        area: Area::Performance,
+        severity: Severity::Low,
+        effort: 1,
+        title: "No compression signal",
+        fix: "Serve gzip or brotli with a content-encoding header.",
+    },
+    Rule {
+        id: "R45",
+        area: Area::Performance,
+        severity: Severity::Low,
+        effort: 2,
+        title: "Render-blocking weight",
+        fix: "Defer non-critical scripts and styles.",
+    },
+    Rule {
+        id: "R46",
+        area: Area::Performance,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Images without dimensions",
+        fix: "Set width and height to stop layout shift.",
+    },
     // Security (2)
-    Rule { id: "R47", area: Area::Security, severity: Severity::High, effort: 1, title: "Serves over HTTP", fix: "Redirect everything to HTTPS with HSTS." },
-    Rule { id: "R48", area: Area::Security, severity: Severity::Medium, effort: 1, title: "Mixed content", fix: "Upgrade HTTP subresources to HTTPS." },
+    Rule {
+        id: "R47",
+        area: Area::Security,
+        severity: Severity::High,
+        effort: 1,
+        title: "Serves over HTTP",
+        fix: "Redirect everything to HTTPS with HSTS.",
+    },
+    Rule {
+        id: "R48",
+        area: Area::Security,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Mixed content",
+        fix: "Upgrade HTTP subresources to HTTPS.",
+    },
     // Canonical (2)
-    Rule { id: "R49", area: Area::Canonical, severity: Severity::Medium, effort: 1, title: "Canonical variant duplicates", fix: "One URL per page: pick slash policy and enforce it." },
-    Rule { id: "R50", area: Area::Canonical, severity: Severity::Low, effort: 1, title: "Tracking-param URLs indexed", fix: "Strip marketing params from canonicals and sitemaps." },
+    Rule {
+        id: "R49",
+        area: Area::Canonical,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Canonical variant duplicates",
+        fix: "One URL per page: pick slash policy and enforce it.",
+    },
+    Rule {
+        id: "R50",
+        area: Area::Canonical,
+        severity: Severity::Low,
+        effort: 1,
+        title: "Tracking-param URLs indexed",
+        fix: "Strip marketing params from canonicals and sitemaps.",
+    },
     // Vitals (3, PageSpeed lab unless Chrome field data exists)
-    Rule { id: "R51", area: Area::Performance, severity: Severity::Medium, effort: 2, title: "Slow LCP over 2500ms", fix: "Cut render-blocking weight above the fold; lab budget is 2.5s." },
-    Rule { id: "R52", area: Area::Performance, severity: Severity::Medium, effort: 2, title: "Layout shift over 0.100", fix: "Set image and embed dimensions; hold CLS under 0.10." },
-    Rule { id: "R53", area: Area::Performance, severity: Severity::Low, effort: 1, title: "No Chrome field data", fix: "Lab numbers only until the URL earns CrUX traffic; treat them as directional." },
+    Rule {
+        id: "R51",
+        area: Area::Performance,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Slow LCP over 2500ms",
+        fix: "Cut render-blocking weight above the fold; lab budget is 2.5s.",
+    },
+    Rule {
+        id: "R52",
+        area: Area::Performance,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Layout shift over 0.100",
+        fix: "Set image and embed dimensions; hold CLS under 0.10.",
+    },
+    Rule {
+        id: "R53",
+        area: Area::Performance,
+        severity: Severity::Low,
+        effort: 1,
+        title: "No Chrome field data",
+        fix: "Lab numbers only until the URL earns CrUX traffic; treat them as directional.",
+    },
 ];
 
 pub fn rule(id: &str) -> Option<&'static Rule> {
@@ -179,15 +586,19 @@ pub fn gate(id: &str) -> Gate {
     let bare = id.strip_prefix("RULE-").unwrap_or(id);
     match bare.to_ascii_uppercase().as_str() {
         "R01" | "R02" | "R03" | "R04" | "R05" | "R06" | "R07" | "R08" | "R09" | "R11" | "R13"
-        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" | "R56"
-        | "R57" => Gate::Blocking,
+        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" | "R56" | "R57" => {
+            Gate::Blocking
+        }
         _ => Gate::Advisory,
     }
 }
 
 /// Blocking findings from a finding list: the only set that fails a gate.
 pub fn blocking_findings(findings: &[Finding]) -> Vec<&Finding> {
-    findings.iter().filter(|f| effective_gate(&f.rule_id, &f.scope) == Gate::Blocking).collect()
+    findings
+        .iter()
+        .filter(|f| effective_gate(&f.rule_id, &f.scope) == Gate::Blocking)
+        .collect()
 }
 
 /// Gate adjusted for file type. Description, link, schema, OG, and canonical
@@ -202,7 +613,10 @@ pub fn effective_gate(rule_id: &str, scope: &str) -> Gate {
     let is_md = lower.ends_with(".md") || lower.ends_with(".mdx") || lower.ends_with(".markdown");
     if is_md {
         let bare = rule_id.strip_prefix("RULE-").unwrap_or(rule_id);
-        if matches!(bare.to_ascii_uppercase().as_str(), "R11" | "R26" | "R31" | "R35" | "R36") {
+        if matches!(
+            bare.to_ascii_uppercase().as_str(),
+            "R11" | "R26" | "R31" | "R35" | "R36"
+        ) {
             return Gate::Advisory;
         }
     }
@@ -277,7 +691,9 @@ pub fn score_areas(findings: &[Finding], totals: &HashMap<Area, usize>) -> Vec<A
         // Distinct scopes per rule so one bad page counts once per rule.
         let mut hits: HashMap<&str, std::collections::HashSet<&str>> = HashMap::new();
         for f in list {
-            hits.entry(f.rule_id.as_str()).or_default().insert(f.scope.as_str());
+            hits.entry(f.rule_id.as_str())
+                .or_default()
+                .insert(f.scope.as_str());
         }
         let mut penalty = 0.0;
         for (rule_id, scopes) in &hits {
@@ -289,7 +705,11 @@ pub fn score_areas(findings: &[Finding], totals: &HashMap<Area, usize>) -> Vec<A
             let reach = (scopes.len() as f64 / total).min(1.0);
             penalty += deduct(sev) * (0.5 + 0.5 * reach);
         }
-        out.push(AreaScore { area: *area, score: (100.0 - penalty).max(0.0).round() as u32, findings: list.len() });
+        out.push(AreaScore {
+            area: *area,
+            score: (100.0 - penalty).max(0.0).round() as u32,
+            findings: list.len(),
+        });
     }
     out
 }
@@ -299,7 +719,12 @@ pub fn overall(areas: &[AreaScore]) -> u32 {
     let mut total = 0.0;
     let mut weight = 0.0;
     for a in areas {
-        let w = AREA_WEIGHTS.iter().find(|(ar, _)| ar == &a.area).map(|(_, w)| w).copied().unwrap_or(0.0);
+        let w = AREA_WEIGHTS
+            .iter()
+            .find(|(ar, _)| ar == &a.area)
+            .map(|(_, w)| w)
+            .copied()
+            .unwrap_or(0.0);
         total += a.score as f64 * w;
         weight += w;
     }
@@ -310,7 +735,8 @@ pub fn overall(areas: &[AreaScore]) -> u32 {
 }
 
 /// Findings grouped into ranked actions. One action per rule, evidence capped.
-pub fn actions_for(findings: &[Finding]) -> Vec<crate::actions::Action> {    let mut by_rule: HashMap<&str, Vec<&Finding>> = HashMap::new();
+pub fn actions_for(findings: &[Finding]) -> Vec<crate::actions::Action> {
+    let mut by_rule: HashMap<&str, Vec<&Finding>> = HashMap::new();
     for f in findings {
         by_rule.entry(f.rule_id.as_str()).or_default().push(f);
     }
@@ -379,7 +805,12 @@ pub fn label(area: &Area) -> &'static str {
 
 fn track_param(k: &str) -> bool {
     let k = k.to_lowercase();
-    k == "amp" || k.starts_with("utm_") || k == "fbclid" || k == "gclid" || k == "msclkid" || k == "yclid"
+    k == "amp"
+        || k.starts_with("utm_")
+        || k == "fbclid"
+        || k == "gclid"
+        || k == "msclkid"
+        || k == "yclid"
 }
 
 fn has_tracking(url: &str) -> bool {
@@ -397,7 +828,8 @@ pub fn probe_finding(rule_id: &str, scope: String, evidence: String) -> Option<F
     Some(f)
 }
 
-fn mk(rule_id: &'static str, scope: String, evidence: String) -> Finding {    let r = rule(rule_id).expect("rule id");
+fn mk(rule_id: &'static str, scope: String, evidence: String) -> Finding {
+    let r = rule(rule_id).expect("rule id");
     Finding {
         rule_id: rule_id.to_string(),
         area: r.area,
@@ -420,7 +852,11 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
             if p.hops.is_empty() {
                 out.push(mk("R02", p.url.clone(), "fetch failed".into()));
             } else {
-                out.push(mk("R03", p.url.clone(), format!("chain exhausted after {} hops", p.hops.len())));
+                out.push(mk(
+                    "R03",
+                    p.url.clone(),
+                    format!("chain exhausted after {} hops", p.hops.len()),
+                ));
             }
         } else if p.status >= 400 {
             out.push(mk("R01", p.url.clone(), format!("HTTP {}", p.status)));
@@ -454,7 +890,11 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
         if p.final_url.trim_end_matches('/') != p.url.trim_end_matches('/')
             && crate::crawl::canonicalize(&p.final_url) == p.url
         {
-            out.push(mk("R49", p.url.clone(), format!("serves variant {}", p.final_url)));
+            out.push(mk(
+                "R49",
+                p.url.clone(),
+                format!("serves variant {}", p.final_url),
+            ));
         }
     }
     if let Some(v) = &rep.vitals {
@@ -473,7 +913,10 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
             }
         }
         if !v.field && (v.lcp_ms.is_some() || v.cls_milli.is_some() || v.inp_ms.is_some()) {
-            let inp = v.inp_ms.map(|x| format!(", INP {}ms", x)).unwrap_or_default();
+            let inp = v
+                .inp_ms
+                .map(|x| format!(", INP {}ms", x))
+                .unwrap_or_default();
             out.push(mk(
                 "R53",
                 rep.start_url.clone(),
@@ -488,7 +931,11 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
         // A single hop is a normal redirect (http->https, trailing slash).
         // Only real chains (2+ hops) surface as R03 redirect chains.
         if p.status != 0 && p.hops.len() >= 2 {
-            out.push(mk("R03", p.url.clone(), format!("{} hops -> {}", p.hops.len(), p.final_url)));
+            out.push(mk(
+                "R03",
+                p.url.clone(),
+                format!("{} hops -> {}", p.hops.len(), p.final_url),
+            ));
         }
     }
     if !rep.seeded_from_sitemap {
@@ -498,7 +945,11 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
         out.push(mk("R06", rep.start_url.clone(), "no robots.txt".into()));
     }
     if rep.capped {
-        out.push(mk("R07", rep.start_url.clone(), format!("capped at {} pages", rep.pages_crawled)));
+        out.push(mk(
+            "R07",
+            rep.start_url.clone(),
+            format!("capped at {} pages", rep.pages_crawled),
+        ));
     }
     for f in &mut out {
         f.source = "live-crawl".into();
@@ -515,7 +966,11 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
             None => out.push(mk("R09", scope.clone(), "no title".into())),
             Some(t) => {
                 if r.title_len < 30 || r.title_len > 60 {
-                    out.push(mk("R10", scope.clone(), format!("{} chars: {}", r.title_len, t)));
+                    out.push(mk(
+                        "R10",
+                        scope.clone(),
+                        format!("{} chars: {}", r.title_len, t),
+                    ));
                 }
             }
         }
@@ -523,7 +978,11 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
             None => out.push(mk("R11", scope.clone(), "no description".into())),
             Some(_) => {
                 if r.description_len < 120 || r.description_len > 160 {
-                    out.push(mk("R12", scope.clone(), format!("{} chars", r.description_len)));
+                    out.push(mk(
+                        "R12",
+                        scope.clone(),
+                        format!("{} chars", r.description_len),
+                    ));
                 }
             }
         }
@@ -533,10 +992,18 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
             out.push(mk("R14", scope.clone(), format!("{} H1", r.h1_count)));
         }
         if !r.heading_skipped_levels.is_empty() {
-            out.push(mk("R15", scope.clone(), r.heading_skipped_levels.join(", ")));
+            out.push(mk(
+                "R15",
+                scope.clone(),
+                r.heading_skipped_levels.join(", "),
+            ));
         }
         if r.images_missing_alt > 0 {
-            out.push(mk("R16", scope.clone(), format!("{} missing alt", r.images_missing_alt)));
+            out.push(mk(
+                "R16",
+                scope.clone(),
+                format!("{} missing alt", r.images_missing_alt),
+            ));
         }
         if r.word_count < 300 {
             out.push(mk("R18", scope.clone(), format!("{} words", r.word_count)));
@@ -550,13 +1017,20 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
             out.push(mk(
                 "R19",
                 scope.clone(),
-                format!("{} em-dashes, {}", r.em_dash_count, r.ai_slop_words_found.join(", ")),
+                format!(
+                    "{} em-dashes, {}",
+                    r.em_dash_count,
+                    r.ai_slop_words_found.join(", ")
+                ),
             ));
         }
-        if r.word_count > 0
-            && (r.em_dash_count as f64) * 500.0 / (r.word_count.max(1) as f64) > 2.0
+        if r.word_count > 0 && (r.em_dash_count as f64) * 500.0 / (r.word_count.max(1) as f64) > 2.0
         {
-            out.push(mk("R20", scope.clone(), format!("{} em-dashes", r.em_dash_count)));
+            out.push(mk(
+                "R20",
+                scope.clone(),
+                format!("{} em-dashes", r.em_dash_count),
+            ));
         }
         if r.internal_links == 0 && r.external_links == 0 {
             out.push(mk("R26", scope.clone(), "no outbound links".into()));
@@ -564,7 +1038,11 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
         if !r.schema_found {
             out.push(mk("R31", scope.clone(), "no JSON-LD".into()));
         } else if !r.schema_json_valid {
-            out.push(mk("R33", scope.clone(), "ld+json block fails to parse".into()));
+            out.push(mk(
+                "R33",
+                scope.clone(),
+                "ld+json block fails to parse".into(),
+            ));
         }
         if !r.canonical_found {
             out.push(mk("R36", scope.clone(), "no canonical".into()));
@@ -575,12 +1053,24 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
         // GEO window lives on the same opening count as the display badge:
         // thin ledes cannot answer (R24), bloated ones dilute it (R41).
         if r.geo_opening_words < crate::audit::GEO_MIN_WORDS {
-            out.push(mk("R24", scope.clone(), format!("opening {} words", r.geo_opening_words)));
+            out.push(mk(
+                "R24",
+                scope.clone(),
+                format!("opening {} words", r.geo_opening_words),
+            ));
         } else if r.geo_opening_words > crate::audit::GEO_MAX_WORDS {
-            out.push(mk("R41", scope.clone(), format!("opening {} words", r.geo_opening_words)));
+            out.push(mk(
+                "R41",
+                scope.clone(),
+                format!("opening {} words", r.geo_opening_words),
+            ));
         }
         if r.uncited_claims > 0 {
-            out.push(mk("R55", scope.clone(), format!("{} statistics without a nearby source", r.uncited_claims)));
+            out.push(mk(
+                "R55",
+                scope.clone(),
+                format!("{} statistics without a nearby source", r.uncited_claims),
+            ));
         }
         if let (Some(t), Some(d)) = (&r.title, &r.description) {
             let tl = t.to_lowercase();
@@ -591,7 +1081,14 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
             } else if tl.len() >= 10 && dl.starts_with(&tl) {
                 signals.push("description opens with title");
             }
-            for cta in ["learn more", "contact us", "read more", "click here", "shop now", "sign up"] {
+            for cta in [
+                "learn more",
+                "contact us",
+                "read more",
+                "click here",
+                "shop now",
+                "sign up",
+            ] {
                 if dl.ends_with(cta) {
                     signals.push("stock CTA close");
                     break;
@@ -601,19 +1098,42 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
                 out.push(mk("R54", scope.clone(), signals.join("; ")));
             }
         }
+        if r.js_shell {
+            let mut f = mk("R08", scope.clone(), "JS-only shell: thin readable text with heavy script payload (ponytail: warn only, render with --features js)".into());
+            f.severity = Severity::Low;
+            out.push(f);
+        }
+        if !r.schema_missing_required.is_empty() {
+            out.push(mk(
+                "R32",
+                scope.clone(),
+                r.schema_missing_required.join("; "),
+            ));
+        }
     }
     for (title, files) in &rep.duplicate_titles {
-        out.push(mk("R21", files.first().cloned().unwrap_or_default(), format!("shared title: {}", title)));
+        out.push(mk(
+            "R21",
+            files.first().cloned().unwrap_or_default(),
+            format!("shared title: {}", title),
+        ));
     }
     let mut by_desc: HashMap<&str, Vec<&str>> = HashMap::new();
     for r in &rep.reports {
         if let Some(d) = &r.description {
-            by_desc.entry(d.as_str()).or_default().push(r.file_path.as_str());
+            by_desc
+                .entry(d.as_str())
+                .or_default()
+                .push(r.file_path.as_str());
         }
     }
     for (desc, files) in &by_desc {
         if files.len() > 1 {
-            out.push(mk("R22", files[0].to_string(), format!("shared description: {}", desc)));
+            out.push(mk(
+                "R22",
+                files[0].to_string(),
+                format!("shared description: {}", desc),
+            ));
         }
     }
     for item in &rep.keyword_cannibalization {
@@ -633,24 +1153,42 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
     let by_path: std::collections::HashMap<String, &crate::audit::AuditReport> = rep
         .reports
         .iter()
-        .map(|r| (std::path::Path::new(&r.file_path).file_name().unwrap_or_default().to_string_lossy().to_string(), r))
+        .map(|r| {
+            (
+                std::path::Path::new(&r.file_path)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string(),
+                r,
+            )
+        })
         .collect();
     let mut seen_cluster: Vec<(String, String, String)> = Vec::new();
     for r in &rep.reports {
         for (lang, href) in &r.hreflang_alternates {
-            let bare = href.split(['/', '\\']).next_back().unwrap_or("").to_string();
+            let bare = href
+                .split(['/', '\\'])
+                .next_back()
+                .unwrap_or("")
+                .to_string();
             let target = match by_path.get(&bare) {
                 Some(t) => t,
                 None => continue, // not in this audit set
             };
             let is_self = target.file_path == r.file_path;
             let has_index = !target.noindex;
-            let governs = has_index && (is_self || target.hreflang_alternates.iter().any(|(l, h)| {
-                l == lang && {
-                    let other = h.split(['/', '\\']).next_back().unwrap_or("");
-                    other == std::path::Path::new(&r.file_path).file_name().unwrap_or_default()
-                }
-            }));
+            let governs = has_index
+                && (is_self
+                    || target.hreflang_alternates.iter().any(|(l, h)| {
+                        l == lang && {
+                            let other = h.split(['/', '\\']).next_back().unwrap_or("");
+                            other
+                                == std::path::Path::new(&r.file_path)
+                                    .file_name()
+                                    .unwrap_or_default()
+                        }
+                    }));
             if !governs {
                 let why = if !has_index && !is_self {
                     "points at a noindexed target"
@@ -659,10 +1197,22 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
                 } else {
                     "alternate is not reciprocated"
                 };
-                let dup = seen_cluster.contains(&(r.file_path.clone(), target.file_path.clone(), lang.clone()));
+                let dup = seen_cluster.contains(&(
+                    r.file_path.clone(),
+                    target.file_path.clone(),
+                    lang.clone(),
+                ));
                 if !dup {
-                    seen_cluster.push((r.file_path.clone(), target.file_path.clone(), lang.clone()));
-                    out.push(mk("R58", r.file_path.clone(), format!("{} -> {} ({}) {why}", lang, target.file_path, href)));
+                    seen_cluster.push((
+                        r.file_path.clone(),
+                        target.file_path.clone(),
+                        lang.clone(),
+                    ));
+                    out.push(mk(
+                        "R58",
+                        r.file_path.clone(),
+                        format!("{} -> {} ({}) {why}", lang, target.file_path, href),
+                    ));
                 }
             }
         }

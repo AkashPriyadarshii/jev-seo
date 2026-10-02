@@ -62,7 +62,9 @@ fn score_of(rep: &crate::audit::DirectoryAuditReport) -> u32 {
 fn counts(findings: &[crate::rules::Finding]) -> (usize, usize) {
     let blocking = findings
         .iter()
-        .filter(|f| crate::rules::effective_gate(&f.rule_id, &f.scope) == crate::rules::Gate::Blocking)
+        .filter(|f| {
+            crate::rules::effective_gate(&f.rule_id, &f.scope) == crate::rules::Gate::Blocking
+        })
         .count();
     let warnings = findings.len().saturating_sub(blocking);
     (blocking, warnings)
@@ -84,20 +86,23 @@ pub fn watch_repo_once(
         .map(|s| s.to_string())
         .unwrap_or_else(|| format!("watch-{}", path.replace(['/', '\\', ':', '.'], "-")));
     let before_src = db.load_baseline(&slug)?;
-    let (score_before, findings_before, blocking_before, warnings_before) = if let Some(src) = before_src {
-        if let Ok(base) = serde_json::from_str::<crate::audit::DirectoryAuditReport>(&src) {
-            let s = score_of(&base);
-            let (b, w) = counts(&base.findings);
-            (Some(s), base.findings.len(), b, w)
+    let (score_before, findings_before, blocking_before, warnings_before) =
+        if let Some(src) = before_src {
+            if let Ok(base) = serde_json::from_str::<crate::audit::DirectoryAuditReport>(&src) {
+                let s = score_of(&base);
+                let (b, w) = counts(&base.findings);
+                (Some(s), base.findings.len(), b, w)
+            } else {
+                (None, 0, 0, 0)
+            }
         } else {
             (None, 0, 0, 0)
-        }
-    } else {
-        (None, 0, 0, 0)
-    };
+        };
     let score_now = score_of(&rep);
     let (blocking_now, warnings_now) = counts(&rep.findings);
-    let delta = score_before.map(|b| score_now as i32 - b as i32).unwrap_or(0);
+    let delta = score_before
+        .map(|b| score_now as i32 - b as i32)
+        .unwrap_or(0);
     let status = if score_before.is_none() {
         "baseline".to_string()
     } else if delta < 0 || blocking_now > blocking_before {
@@ -108,7 +113,10 @@ pub fn watch_repo_once(
         "clean".to_string()
     };
     let drift = db.drift_alerts(200).unwrap_or_default();
-    let top_actions = crate::rules::actions_for(&rep.findings).into_iter().take(5).collect();
+    let top_actions = crate::rules::actions_for(&rep.findings)
+        .into_iter()
+        .take(5)
+        .collect();
 
     // Persist this run as new baseline for next watch iteration
     let cur_src = serde_json::to_string(&rep)?;
@@ -133,16 +141,27 @@ pub fn watch_repo_once(
     })
 }
 
-pub fn watch_site_once(url: &str, label: Option<&str>, no_jev: bool) -> anyhow::Result<WatchResult> {
+pub fn watch_site_once(
+    url: &str,
+    label: Option<&str>,
+    no_jev: bool,
+) -> anyhow::Result<WatchResult> {
     let mut budget = crate::fetch::Budget::default();
-    let rep = crate::crawl::crawl_site(url, crate::crawl::DEFAULT_MAX_PAGES, crate::fetch::FetchMode::Auto, &mut budget)?;
+    let rep = crate::crawl::crawl_site(
+        url,
+        crate::crawl::DEFAULT_MAX_PAGES,
+        crate::fetch::FetchMode::Auto,
+        &mut budget,
+    )?;
     let _ = no_jev;
     let db = crate::rank::DbStore::open()?;
     let slug = label
         .map(|s| s.to_string())
         .unwrap_or_else(|| format!("watch-{}", url.replace(['/', ':', '.', '?', '&', '='], "-")));
     let before_src = db.load_baseline(&slug)?;
-    let (score_before, findings_before, blocking_before, warnings_before) = if let Some(src) = before_src {
+    let (score_before, findings_before, blocking_before, warnings_before) = if let Some(src) =
+        before_src
+    {
         // Try crawl report first, fallback to audit report shape
         if let Ok(base) = serde_json::from_str::<crate::crawl::CrawlReport>(&src) {
             let (b, w) = counts(&base.findings);
@@ -159,7 +178,9 @@ pub fn watch_site_once(url: &str, label: Option<&str>, no_jev: bool) -> anyhow::
     };
     let score_now = rep.score;
     let (blocking_now, warnings_now) = counts(&rep.findings);
-    let delta = score_before.map(|b| score_now as i32 - b as i32).unwrap_or(0);
+    let delta = score_before
+        .map(|b| score_now as i32 - b as i32)
+        .unwrap_or(0);
     let status = if score_before.is_none() {
         "baseline".to_string()
     } else if delta < 0 || blocking_now > blocking_before {

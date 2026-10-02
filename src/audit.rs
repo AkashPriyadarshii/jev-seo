@@ -11,18 +11,44 @@ static SLOP_RE: LazyLock<Regex> = LazyLock::new(|| {
     alts.sort_by_key(|a| std::cmp::Reverse(a.len()));
     Regex::new(&format!("(?i)\\b(?:{})\\b", alts.join("|"))).expect("slop regex")
 });
-static TAG_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?is)<(script|style|head)\b[^>]*>.*?</(script|style|head)\s*>").expect("tag regex"));
+static TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?is)<(script|style|head)\b[^>]*>.*?</(script|style|head)\s*>").expect("tag regex")
+});
 static MD_HTML_H_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?i)<h([1-6])\b[^>]*>"#).expect("md html heading regex"));
 static MD_FENCE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)```.*?```").expect("fence regex"));
-static CLAIM_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b\d+(?:\.\d+)?%?|\b(?:19|20)\d{2}\b").expect("claim regex")
-});
+static CLAIM_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b\d+(?:\.\d+)?%?|\b(?:19|20)\d{2}\b").expect("claim regex"));
 static CITE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)https?://|source|study|studies|research|according to|figure|fig\.|report|survey|data shows|\[\d+\]").expect("cite regex")
 });
+static SCRIPT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?is)<script\b[^>]*>(.*?)</script>").expect("script regex"));
+
+pub(crate) fn js_shell_for(raw: &str, word_count: usize) -> bool {
+    if word_count >= 300 {
+        return false;
+    }
+    // ponytail: bytes ratio only, no headless render until --features js
+    let script_bytes: usize = SCRIPT_RE.captures_iter(raw).map(|c| c[1].len()).sum();
+    let text = crate::fetch::readable_text(raw, 200_000);
+    let text_bytes = text.len().max(1);
+    word_count < 300 && script_bytes > 2 * text_bytes
+}
+
+pub(crate) fn schema_missing_for(content: &str, label: &str) -> Vec<String> {
+    let Ok(rep) = crate::schema::validate_content(label, content) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for d in &rep.details {
+        for m in &d.missing_required {
+            out.push(format!("{}: {}", d.schema_type, m));
+        }
+    }
+    out
+}
 
 /// Claims (statistics, quantities, years) with no citation signal within
 /// 200 chars either side: the cheapest trust gap a rule can measure.
@@ -37,12 +63,16 @@ pub fn count_uncited_claims(text: &str) -> usize {
     }
     n
 }
-static MD_LINK_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"!\[([^\]]*)\]\([^)]+\)|\[([^\]]*)\]\([^)]+\)").expect("md link regex"));
+static MD_LINK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"!\[([^\]]*)\]\([^)]+\)|\[([^\]]*)\]\([^)]+\)").expect("md link regex")
+});
 
 /// Attribute value from a single HTML tag, any attribute order.
 fn tag_attr(tag: &str, attr: &str) -> Option<String> {
-    let pat = format!(r#"(?i)\b{}\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)"#, regex::escape(attr));
+    let pat = format!(
+        r#"(?i)\b{}\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)"#,
+        regex::escape(attr)
+    );
     let re = Regex::new(&pat).ok()?;
     re.captures(tag).and_then(|c| {
         c.get(1).map(|m| {
@@ -85,7 +115,9 @@ fn md_prose_words(body: &str) -> (String, usize) {
     let words: Vec<&str> = no_code
         .split_whitespace()
         .filter(|w| {
-            let t = w.trim_matches(|c: char| c == '#' || c == '*' || c == '_' || c == '-' || c == '>' || c == '|');
+            let t = w.trim_matches(|c: char| {
+                c == '#' || c == '*' || c == '_' || c == '-' || c == '>' || c == '|'
+            });
             !t.is_empty()
         })
         .collect();
@@ -131,6 +163,12 @@ pub struct AuditReport {
     /// reports saved before validation existed do not newly fail R33.
     #[serde(default = "schema_valid_default")]
     pub schema_json_valid: bool,
+    /// Missing required rich-result props (R32) extracted from ld+json.
+    #[serde(default)]
+    pub schema_missing_required: Vec<String>,
+    /// JS-only shell heuristic: readable_text <300w && script bytes >2× text (R08).
+    #[serde(default)]
+    pub js_shell: bool,
     pub checks: Vec<CheckItem>,
 }
 
@@ -200,7 +238,11 @@ pub fn check_ai_slop(em_dash_count: usize, slop_words: &[String], word_count: us
     let passed = !is_excessive_dashes && !is_excessive_words;
 
     let message = if passed {
-        format!("Natural writing tone ({} em-dashes, {} AI crutches)", em_dash_count, slop_words.len())
+        format!(
+            "Natural writing tone ({} em-dashes, {} AI crutches)",
+            em_dash_count,
+            slop_words.len()
+        )
     } else {
         format!(
             "Helpful Content risk: {} em-dashes ({:.1}/500w) and {} AI tells [{}]",
@@ -223,7 +265,10 @@ pub fn check_title_length(title_len: usize) -> CheckItem {
     CheckItem {
         name: "Title Tag Length".into(),
         passed,
-        message: format!("Length: {} chars (Optimal: {}-{} chars)", title_len, MIN_TITLE_CHARS, MAX_TITLE_CHARS),
+        message: format!(
+            "Length: {} chars (Optimal: {}-{} chars)",
+            title_len, MIN_TITLE_CHARS, MAX_TITLE_CHARS
+        ),
     }
 }
 
@@ -235,7 +280,10 @@ pub fn check_meta_description(description_len: usize) -> CheckItem {
         message: if description_len == 0 {
             "Missing description metadata".into()
         } else {
-            format!("Length: {} chars (Optimal: {}-{} chars)", description_len, MIN_DESC_CHARS, MAX_DESC_CHARS)
+            format!(
+                "Length: {} chars (Optimal: {}-{} chars)",
+                description_len, MIN_DESC_CHARS, MAX_DESC_CHARS
+            )
         },
     }
 }
@@ -252,7 +300,10 @@ pub fn check_content_depth(word_count: usize) -> CheckItem {
     CheckItem {
         name: "Content Depth".into(),
         passed: word_count >= MIN_CONTENT_WORDS,
-        message: format!("Word count: {} (Recommended min: {} words)", word_count, MIN_CONTENT_WORDS),
+        message: format!(
+            "Word count: {} (Recommended min: {} words)",
+            word_count, MIN_CONTENT_WORDS
+        ),
     }
 }
 
@@ -260,7 +311,10 @@ pub fn check_image_alt_tags(image_count: usize, images_missing_alt: usize) -> Ch
     CheckItem {
         name: "Image Alt Tags".into(),
         passed: images_missing_alt == 0,
-        message: format!("Images: {}, Missing Alt: {}", image_count, images_missing_alt),
+        message: format!(
+            "Images: {}, Missing Alt: {}",
+            image_count, images_missing_alt
+        ),
     }
 }
 
@@ -269,7 +323,10 @@ pub fn check_geo_citation_density(words: usize) -> CheckItem {
     CheckItem {
         name: "GEO Citation Density".into(),
         passed,
-        message: format!("Opening passage: {} words (Optimal AI citation block: 134-167 words)", words),
+        message: format!(
+            "Opening passage: {} words (Optimal AI citation block: 134-167 words)",
+            words
+        ),
     }
 }
 
@@ -277,7 +334,11 @@ pub fn check_schema_markup(schema_found: bool) -> CheckItem {
     CheckItem {
         name: "Schema Markup".into(),
         passed: schema_found,
-        message: if schema_found { "Structured data present".into() } else { "No JSON-LD/schema markup defined".into() },
+        message: if schema_found {
+            "Structured data present".into()
+        } else {
+            "No JSON-LD/schema markup defined".into()
+        },
     }
 }
 
@@ -285,7 +346,11 @@ pub fn check_canonical_reference(canonical_found: bool) -> CheckItem {
     CheckItem {
         name: "Canonical Reference".into(),
         passed: canonical_found,
-        message: if canonical_found { "Canonical tag configured".into() } else { "Missing canonical URL definition".into() },
+        message: if canonical_found {
+            "Canonical tag configured".into()
+        } else {
+            "Missing canonical URL definition".into()
+        },
     }
 }
 
@@ -293,7 +358,11 @@ pub fn check_opengraph_metadata(og_found: bool) -> CheckItem {
     CheckItem {
         name: "OpenGraph Metadata".into(),
         passed: og_found,
-        message: if og_found { "OpenGraph meta tags found".into() } else { "Missing og:title, og:description, or og:image tags".into() },
+        message: if og_found {
+            "OpenGraph meta tags found".into()
+        } else {
+            "Missing og:title, og:description, or og:image tags".into()
+        },
     }
 }
 
@@ -302,9 +371,9 @@ pub fn audit_file(path_str: &str) -> Result<AuditReport> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read file: {}", path_str))?;
 
-    let is_markdown = path.extension().is_some_and(|ext| {
-        ext == "md" || ext == "mdx" || ext == "markdown"
-    });
+    let is_markdown = path
+        .extension()
+        .is_some_and(|ext| ext == "md" || ext == "mdx" || ext == "markdown");
 
     if is_markdown {
         audit_markdown(path_str, &content)
@@ -360,7 +429,9 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
                 hreflang_alternates.push((lang.to_ascii_lowercase(), href));
             }
         }
-        let script_re = Regex::new(r#"(?is)<script\b[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
+        let script_re = Regex::new(
+            r#"(?is)<script\b[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#,
+        )?;
         for cap in script_re.captures_iter(&body) {
             schema_found = true;
             if serde_json::from_str::<serde_json::Value>(&cap[1]).is_err() {
@@ -473,7 +544,10 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
             let target = cap[2].trim().split('#').next().unwrap_or("").trim();
             if target.starts_with("http://") || target.starts_with("https://") {
                 external_links += 1;
-            } else if !target.is_empty() && !target.starts_with('#') && !target.starts_with("mailto:") {
+            } else if !target.is_empty()
+                && !target.starts_with('#')
+                && !target.starts_with("mailto:")
+            {
                 internal_links += 1;
                 internal_link_targets.push(target.to_string());
             }
@@ -517,6 +591,8 @@ fn audit_markdown(path_str: &str, content: &str) -> Result<AuditReport> {
         external_links,
         schema_found,
         schema_json_valid,
+        schema_missing_required: schema_missing_for(&body, path_str),
+        js_shell: js_shell_for(content, word_count),
         canonical_found,
         og_tags_found,
         geo_opening_words: first_section_words,
@@ -537,7 +613,8 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
     let img_re = Regex::new(r#"(?is)<img\b([^>]*)>"#)?;
     let alt_attr_re = Regex::new(r#"(?is)\balt\s*="#)?;
     let a_re = Regex::new(r#"(?is)<a\b[^>]*href=["']([^"']*)["']"#)?;
-    let schema_block_re = Regex::new(r#"(?is)<script\b[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
+    let schema_block_re =
+        Regex::new(r#"(?is)<script\b[^>]*type=["']application/ld\+json["'][^>]*>(.*?)</script>"#)?;
     let strip_html = Regex::new(r#"<[^>]+>"#)?;
 
     let title = title_re.captures(content).map(|c| c[1].trim().to_string());
@@ -587,9 +664,15 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
     // All three OG tags required: one of three passing hid partial markup.
     let og_tags_found = og_seen.len() == 3;
 
-    let h1_count = Regex::new(r#"(?is)<h1\b[^>]*>.*?</h1>"#)?.find_iter(content).count();
-    let h2_count = Regex::new(r#"(?is)<h2\b[^>]*>.*?</h2>"#)?.find_iter(content).count();
-    let h3_count = Regex::new(r#"(?is)<h3\b[^>]*>.*?</h3>"#)?.find_iter(content).count();
+    let h1_count = Regex::new(r#"(?is)<h1\b[^>]*>.*?</h1>"#)?
+        .find_iter(content)
+        .count();
+    let h2_count = Regex::new(r#"(?is)<h2\b[^>]*>.*?</h2>"#)?
+        .find_iter(content)
+        .count();
+    let h3_count = Regex::new(r#"(?is)<h3\b[^>]*>.*?</h3>"#)?
+        .find_iter(content)
+        .count();
 
     let heading_seq_re = Regex::new(r#"(?is)<(h[1-6])\b[^>]*>"#)?;
     let mut prev_heading_level: Option<usize> = None;
@@ -699,6 +782,8 @@ fn audit_html(path_str: &str, content: &str) -> Result<AuditReport> {
         external_links,
         schema_found,
         schema_json_valid,
+        schema_missing_required: schema_missing_for(content, path_str),
+        js_shell: js_shell_for(content, word_count),
         canonical_found,
         og_tags_found,
         geo_opening_words: opening_words,
@@ -746,7 +831,11 @@ pub fn cannibalization_pairs(rep: &DirectoryAuditReport) -> Vec<CannibalizationP
             for j in (i + 1)..files.len() {
                 let (a, b) = (files[i].clone(), files[j].clone());
                 let (aw, bw) = (words_for(&a), words_for(&b));
-                let winner = if aw > bw || (aw == bw && a < b) { a.clone() } else { b.clone() };
+                let winner = if aw > bw || (aw == bw && a < b) {
+                    a.clone()
+                } else {
+                    b.clone()
+                };
                 out.push(CannibalizationPair {
                     keyword_stem: item.keyword_stem.clone(),
                     a,
@@ -827,7 +916,7 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
             orphan_pages: Vec::new(),
             keyword_cannibalization: Vec::new(),
             findings: Vec::new(),
-        }))
+        }));
     }
 
     let mut files = Vec::new();
@@ -835,14 +924,18 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
     files.sort();
 
     if files.is_empty() {
-        anyhow::bail!("No markdown (.md/.mdx) or HTML files found in directory: {}", path_str);
+        anyhow::bail!(
+            "No markdown (.md/.mdx) or HTML files found in directory: {}",
+            path_str
+        );
     }
 
     let mut reports = Vec::new();
     let mut total_words = 0;
     let mut total_checks = 0;
     let mut total_passed = 0;
-    let mut title_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut title_map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     let mut thin_pages = Vec::new();
     let mut missing_canonicals = Vec::new();
     let mut missing_descriptions = Vec::new();
@@ -885,13 +978,21 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
         .collect();
 
     // Internal Link Graph & Orphan Page Detection
-    let mut inbound_map: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut inbound_map: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     for rep in &reports {
         let rep_norm = rep.file_path.replace('\\', "/");
-        let rep_stem = Path::new(&rep.file_path).file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+        let rep_stem = Path::new(&rep.file_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
 
         for raw_target in &rep.internal_link_targets {
-            let clean = raw_target.trim().trim_start_matches("./").replace('\\', "/");
+            let clean = raw_target
+                .trim()
+                .trim_start_matches("./")
+                .replace('\\', "/");
             let clean_stem = clean.split('/').next_back().unwrap_or("").to_string();
 
             for f in &files {
@@ -913,7 +1014,11 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
     if files.len() > 1 {
         for f in &files {
             let f_norm = f.to_string_lossy().replace('\\', "/");
-            let f_name = f.file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
+            let f_name = f
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_lowercase();
             // Skip root index / readme as landing entrypoint
             if f_name.starts_with("readme") || f_name.starts_with("index") {
                 continue;
@@ -926,10 +1031,14 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
 
     // Keyword Cannibalization Radar
     let stop_words: std::collections::HashSet<&str> = [
-        "a", "an", "the", "in", "on", "at", "for", "to", "of", "and", "or", "with", "by", "is", "vs", "how"
-    ].into_iter().collect();
+        "a", "an", "the", "in", "on", "at", "for", "to", "of", "and", "or", "with", "by", "is",
+        "vs", "how",
+    ]
+    .into_iter()
+    .collect();
 
-    let mut stem_to_files: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let mut stem_to_files: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     for rep in &reports {
         if let Some(title) = &rep.title {
             let words: Vec<String> = title
@@ -941,7 +1050,10 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
 
             if words.len() >= 2 {
                 let stem = words[..words.len().min(3)].join(" ");
-                stem_to_files.entry(stem).or_default().push(rep.file_path.clone());
+                stem_to_files
+                    .entry(stem)
+                    .or_default()
+                    .push(rep.file_path.clone());
             }
         }
     }
@@ -949,7 +1061,10 @@ pub fn audit_path(path_str: &str) -> Result<DirectoryAuditReport> {
     let keyword_cannibalization: Vec<CannibalizationItem> = stem_to_files
         .into_iter()
         .filter(|(_, paths)| paths.len() > 1)
-        .map(|(keyword_stem, colliding_files)| CannibalizationItem { keyword_stem, colliding_files })
+        .map(|(keyword_stem, colliding_files)| CannibalizationItem {
+            keyword_stem,
+            colliding_files,
+        })
         .collect();
 
     let total_files = reports.len();
@@ -989,13 +1104,19 @@ fn collect_audit_files(dir: &Path, files: &mut Vec<std::path::PathBuf>) -> Resul
             let entry = entry?;
             let path = entry.path();
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if file_name.starts_with('.') || file_name == "node_modules" || file_name == "target" || file_name == "dist" || file_name == "build" {
+            if file_name.starts_with('.')
+                || file_name == "node_modules"
+                || file_name == "target"
+                || file_name == "dist"
+                || file_name == "build"
+            {
                 continue;
             }
             if path.is_dir() {
                 collect_audit_files(&path, files)?;
             } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if ext == "md" || ext == "mdx" || ext == "markdown" || ext == "html" || ext == "htm" {
+                if ext == "md" || ext == "mdx" || ext == "markdown" || ext == "html" || ext == "htm"
+                {
                     files.push(path);
                 }
             }
@@ -1046,8 +1167,18 @@ fn pdf_lines(title: &str, lines: &[String]) -> Vec<u8> {
     // Objects: 1 catalog, 2 pages, 3 font, then per page (page, content).
     let mut objs: Vec<Vec<u8>> = Vec::new();
     objs.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
-    let kids: Vec<String> = (0..pages.len()).map(|p| format!("{} 0 R", 4 + p * 2)).collect();
-    objs.push(format!("<< /Type /Pages /Kids [{}] /Count {} >>", kids.join(" "), pages.len()).as_bytes().to_vec());
+    let kids: Vec<String> = (0..pages.len())
+        .map(|p| format!("{} 0 R", 4 + p * 2))
+        .collect();
+    objs.push(
+        format!(
+            "<< /Type /Pages /Kids [{}] /Count {} >>",
+            kids.join(" "),
+            pages.len()
+        )
+        .as_bytes()
+        .to_vec(),
+    );
     objs.push(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_vec());
     for (pi, chunk) in pages.iter().enumerate() {
         let content_obj = 5 + pi * 2;
@@ -1068,7 +1199,9 @@ fn pdf_lines(title: &str, lines: &[String]) -> Vec<u8> {
         }
         stream.push_str("ET");
         let bytes = stream.as_bytes();
-        let mut obj = format!("<< /Length {} >>\nstream\n", bytes.len()).as_bytes().to_vec();
+        let mut obj = format!("<< /Length {} >>\nstream\n", bytes.len())
+            .as_bytes()
+            .to_vec();
         obj.extend_from_slice(bytes);
         obj.extend_from_slice(b"\nendstream");
         objs.push(obj);
@@ -1088,7 +1221,12 @@ fn pdf_lines(title: &str, lines: &[String]) -> Vec<u8> {
         out.extend_from_slice(format!("{:010} 00000 n \n", off).as_bytes());
     }
     out.extend_from_slice(
-        format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF", objs.len() + 1, xref_at).as_bytes(),
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF",
+            objs.len() + 1,
+            xref_at
+        )
+        .as_bytes(),
     );
     out
 }
@@ -1114,15 +1252,25 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
         ));
     }
     if !rep.duplicate_titles.is_empty() {
-        m.push_str(&format!("\n## Duplicate titles ({})\n\n", rep.duplicate_titles.len()));
+        m.push_str(&format!(
+            "\n## Duplicate titles ({})\n\n",
+            rep.duplicate_titles.len()
+        ));
         let mut titles: Vec<&String> = rep.duplicate_titles.keys().collect();
         titles.sort();
         for t in titles {
-            m.push_str(&format!("- {} ({} files)\n", t, rep.duplicate_titles[t].len()));
+            m.push_str(&format!(
+                "- {} ({} files)\n",
+                t,
+                rep.duplicate_titles[t].len()
+            ));
         }
     }
     if !rep.orphan_pages.is_empty() {
-        m.push_str(&format!("\n## Orphan pages ({})\n\n", rep.orphan_pages.len()));
+        m.push_str(&format!(
+            "\n## Orphan pages ({})\n\n",
+            rep.orphan_pages.len()
+        ));
         for f in &rep.orphan_pages {
             m.push_str(&format!("- {}\n", f));
         }
@@ -1134,14 +1282,23 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
         }
     }
     if !rep.keyword_cannibalization.is_empty() {
-        m.push_str(&format!("\n## Keyword cannibalization ({})\n\n", rep.keyword_cannibalization.len()));
+        m.push_str(&format!(
+            "\n## Keyword cannibalization ({})\n\n",
+            rep.keyword_cannibalization.len()
+        ));
         for item in &rep.keyword_cannibalization {
-            m.push_str(&format!("- {} ({} pages)\n", item.keyword_stem, item.colliding_files.len()));
+            m.push_str(&format!(
+                "- {} ({} pages)\n",
+                item.keyword_stem,
+                item.colliding_files.len()
+            ));
         }
         let pairs = cannibalization_pairs(rep);
         if !pairs.is_empty() {
             m.push_str(&format!("\n### Conflict pairs ({})\n\n", pairs.len()));
-            m.push_str("| Stem | A | B | A words | B words | Keep |\n|---|---|---|---:|---:|---|\n");
+            m.push_str(
+                "| Stem | A | B | A words | B words | Keep |\n|---|---|---|---:|---:|---|\n",
+            );
             for p in pairs.iter().take(20) {
                 m.push_str(&format!(
                     "| {} | {} | {} | {} | {} | {} |\n",
@@ -1150,6 +1307,8 @@ pub fn to_markdown(rep: &DirectoryAuditReport) -> String {
             }
         }
     }
+    // Offline rescore hint for agents: same JSON via --rescore.
+    m.push_str("\n## Trend\n\nOffline rescore: `jev-seo audit <dir> --rescore audit.json --json`. Per-target GEO history in `geo_history`, sparkline `<svg>` in HTML/PDF.\n");
     m.push_str("\n## Method\n\nOn-page checks per file, duplicate titles, orphan link graph, thin-page and cannibalization radar. Scores rank work; they never predict rankings or traffic.\n");
     m.push_str("\n## How to read this report\n\nFindings marked fact were measured directly (status codes, missing tags, counts). Findings marked heuristic are threshold guesses that can fire on healthy pages: re-check those by hand before acting. Any Jev semantic lines carry their model and confidence; below-confidence answers print as notes, not scores. A recommendation failed when its evidence is missing: that is the falsifiability test. Rule set version rides `run.json`.\n");
     m.push_str("\n## Completeness\n\nLocal file walk only. Jev and live crawl are not part of this report unless run separately. Companion artifacts: `run.json`, `ledger.json`.\n");
@@ -1215,20 +1374,29 @@ pub fn bundle_markdown(
         m.push_str(&format!("\n## Merge candidates ({})\n\n", pairs.len()));
         m.push_str("| Stem | A | B | Keep |\n|---|---|---|---|\n");
         for p in pairs.iter().take(20) {
-            m.push_str(&format!("| {} | {} | {} | {} |\n", p.keyword_stem, p.a, p.b, p.winner));
+            m.push_str(&format!(
+                "| {} | {} | {} | {} |\n",
+                p.keyword_stem, p.a, p.b, p.winner
+            ));
         }
     }
     if !drift.is_empty() {
         m.push_str("\n## Drift since last check\n\n");
         for d in drift {
-            m.push_str(&format!("- {}: {} `{}` ({} → {})\n", d.kind, d.target, d.term, d.from, d.to));
+            m.push_str(&format!(
+                "- {}: {} `{}` ({} → {})\n",
+                d.kind, d.target, d.term, d.from, d.to
+            ));
         }
     }
     m
 }
 
 /// PDF with an embedded narrative block when present.
-pub fn to_pdf_with_narrative(rep: &DirectoryAuditReport, n: &crate::narrative::Narrative) -> Vec<u8> {
+pub fn to_pdf_with_narrative(
+    rep: &DirectoryAuditReport,
+    n: &crate::narrative::Narrative,
+) -> Vec<u8> {
     to_pdf_opt(rep, Some(n))
 }
 
@@ -1319,11 +1487,18 @@ pub fn pdf_inventory(rep: &DirectoryAuditReport) -> Vec<String> {
     }
     if !rep.duplicate_titles.is_empty() {
         lines.push(String::new());
-        lines.push(format!("Duplicate titles ({}):", rep.duplicate_titles.len()));
+        lines.push(format!(
+            "Duplicate titles ({}):",
+            rep.duplicate_titles.len()
+        ));
         let mut titles: Vec<&String> = rep.duplicate_titles.keys().collect();
         titles.sort();
         for t in titles.iter().take(10) {
-            lines.push(format!("- {} ({} files)", t, rep.duplicate_titles[*t].len()));
+            lines.push(format!(
+                "- {} ({} files)",
+                t,
+                rep.duplicate_titles[*t].len()
+            ));
         }
     }
     if !rep.orphan_pages.is_empty() {
@@ -1378,8 +1553,57 @@ pub fn pdf_method() -> Vec<String> {
     ]
 }
 
-pub(crate) fn to_pdf_opt(rep: &DirectoryAuditReport, n: Option<&crate::narrative::Narrative>) -> Vec<u8> {
+/// Inline SVG sparkline from integer series. Std only. 0..100 scaled to 20px height.
+/// ponytail: no chart dep, <svg> polyline only
+pub fn sparkline_svg(values: &[u32], width: u32) -> String {
+    if values.len() < 2 {
+        return String::new();
+    }
+    let w = width.max(60) as f64;
+    let h = 20.0;
+    let max = *values.iter().max().unwrap().max(&1) as f64;
+    let min = *values.iter().min().unwrap() as f64;
+    let range = (max - min).max(1.0);
+    let step = w / (values.len() - 1) as f64;
+    let pts: Vec<String> = values
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let x = i as f64 * step;
+            let y = h - ((*v as f64 - min) / range * (h - 4.0) + 2.0);
+            format!("{:.1},{:.1}", x, y)
+        })
+        .collect();
+    format!("<svg width=\"{width}\" height=\"20\" viewBox=\"0 0 {width} 20\" xmlns=\"http://www.w3.org/2000/svg\"><polyline fill=\"none\" stroke=\"#f386a1\" stroke-width=\"1.5\" points=\"{}\"/></svg>", pts.join(" "))
+}
+
+/// Embed GEO/score sparkline in PDF deck when trend history exists.
+fn pdf_trend(db_target: &str) -> Vec<String> {
+    let Ok(db) = crate::rank::DbStore::open() else {
+        return Vec::new();
+    };
+    let Ok(vals) = db.geo_trend(db_target, 12) else {
+        return Vec::new();
+    };
+    if vals.len() < 2 {
+        return Vec::new();
+    }
+    vec![format!(
+        "Trend {}: {}",
+        db_target,
+        vals.iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" → ")
+    )]
+}
+
+pub(crate) fn to_pdf_opt(
+    rep: &DirectoryAuditReport,
+    n: Option<&crate::narrative::Narrative>,
+) -> Vec<u8> {
     let mut lines = pdf_cover(rep);
+    lines.extend(pdf_trend(&rep.dir_path));
     lines.push(String::new());
     lines.extend(pdf_scorecard(rep));
     lines.push(String::new());
@@ -1432,19 +1656,29 @@ pub fn to_html(rep: &DirectoryAuditReport) -> String {
         let mut titles: Vec<&String> = rep.duplicate_titles.keys().collect();
         titles.sort();
         for t in titles {
-            h.push_str(&format!("<li>{} ({} files)</li>", esc(t), rep.duplicate_titles[t].len()));
+            h.push_str(&format!(
+                "<li>{} ({} files)</li>",
+                esc(t),
+                rep.duplicate_titles[t].len()
+            ));
         }
         h.push_str("</ul>");
     }
     if !rep.orphan_pages.is_empty() {
-        h.push_str(&format!("<h2>Orphan pages ({})</h2><ul>", rep.orphan_pages.len()));
+        h.push_str(&format!(
+            "<h2>Orphan pages ({})</h2><ul>",
+            rep.orphan_pages.len()
+        ));
         for f in &rep.orphan_pages {
             h.push_str(&format!("<li>{}</li>", esc(f)));
         }
         h.push_str("</ul>");
     }
     if !rep.thin_pages.is_empty() {
-        h.push_str(&format!("<h2>Thin pages ({})</h2><ul>", rep.thin_pages.len()));
+        h.push_str(&format!(
+            "<h2>Thin pages ({})</h2><ul>",
+            rep.thin_pages.len()
+        ));
         for (f, wc) in &rep.thin_pages {
             h.push_str(&format!("<li>{} ({} words)</li>", esc(f), wc));
         }
@@ -1461,7 +1695,15 @@ pub fn to_html(rep: &DirectoryAuditReport) -> String {
         }
         h.push_str("</ul>");
     }
-    h.push_str("<div class=\"foot\">Generated locally by <code>jev-seo audit --html</code>. Scores rank work; they never predict rankings or traffic. Method: on-page checks per file, duplicate titles, orphan detection via internal link graph, thin-page and cannibalization radar. Completeness: local file walk; Jev and live crawl not part of this report unless run separately. Companion files: <code>run.json</code>, <code>ledger.json</code>.</div>");
+    if let Ok(db) = crate::rank::DbStore::open() {
+        if let Ok(vals) = db.geo_trend(&rep.dir_path, 12) {
+            let svg = sparkline_svg(&vals, 320);
+            if !svg.is_empty() {
+                h.push_str(&format!("<h2>Trend</h2>{}", svg));
+            }
+        }
+    }
+    h.push_str("<div class=\"foot\">Generated locally by <code>jev-seo audit --html</code>. Scores rank work; they never predict rankings or traffic. Method: on-page checks per file, duplicate titles, orphan detection via internal link graph, thin-page and cannibalization radar. Completeness: local file walk; Jev and live crawl not part of this report unless run separately. Companion files: <code>run.json</code>, <code>ledger.json</code>. Offline rescore: <code>jev-seo audit &lt;dir&gt; --rescore audit.json</code>.</div>");
     h.push_str("</body></html>");
     h
 }
