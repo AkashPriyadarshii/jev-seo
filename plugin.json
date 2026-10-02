@@ -1,6 +1,6 @@
 {
   "name": "jev-seo",
-  "version": "0.1.2",
+  "version": "0.3.0",
   "displayName": "jev-seo — Free SEO & GEO Radar",
   "description": "Free Rust SEO & GEO audits: 58-rule checks, live crawl, AI citation scoring, rank drift. 15-tool MCP for agents.",
   "repository": "https://github.com/AkashPriyadarshii/jev-seo",
