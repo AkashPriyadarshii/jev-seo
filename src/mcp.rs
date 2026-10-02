@@ -318,7 +318,8 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                             "type": "object",
                             "properties": {
                                 "url": { "type": "string", "description": "Start URL" },
-                                "max_pages": { "type": "integer", "description": "Maximum pages to fetch (default: 50)" }
+                                "max_pages": { "type": "integer", "description": "Maximum pages to fetch (default: 50)" },
+                                "sitemap": { "type": "string", "description": "Sitemap URL override (else robots.txt Sitemap: + /sitemap.xml)" }
                             },
                             "required": ["url"]
                         }
@@ -642,8 +643,10 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                 return err;
             }
             let max_pages = args.get("max_pages").and_then(|v| v.as_u64()).unwrap_or(crate::crawl::DEFAULT_MAX_PAGES as u64) as usize;
+            let sitemap = args.get("sitemap").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty());
+            if let Some(s) = sitemap { if let Some(err) = safety_gate("seo_crawl", s) { return err; } }
             let mut budget = crate::fetch::Budget::default();
-            match crate::crawl::crawl_site(url, max_pages, crate::fetch::FetchMode::Auto, &mut budget) {
+            match crate::crawl::crawl_site_with_sitemap(url, max_pages, crate::fetch::FetchMode::Auto, &mut budget, sitemap) {
                 Ok(rep) => serde_json::to_string_pretty(&rep).unwrap_or_default(),
                 Err(e) => format!("Error: {}", e),
             }

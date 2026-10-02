@@ -57,6 +57,10 @@ Agentic loop: `seo_gap` ranks the Search Console queue (needs site auth once via
 
 `jev-seo serve --addr 0.0.0.0:8787` exposes Streamable HTTP at `POST /mcp` plus `GET /plugin.json` and `/extensions/*` for ChatGPT Plugin Extensions.
 
+## Fix plan
+
+`jev-seo audit docs/ --json > audit.json && jev-seo fix-plan audit.json --json` — deterministic `rule→patch→verify` per finding (fact/heuristic, confidence-capped), sorted blocking first. Non-LLM, one hint per finding, `verify: jev-seo audit <file> --json | jq '.findings | no RULE-Rxx'`.
+
 ## Watch
 
 `jev-seo watch docs/ --once --no-jev` or `jev-seo watch https://example.com --once --json`; loop mode `jev-seo watch docs/ --every 30`. Compares against `watch-<slug>` sqlite baseline, emits `clean|regressed|improved|baseline` with delta, blocking counts, drift alerts. Polling, not inotify.

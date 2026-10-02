@@ -219,6 +219,79 @@ pub fn sitemap_seed_urls(xml: &str) -> Vec<String> {
         .collect()
 }
 
+/// `Sitemap:` directives from a robots.txt body (per https://www.sitemaps.org/protocol.html,
+/// `Sitemap:` is a top-level directive, not scoped to any `User-agent` group — case-insensitive).
+pub fn robots_sitemaps(body: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let clean = line.split('#').next().unwrap_or("").trim();
+        if clean.len() < 8 {
+            continue;
+        }
+        if clean[..8].eq_ignore_ascii_case("sitemap:") {
+            let url = clean[8..].trim().to_string();
+            if url.starts_with("http://") || url.starts_with("https://") {
+                out.push(url);
+            }
+        }
+    }
+    out
+}
+
+/// Heuristic: body is a sitemap (urlset or sitemapindex), not an HTML page.
+pub fn is_sitemap_xml(body: &str) -> bool {
+    let low = body.to_ascii_lowercase();
+    // Yoast indexes use <sitemapindex>, plain sitemaps use <urlset>; both carry <loc>.
+    (low.contains("<urlset") || low.contains("<sitemapindex") || low.contains("<sitemap"))
+        && low.contains("<loc>")
+}
+
+fn fetch_sitemap_body(url: &str) -> Option<String> {
+    if crate::paths::reject_private_url(url).is_err() {
+        return None;
+    }
+    crate::fetch::with_extra_headers(
+        ureq::get(url)
+            .timeout(Duration::from_secs(10))
+            .set("User-Agent", CRAWL_UA),
+    )
+    .call()
+    .ok()
+        .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
+        .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
+}
+
+fn expand_sitemap_locs(xml: &str) -> Vec<String> {
+    let locs = sitemap_seed_urls(xml);
+    if locs.is_empty() {
+        return Vec::new();
+    }
+    let low = xml.to_ascii_lowercase();
+    // Index file: locs point at other sitemaps (.xml). Flatten one level.
+    let is_index = low.contains("<sitemapindex") || low.contains("<sitemap>")
+        || locs.iter().filter(|u| u.to_ascii_lowercase().ends_with(".xml")).count() * 2 >= locs.len();
+    if !is_index {
+        return locs;
+    }
+    let mut pages = Vec::new();
+    for sub in &locs {
+        if let Some(body) = fetch_sitemap_body(sub) {
+            if is_sitemap_xml(&body) {
+                pages.extend(sitemap_seed_urls(&body));
+            }
+        }
+        // ponytail: one level only; nested indexes beyond that are rare, add recursion if hit
+        if pages.len() >= 50_000 {
+            break;
+        }
+    }
+    if pages.is_empty() {
+        // Index fetch failed (network/empty) — fall back to locs themselves so caller still seeds something
+        return locs;
+    }
+    pages
+}
+
 struct Fetch {
     status: u16,
     final_url: String,
@@ -305,6 +378,16 @@ pub fn crawl_site(
     mode: crate::fetch::FetchMode,
     budget: &mut crate::fetch::Budget,
 ) -> Result<CrawlReport> {
+    crawl_site_with_sitemap(start_url, max_pages, mode, budget, None)
+}
+
+pub fn crawl_site_with_sitemap(
+    start_url: &str,
+    max_pages: usize,
+    mode: crate::fetch::FetchMode,
+    budget: &mut crate::fetch::Budget,
+    sitemap_override: Option<&str>,
+) -> Result<CrawlReport> {
     let start = crate::paths::reject_private_url(start_url)?;
     let start_clean = canonicalize(start.as_str());
     if matches!(mode, crate::fetch::FetchMode::Firecrawl) && budget.max_credits == 0 {
@@ -328,17 +411,52 @@ pub fn crawl_site(
         .unwrap_or_default();
     eprintln!("{} robots.txt {}", stamp(), if robots_body.is_empty() { "missing" } else { "ok" });
 
-    let sitemap_urls: Vec<String> = crate::fetch::with_extra_headers(
-        ureq::get(&format!("{}://{}/sitemap.xml", start.scheme(), host))
-            .timeout(Duration::from_secs(10))
-            .set("User-Agent", CRAWL_UA),
-    )
-    .call()
-    .ok()
-        .filter(|r| crate::paths::reject_redirect_target(r.get_url()).is_ok())
-        .and_then(|r| crate::fetch::capped_string(r, crate::fetch::MAX_AUX_BYTES).ok())
-        .map(|xml| sitemap_seed_urls(&xml))
-        .unwrap_or_default();
+    // --sitemap override wins; else robots.txt Sitemap: lines + host-root default.
+    let mut sitemap_candidates: Vec<String> = Vec::new();
+    if let Some(url) = sitemap_override.filter(|u| !u.trim().is_empty()) {
+        sitemap_candidates.push(url.trim().to_string());
+    } else {
+        let mut robots_sites = robots_sitemaps(&robots_body);
+        // Keep only same-host sitemaps on the free path (SSRF guard already checks, but be explicit)
+        // and deduplicate while preserving robots order.
+        let mut seen = std::collections::HashSet::new();
+        for u in robots_sites.drain(..) {
+            if seen.insert(u.clone()) {
+                sitemap_candidates.push(u);
+            }
+        }
+        let default = format!("{}://{}/sitemap.xml", start.scheme(), host);
+        if !seen.contains(&default) {
+            sitemap_candidates.push(default);
+        }
+    }
+    let mut sitemap_urls: Vec<String> = Vec::new();
+    for cand in &sitemap_candidates {
+        if let Some(body) = fetch_sitemap_body(cand) {
+            if is_sitemap_xml(&body) {
+                let expanded = expand_sitemap_locs(&body);
+                if !expanded.is_empty() {
+                    sitemap_urls.extend(expanded);
+                    break;
+                }
+            }
+        }
+    }
+    // Start URL itself is a sitemap (e.g. /fr/sitemap_index.xml passed as URL): parse it directly.
+    if sitemap_urls.is_empty() {
+        let looks_like_sitemap = start_clean.to_ascii_lowercase().ends_with(".xml")
+            || start_clean.contains("sitemap");
+        if looks_like_sitemap {
+            if let Some(body) = fetch_sitemap_body(&start_clean) {
+                if is_sitemap_xml(&body) {
+                    let expanded = expand_sitemap_locs(&body);
+                    if !expanded.is_empty() {
+                        sitemap_urls = expanded;
+                    }
+                }
+            }
+        }
+    }
     let seeded = !sitemap_urls.is_empty();
     // Pre-flight probes: three cheap fetches that catch what page crawling
     // cannot. Soft-404 expects non-200 on a junk URL; temp-redirect expects

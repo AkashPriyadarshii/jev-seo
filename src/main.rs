@@ -24,6 +24,7 @@ mod robots;
 mod rules;
 mod schema;
 mod capabilities;
+mod fix_plan;
 mod plugin_bridge;
 mod watch;
 mod serp;
@@ -209,6 +210,9 @@ enum Commands {
         /// Start URL (seeds from /sitemap.xml when present)
         #[arg(value_name = "URL")]
         url: Option<String>,
+        /// Sitemap URL override (else robots.txt Sitemap: + /sitemap.xml)
+        #[arg(long, value_name = "URL")]
+        sitemap: Option<String>,
         /// Maximum pages to fetch from this host
         #[arg(long, default_value_t = crate::crawl::DEFAULT_MAX_PAGES)]
         max_pages: usize,
@@ -320,6 +324,16 @@ enum Commands {
     },
     /// Show capability counts (rules, tools, commands) as JSON
     Capabilities {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Emit deterministic patch hints from an audit JSON
+    FixPlan {
+        /// Audit JSON from `audit --json`
+        audit: String,
+        /// Max items (top by blocking+confidence)
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
         #[arg(long)]
         json: bool,
     },
@@ -1366,7 +1380,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Crawl { url, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest, no_jev, jev_budget: _, vitals } => {
+        Commands::Crawl { url, sitemap, max_pages, fetch, max_credits, json, diff, csv, rescore, manifest, no_jev, jev_budget: _, vitals } => {
             if let Some(path) = rescore {
                 if csv.is_some() || diff || manifest.is_some() || vitals {
                     eprintln!("{}", "Note: --rescore rebuilds from saved pages; --csv/--diff/--manifest/--vitals are ignored.".yellow());
@@ -1406,7 +1420,10 @@ fn main() -> Result<()> {
                 _ => crate::fetch::FetchMode::Auto,
             };
             let mut budget = crate::fetch::Budget { max_credits, spent: 0 };
-            let mut report = crawl::crawl_site(&url, max_pages, mode, &mut budget)?;
+            let mut report = crawl::crawl_site_with_sitemap(&url, max_pages, mode, &mut budget, sitemap.as_deref())?;
+            if !report.seeded_from_sitemap && report.pages_crawled <= 1 {
+                eprintln!("{} no sitemap seed — crawl has only the start URL (try --sitemap <url> or fix robots.txt Sitemap: / sitemap_index)", "warn".yellow());
+            }
             if vitals {
                 eprintln!("{}", "Fetching PageSpeed vitals for start URL (free, keyless)...".dimmed());
                 let v = crate::vitals::fetch_home_vitals(&report.start_url);
@@ -1961,6 +1978,27 @@ fn main() -> Result<()> {
         }
         Commands::Capabilities { json: _ } => {
             println!("{}", serde_json::to_string_pretty(&capabilities::as_json())?);
+        }
+        Commands::FixPlan { audit, limit, json } => {
+            let mut src = std::fs::read_to_string(audit.trim()).or_else(|_| crate::paths::read_user_file(&audit, &["json"]))?;
+            if let Some(s) = src.find('{') { if let Some(e) = src.rfind('}') { src = src[s..=e].to_string(); } else { src = src[s..].to_string(); } }
+            if src.trim().is_empty() { anyhow::bail!("empty audit JSON: {}", audit); }
+            let rep: crate::audit::DirectoryAuditReport = serde_json::from_str(&src).map_err(|e| anyhow::anyhow!("parse audit JSON: {e}"))?;
+            if rep.findings.is_empty() && rep.reports.is_empty() {
+                anyhow::bail!("audit JSON has no findings/reports; re-run `jev-seo audit --json`");
+            }
+            let mut items = fix_plan::from_findings(&rep.findings);
+            if limit > 0 && items.len() > limit { items.truncate(limit); }
+            if json {
+                println!("{}", serde_json::to_string_pretty(&items)?);
+            } else {
+                println!("{} {} findings -> {} fixes", "Fix plan".cyan().bold(), rep.findings.len(), items.len());
+                for it in &items {
+                    let k = if it.kind == "heuristic" { "heuristic".yellow().to_string() } else { "fact".green().to_string() };
+                    println!("  [{} {:.2}] {} -> {} ({}) {}", it.rule.bold(), it.confidence, it.target.dimmed(), it.patch.field, k, it.patch.hint.dimmed());
+                    println!("       verify: {}", it.verification.dimmed());
+                }
+            }
         }
         Commands::Watch { target, repo, site, once, every, label, json, no_jev } => {
             let t = repo.or(site).or(target).unwrap_or_else(|| {

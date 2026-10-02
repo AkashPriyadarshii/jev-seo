@@ -104,7 +104,7 @@
 
 ### `crawl.rs` (Live-Site Crawler)
 - Level-batched parallel fetch over 8 std threads, no async runtime.
-- Seeds from `/sitemap.xml`, honors robots.txt, SSRF-guarded redirects with same-host pins and hop chains.
+- Seeds from robots.txt `Sitemap:` directives + `/sitemap.xml` fallback, expands `sitemapindex` one level, accepts `--sitemap <url>` or a sitemap start URL as seed; honors robots.txt, SSRF-guarded redirects with same-host pins and hop chains.
 - Canonical dedup (tracking params, `/index.html`, slash policy), per-page timing, 2MB body cap.
 - Weak bodies upgrade to Jina or Firecrawl backends under a shared credit budget.
 
@@ -130,6 +130,9 @@
 
 ### `capabilities.rs` (Single source)
 - `RULES.len()` + `MCP_TOOLS` + `COMMANDS` → `jev-seo capabilities --json`; generator for README/SKILL/PRD.
+
+### `fix_plan.rs` (Deterministic remediation)
+- `from_findings(findings) → FixItem[]`: one `rule→patch→verify` per Finding, `truth_kind`/`gate`/`rule()` sourced, heuristic confidence capped 0.65, sorted blocking→confidence→rule→target.
 
 ### `watch.rs` (Regression watch)
 - `watch_repo_once` / `watch_site_once` vs `watch-<slug>` baseline in sqlite, delta + blocking + drift + top actions; loop via `watch --every` sleep.

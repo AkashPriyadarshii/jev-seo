@@ -490,7 +490,7 @@ Drop `narrative.json` next to exports (or in `--manifest`). Required keys: `exec
 | `link <path>` | Jev Choice internal-link suggestions per page, or `no_link` | `--limit <n>`, `--json` |
 | `rank` | SQLite rank drift tracker (`.jev-seo.db`) | `--domain <domain>`, `--query <query>` |
 | `sitemap <target>` | XML sitemap, 50k limit, HTTPS, hreflang | `--json` |
-| `crawl <url>` | Live BFS crawl: health score, actions, redirects, orphans, timing | `--max-pages <n>`, `--fetch auto\|direct\|jina\|firecrawl`, `--max-credits <n>`, `--json`, `--diff`, `--csv <path>`, `--rescore <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>`, `--user <u>`, `--password <p>`, `--header <name:value>`, `--vitals` |
+| `crawl <url>` | Live BFS crawl: health score, actions, redirects, orphans, timing | `--sitemap <url>`, `--max-pages <n>`, `--fetch auto\|direct\|jina\|firecrawl`, `--max-credits <n>`, `--json`, `--diff`, `--csv <path>`, `--rescore <path>`, `--manifest <dir>`, `--no-jev`, `--jev-budget <usd>`, `--user <u>`, `--password <p>`, `--header <name:value>`, `--vitals` |
 | `llms <domain>` | llms.txt and AI crawler readiness with actions | `--json` |
 | `explain <id>` | Rule card for `R19` or `RULE-R19` | `--json` |
 | `report <path>` | Diff two audit JSONs: score, rules, actions | `--baseline <path>`, `--actions-csv <path>`, `--json` |
@@ -498,6 +498,7 @@ Drop `narrative.json` next to exports (or in `--manifest`). Required keys: `exec
 | `drift <op>` | Snapshot baselines `baseline`/`compare`/`history` | `--report <path>`, `--label <name>`, `--json` |
 | `doctor` | Version, API key, database, platform | `--json` |
 | `capabilities` | Machine source of truth `{version, rule_set, rules, mcp_tools, commands}` | `--json` |
+| `fix-plan <audit.json>` | Deterministic patch hints from findings (fact/heuristic) | `--limit <n>`, `--json` |
 | `watch <target>` | Regression watch vs stored baseline (polling) | `--repo/--site`, `--once`, `--every <min>`, `--label`, `--json`, `--no-jev` |
 | `serve` | HTTP bridge for ChatGPT Plugin Extensions (Streamable HTTP) | `--addr <host:port>` |
 | `gsc <auth\|sites\|query\|gap>` | Search Console: free first-party query data | `--site <url>`, `--code`, `--limit <n>`, `--json` |

@@ -2065,6 +2065,21 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_robots_sitemaps_and_sitemap_detection() {
+        use crate::crawl::{is_sitemap_xml, robots_sitemaps, sitemap_seed_urls};
+        let robots = "User-agent: *\nDisallow: /private\nSitemap: https://example.com/sitemap.xml\nSitemap: https://example.com/fr/sitemap_index.xml\n# Sitemap: https://example.invalid/commented\n";
+        let sites = robots_sitemaps(robots);
+        assert_eq!(sites, vec!["https://example.com/sitemap.xml", "https://example.com/fr/sitemap_index.xml"]);
+        assert!(robots_sitemaps("User-agent: *\nDisallow: /").is_empty());
+        let urlset = r#"<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/a</loc></url><url><loc>https://example.com/b</loc></url></urlset>"#;
+        assert_eq!(sitemap_seed_urls(urlset), vec!["https://example.com/a", "https://example.com/b"]);
+        assert!(is_sitemap_xml(urlset));
+        assert!(is_sitemap_xml(r#"<sitemapindex><sitemap><loc>https://example.com/sitemap.xml</loc></sitemap></sitemapindex>"#));
+        assert!(!is_sitemap_xml("<html><body><a href=\"/a\">a</a></body></html>"));
+        assert!(!is_sitemap_xml(""));
+    }
+
+    #[test]
     fn test_page_state_has_single_text_field() {
         use crate::engine::page_state;
         let state = page_state("q", Some("t".into()), None, "body copy".into(), 2, None);
