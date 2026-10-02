@@ -26,3 +26,6 @@ jobs:
 
       - name: Cargo Test
         run: cargo test --all --verbose
+
+      - name: Docker build check
+        run: docker build -t jev-seo:test .
