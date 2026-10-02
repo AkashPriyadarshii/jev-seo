@@ -28,10 +28,10 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 
 ## MCP server (14 tools)
 
-Run it over stdio: `npx -y jev-seo` (or `jev-seo mcp` with a local build). Client config:
+Run it over stdio: `npx -y @akashpriyadarshii/jev-seo` (or `jev-seo mcp` with a local build). Client config:
 
 ```json
-{ "mcpServers": { "jev-seo": { "command": "npx", "args": ["-y", "jev-seo"] } } }
+{ "mcpServers": { "jev-seo": { "command": "npx", "args": ["-y", "@akashpriyadarshii/jev-seo"] } } }
 ```
 
 No local build? Set `JEV_SEO_BIN=/path/to/jev-seo` and the wrapper uses it instead of downloading. First npx run needs network for the one-time download; musl/Alpine systems cannot run the glibc builds and must use `JEV_SEO_BIN` with a local `cargo build`.

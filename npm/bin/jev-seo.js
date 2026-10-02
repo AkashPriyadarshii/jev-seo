@@ -147,7 +147,7 @@ function checkBin(bin) {
 async function main() {
   const entry = platformTarget();
   const bin = await ensureBin(entry);
-  // Bare `npx -y jev-seo` starts the MCP server over stdio.
+  // Bare `npx -y @akashpriyadarshii/jev-seo` starts the MCP server over stdio.
   const args = process.argv.slice(2);
   const child = spawn(bin, args.length ? args : ["mcp"], { stdio: "inherit" });
   child.on("exit", (code, signal) => {

@@ -42,7 +42,7 @@
 - [x] Renamed CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-09-26`
 - [x] Tagged `v0.1.2`, pushed master + site + tag; GitHub Release binaries via workflow
 - [ ] `cargo publish` to crates.io (needs registry token)
-- [ ] `npm publish` for `npx -y jev-seo` (needs npm token)
+- [x] `npm publish` as `@akashpriyadarshii/jev-seo` (unscoped name blocked by registry)
 
 ## v0.2.0 Structural Backlog (from independent arch review)
 - [ ] Thin `src/main.rs`: extract printing to `src/view.rs`
