@@ -62,7 +62,7 @@ memory/
 references/private/
 
 
-# Plugin Extensions � committed
+# Plugin Extensions — committed
 !plugin.json
 !.well-known/plugin.json
 !extensions/

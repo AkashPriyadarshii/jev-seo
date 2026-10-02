@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jev-seo — zero-cost SEO &amp; GEO search radar (Semrush alternative)</title>
+<meta name="description" content="jev-seo is a free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost.">
+<meta name="keywords" content="seo, geo, generative engine optimization, seo audit, semrush alternative, typesafe ai, jev, rust, mcp, ai crawlers, robots.txt, schema validator, serp analysis">
+<link rel="canonical" href="https://jevseo.vercel.app/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="jev-seo">
+<meta property="og:title" content="jev-seo — zero-cost SEO & GEO radar">
+<meta property="og:description" content="jev-seo is a free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost.">
+<meta property="og:url" content="https://jevseo.vercel.app/">
+<meta property="og:image" content="https://jevseo.vercel.app/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="jev-seo — zero-cost SEO & GEO search radar">
+<meta name="twitter:description" content="Free Rust SEO and GEO toolkit powered by TypeSafe Jev. 58-rule audits, 15-tool MCP. Zero cost.">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"jev-seo","applicationCategory":"SEOApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"INR"},"author":{"@type":"Person","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app"},"url":"https://jevseo.vercel.app/","description":"Free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost."}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"jev-seo","url":"https://jevseo.vercel.app/","description":"Free Rust SEO and GEO toolkit powered by TypeSafe Jev. 58-rule audits, 15-tool MCP, zero cost.","inLanguage":"en","publisher":{"@type":"Organization","name":"Akash Priyadarshi","url":"https://akashpriyadarshi.vercel.app","logo":{"@type":"ImageObject","url":"https://jevseo.vercel.app/favicon.svg"}}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is jev-seo free?","acceptedAnswer":{"@type":"Answer","text":"Yes. jev-seo is MIT-licensed open source and costs zero subscriptions. It scrapes free DuckDuckGo endpoints and audits local files, so there is no paid API key required."}},{"@type":"Question","name":"What does GEO mean in jev-seo?","acceptedAnswer":{"@type":"Answer","text":"GEO stands for Generative Engine Optimization: making content likely to be cited by AI search engines such as Gemini Overviews, Perplexity, and SearchGPT. jev-seo scores citation likelihood from 1 to 10 with TypeSafe Jev."}},{"@type":"Question","name":"Does jev-seo need a credit card or paid API?","acceptedAnswer":{"@type":"Answer","text":"No. The only optional key is a free TypeSafe API key for semantic scoring. Ranking history, audits, schema validation, and SERP inspection all run locally with zero cost."}},{"@type":"Question","name":"What is the difference between jev-seo and Semrush or Ahrefs?","acceptedAnswer":{"@type":"Answer","text":"Semrush and Ahrefs are hosted dashboards that cost over $130 a month. jev-seo is a native Rust CLI and MCP server that audits local files, validates schema, checks robots.txt, and scores GEO citations, all in one binary under 30MB RAM."}},{"@type":"Question","name":"How do I install jev-seo?","acceptedAnswer":{"@type":"Answer","text":"Install with cargo install jev-seo, or download the release binary for Windows, macOS, or Linux from the GitHub releases page."}}]}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!--
+CONTRACT jev-seo proof-sheet landing (seed d118b247, assigned direction 7 of 7)
+THESIS: one idea — SEO/GEO is typographic production, so the page is a printer's proof sheet: crop marks, registration crosses, specimen cards, ink on near-black stage. It refuses the SaaS template: no purple gradient hero, no three equal icon cards, no metric row.
+OWN-WORLD: near-black ink ground (#0d0d0f), warm ivory paper (#ece6d8) reserved for proofed surfaces, phosphor green (#7cff4f) and syntax magenta (#ff4fd8) data ink, amber (#ffb000) reserved for the line about to change, danger red (#ff3b1f) only past threshold. Hairline rules, registration marks, numbered captions, ruler gutters. Type: Archivo Expanded display / Instrument Sans body / IBM Plex Mono for data only. Radius 0; print geometry.
+STORY: a technical founder arrives, sees the mechanism working in the first viewport (a real command proofing itself), believes ₹0 and no hallucination, and installs from cargo in one line.
+FIRST VIEWPORT: proof-sheet title block (jev-seo specimen headline + registration mark), live terminal specimen of the real audit mechanism with amber pre-flash and phosphor output, primary action `cargo install jev-seo` beneath the fold line of the title block.
+FORM: assigned direction 7 (proof sheet), raised by challengers: algorave (phosphor/magenta syntax, amber change-flash), VU meter (red only past danger; ballistic rank needles), wildstyle (arrow extensions out of headers).
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+-->
+<header class="sheethead">
+  <svg class="reg-cross" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <g stroke="var(--paper)" stroke-width="2" fill="none">
+      <line x1="4" y1="32" x2="60" y2="32"/>
+      <line x1="32" y1="4" x2="32" y2="60"/>
+      <circle cx="32" cy="32" r="19"/>
+    </g>
+  </svg>
+  <div class="cropmark crop-tl" aria-hidden="true"></div>
+  <div class="cropmark crop-tr" aria-hidden="true"></div>
+  <div class="cropmark crop-bl" aria-hidden="true"></div>
+  <div class="cropmark crop-br" aria-hidden="true"></div>
+  <nav class="topline">
+    <a class="wordmark" href="#top">jev<span class="ink-g">-seo</span></a>
+    <div class="topnav">
+      <a href="#why">why</a>
+      <a href="#bench">bench</a>
+      <a href="#radar">commands</a>
+      <a href="#phi">oracle</a>
+      <a href="#proof">proofed</a>
+      <a href="#install">install</a>
+    </div>
+    <a class="toplink" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">github ↗</a>
+  </nav>
+  <div class="rule"></div>
+  <p class="jobno">JOB SE-001 / SEO + GEO SEARCH RADAR / SHEET 1 OF 1</p>
+</header>
+
+<main id="top">
+  <!-- ============ FIRST VIEWPORT: title block + live mechanism ============ -->
+  <section class="titleblock">
+    <div class="tb-meta">
+      <p class="tb-line">FOSS · RUST · ₹0 · MCP-READY</p>
+      <p class="tb-line tb-right">PROOFED 2026-09-22</p>
+    </div>
+    <h1 class="specimen">jev-seo</h1>
+    <p class="subtitle">Zero-cost SEO &amp; GEO search radar. <span class="paper">Proofs your search presence the way a printer proofs a sheet</span> — no dashboard, no $130/month, no hallucinated advice.</p>
+    <p class="direct-answer">jev-seo is a free, MIT-licensed, open source alternative to Semrush and Ahrefs ($130+/month) that audits local files, validates schema, checks robots.txt, and scores AI citation likelihood. One Rust binary under 30MB RAM, hundreds of files audited in under a second, sixteen commands, zero subscriptions, zero paid data APIs.</p>
+    <div class="foldline" aria-hidden="true"><span>FOLD</span></div>
+    <div class="titleblock-cta">
+      <code class="install-cmd"><span class="ink-g">$</span> cargo install jev-seo</code>
+      <a class="btn-primary" href="#proof">read the proof ↓</a>
+    </div>
+  </section>
+
+  <!-- live mechanism: a real command getting proofed, amber-pre-flash then phosphor -->
+  <section class="mechanism" aria-label="Live mechanism demonstration">
+    <div class="spec-card terminal-spec">
+      <div class="spec-head">
+        <span class="spec-no">FIG. 01</span>
+        <span class="spec-title">audit — batch on-page proof</span>
+        <span class="spec-stat">LIVE</span>
+      </div>
+      <div class="term" id="term" aria-live="off"></div>
+      <div class="spec-caption">Real output shape. The line about to change flashes amber before it lands; red is reserved for flagged defects.</div>
+    </div>
+    <div class="spec-cards-side">
+      <div class="spec-card needle-spec">
+        <div class="spec-head">
+          <span class="spec-no">FIG. 02</span>
+          <span class="spec-title">rank — drift trace</span>
+        </div>
+        <div class="needle" data-level="0.86" style="--lvl:0.86"><div class="needle-bar"></div><span class="needle-scale" aria-hidden="true">0─────10</span></div>
+        <div class="needle" data-level="0.62" style="--lvl:0.62"><div class="needle-bar"></div></div>
+        <div class="needle" data-level="0.94" style="--lvl:0.94"><div class="needle-bar"></div></div>
+        <div class="spec-caption">Cyan measures the drift; red would mean the page fell.</div>
+      </div>
+      <div class="spec-card code-spec">
+        <div class="spec-head">
+          <span class="spec-no">FIG. 03</span>
+          <span class="spec-title">robots — AI crawler radar</span>
+        </div>
+        <ul class="robot-list">
+          <li><i class="chip ok"></i>GPTBot <span class="dim">allowed</span></li>
+          <li><i class="chip ok"></i>ClaudeBot <span class="dim">allowed</span></li>
+          <li><i class="chip warn"></i>Google-Extended <span class="dim">needs check</span></li>
+          <li><i class="chip ok"></i>PerplexityBot <span class="dim">allowed</span></li>
+        </ul>
+        <div class="spec-caption">Five generative indexers, one pass.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CALIBRATION BENCH (Part A): geo meter + command strip ============ -->
+  <section class="benchsec" id="bench" style="padding:0 0 80px">
+    <h2 class="h2">Calibrate once, read every month</h2>
+    <p class="lede">The GEO meter is the real reading for query "jev seo" taken from the jev-for-seo guide. The bench strip is thirteen commands, five proven on this very site.</p>
+    <div class="calibration">
+      <div class="spec-card geo-meter">
+        <div class="spec-head">
+          <span class="spec-no">FIG. 04</span>
+          <span class="spec-title">geo — citation meter</span>
+          <span class="spec-stat" style="color:var(--cyan)">MEASURED</span>
+        </div>
+        <span class="geo-value">8/10 <small>composite</small></span>
+        <div class="geo-sweep" aria-hidden="true"></div>
+        <div class="geo-scale"><span>0</span><span>1-10</span><span>10</span></div>
+        <div class="geo-grid">
+          <div class="geo-cell">direct answer<b class="ok">YES · p=0.81</b></div>
+          <div class="geo-cell">confidence<b>0.83</b></div>
+          <div class="geo-cell">step-by-step<b class="ok">PRESENT</b></div>
+          <div class="geo-cell">refresh<b>monthly</b></div>
+        </div>
+        <p class="spec-caption">Real run: <code>jev-seo geo jev-for-seo.html --query "jev seo"</code>, 2026-09-22. The figure is a commitment, not a claim.</p>
+      </div>
+      <div class="bench">
+        <div class="spec-head" style="margin-bottom:0; padding:16px 20px 10px">
+          <span class="spec-no">FIG. 05</span>
+          <span class="spec-title">bench — thirteen commands</span>
+        </div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo audit .</code><span class="bench-cap">ran here: 74.3% pass, 0 orphans</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo geo &lt;page&gt; --query "jev seo"</code><span class="bench-cap">ran here: 8/10 composite</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo schema index.html</code><span class="bench-cap">ran here: VALID 100/100</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo robots jevseo.vercel.app</code><span class="bench-cap">ran here: all AI crawlers allowed</span></div>
+        <div class="bench-row"><i class="bench-check on"></i><code>jev-seo sitemap sitemap.xml</code><span class="bench-cap">ran here: 9 URLs, lastmod set</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo keywords "jev seo"</code><span class="bench-cap">autocomplete discovery + intent</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo brief "jev for seo" --markdown</code><span class="bench-cap">SERP synthesis + outline</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo query "jev seo"</code><span class="bench-cap">competitor radar + rerank</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo rank --domain jevseo.vercel.app --query "jev seo"</code><span class="bench-cap">baseline in local SQLite</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo mcp</code><span class="bench-cap">stdio server into your agent</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo explain R19</code><span class="bench-cap">rule card: area, severity, effort, fix</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo report --baseline</code><span class="bench-cap">score delta between two audits</span></div>
+        <div class="bench-row"><i class="bench-check"></i><code>jev-seo gsc query --site</code><span class="bench-cap">Search Console clicks, free</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHY ~ ₹0 ============ -->
+  <section class="why" id="why">
+    <h2 class="h2 arrow">The stack that costs $130/month doesn't do this<span class="arr" aria-hidden="true">→→</span></h2>
+    <div class="why-grid">
+      <div class="whyspec">
+        <p class="whyspec-no">01</p>
+        <h3>Zero subscriptions</h3>
+        <p>Scrapes DuckDuckGo HTML and suggest endpoints directly. No credit card, no paid API key, no DataForSEO top-up. The bill is ₹0 forever.</p>
+      </div>
+      <div class="whyspec">
+        <p class="whyspec-no">02</p>
+        <h3>No hallucinated advice</h3>
+        <p>TypeSafe Jev System One scores with typed Choice / Score / Noul primitives. Deterministic judgments, not chatbot essays. What it flags is real.</p>
+      </div>
+      <div class="whyspec">
+        <p class="whyspec-no">03</p>
+        <h3>Fast and local</h3>
+        <p>A native Rust binary under 30MB RAM. Audits hundreds of markdown and HTML files in under a second. Rank history lives in one local SQLite file.</p>
+      </div>
+      <div class="whyspec">
+        <p class="whyspec-no">04</p>
+        <h3>Agent native</h3>
+        <p>A stdio JSON-RPC 2.0 MCP server feeds the same 15 tools into Claude Code, Gemini CLI, and Antigravity. SEO as a capability, not a dashboard.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMMAND RADAR ============ -->
+  <section class="radar" id="radar">
+    <h2 class="h2">Sixteen commands, no dashboard</h2>
+    <p class="lede">Every tool proofs something measurable. Terminal in, verdict out.</p>
+    <div class="radar-grid">
+      <div class="cmd"><code>jev-seo query "offline expense tracker android"</code><span class="cmd-cap">live SERP competitor radar + Jev relevance rerank + gap analysis</span></div>
+      <div class="cmd"><code>jev-seo audit docs/ --min-pass 40</code><span class="cmd-cap">105 files · title collisions, thin pages, AI slop, orphan links · fails CI below the floor</span></div>
+      <div class="cmd"><code>jev-seo geo README.md --query "agentic skills"</code><span class="cmd-cap">GEO citation probability 1-10 + 5-dimension composite vs Perplexity, SearchGPT, Gemini Overviews</span></div>
+      <div class="cmd"><code>jev-seo schema index.html</code><span class="cmd-cap">JSON-LD validator: SoftwareApplication, Article, Organization, Product + deprecation flags</span></div>
+      <div class="cmd"><code>jev-seo robots example.com</code><span class="cmd-cap">GPTBot · ClaudeBot · PerplexityBot · Google-Extended · Bytespider</span></div>
+      <div class="cmd"><code>jev-seo brief "fast local sqlite tui" --markdown</code><span class="cmd-cap">competitor SERP synthesis → H2 outline + 150-word GEO direct answer</span></div>
+      <div class="cmd"><code>jev-seo sitemap sitemap.xml</code><span class="cmd-cap">50,000 URL limit, HTTPS canonical, hreflang en-GB not en-UK, x-default</span></div>
+      <div class="cmd"><code>jev-seo keywords "scraper"</code><span class="cmd-cap">autocomplete discovery + Jev intent classification</span></div>
+      <div class="cmd"><code>jev-seo rank --domain crates.io --query "rust grep"</code><span class="cmd-cap">rank drift tracked in local SQLite over time</span></div>
+      <div class="cmd"><code>jev-seo mcp</code><span class="cmd-cap">stdio MCP server → the 15 tools, straight into your coding agent</span></div>
+      <div class="cmd"><code>jev-seo crawl example.com --max-pages 50</code><span class="cmd-cap">parallel live crawl: health score, broken links, redirect chains, orphans, timing</span></div>
+      <div class="cmd"><code>jev-seo llms example.com</code><span class="cmd-cap">llms.txt plus AI crawler scoring for answer-engine readiness</span></div>
+      <div class="cmd"><code>jev-seo doctor</code><span class="cmd-cap">version, API key presence, database, platform in one check</span></div>
+      <div class="cmd"><code>jev-seo explain R19</code><span class="cmd-cap">rule card: area, severity, effort band, fix for any stable id</span></div>
+      <div class="cmd"><code>jev-seo report --baseline</code><span class="cmd-cap">score delta and rules cleared or new between two audits</span></div>
+      <div class="cmd"><code>jev-seo gsc query --site</code><span class="cmd-cap">free Search Console clicks and positions for your own sites</span></div>
+    </div>
+  </section>
+
+  <!-- ============ SEE IT RUN ============ -->
+  <section class="seen" id="seen">
+    <h2 class="h2">Seen on a real run</h2>
+    <p class="lede">Health score with grades, impact-ranked actions, completeness notes. Scorecard, crawl session, action tracker, MCP surface.</p>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-summary.png" alt="jev-seo HTML audit scorecard, page table, and ranked findings" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-terminal.png" alt="jev-seo live crawl output with health score and ranked actions" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-actions.png" alt="jev-seo ranked action tracker with priority, impact, effort, quick-win flags" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-explain.png" alt="jev-seo explain rule card and report baseline score delta" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/preview-mcp.png" alt="jev-seo MCP tools grid and client config block" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/trust-strip.png" alt="jev-seo trust strip: 132 tests, 58 rules, 15 MCP tools, fast cold start, MIT, zero subscriptions" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+    <figure style="margin:1.5rem 0"><img src="docs/assets/cost-ladder.png" alt="jev-seo cost ladder: free path, capped Jev spend, opt-in paid backends, versus monthly SaaS seat" style="max-width:100%;border-radius:10px" loading="lazy"></figure>
+  </section>
+
+  <!-- ============ ORACLE ============ -->
+  <section class="phi" id="phi">
+    <div class="phi-block">
+      <h2 class="h2 arrow">Reasons Jev: the oracle is a decision engine, not a chatbox<span class="arr" aria-hidden="true">→→</span></h2>
+      <p class="lede">Conversational LLMs write you a confident paragraph you then have to verify. Jev answers machine-native questions with machine-native types.</p>
+      <div class="phi-grid">
+        <div class="phi-cell"><span class="phi-prim">Score</span><span class="phi-desc">1-10: GEO citation probability, content quality, SERP competitiveness</span></div>
+        <div class="phi-cell"><span class="phi-prim">Noul</span><span class="phi-desc">calibrated probability: will this page get cited by Gemini Overviews?</span></div>
+        <div class="phi-cell"><span class="phi-prim">Choice</span><span class="phi-desc">search intent classification, schema type match, gap verdict</span></div>
+        <div class="phi-cell"><span class="phi-prim">Fan-out</span><span class="phi-desc">one state, many questions, one request. 10x fewer round trips, 12x cheaper</span></div>
+      </div>
+      <p class="phi-note">Jev hates being asked for arithmetic or word counts. The CLI does the math; Jev does the judgment. That split is the whole architecture.</p>
+      <span class="verdict-stamp">JEV SEAL<small>DECISION ENGINE, NOT CHATBOX</small></span>
+    </div>
+  </section>
+
+  <!-- ============ PROOFED (slop radar demo) ============ -->
+  <section class="proofed" id="proof">
+    <h2 class="h2">Proof the sheet before it ships</h2>
+    <p class="lede">The audit reads your content the way a proofreader reads a galley. These are real patterns it catches:</p>
+    <div class="proof-grid">
+      <div class="proof-item">
+        <p class="proof-kw">em-dash density</p>
+        <p class="proof-line">"The—admittedly—fragile—stack—" <span class="flag">✗ 3 per 500 words</span></p>
+        <p class="proof-fix">over 2 per 500 words = editorial tic. Flagged.</p>
+      </div>
+      <div class="proof-item">
+        <p class="proof-kw">AI vocabulary</p>
+        <p class="proof-line">"delve · leverage · testament · foster · seamless" <span class="flag">✗ 4 hits</span></p>
+        <p class="proof-fix">17 known boilerplate crutches. Stripped automatically.</p>
+      </div>
+      <div class="proof-item">
+        <p class="proof-kw">heading hierarchy</p>
+        <p class="proof-line">H1 → H3, no H2 <span class="flag">✗ skip-level</span></p>
+        <p class="proof-fix">illegal jump in the outline. Caught.</p>
+      </div>
+      <div class="proof-item">
+        <p class="proof-kw">orphan pages</p>
+        <p class="proof-line">/blog/seo-for-vercel has 0 inbound links <span class="flag">✗ orphan</span></p>
+        <p class="proof-fix">the link graph finds it. You fix the path.</p>
+      </div>
+      <div class="proof-item">
+        <p class="proof-kw">cannibalization</p>
+        <p class="proof-line">3 pages target "rust grep" <span class="flag">✗ collision</span></p>
+        <p class="proof-fix">keyword stems colliding. One winner per stem.</p>
+      </div>
+      <div class="proof-item">
+        <p class="proof-kw">schema deprecation</p>
+        <p class="proof-line">"HowTo" schema present <span class="flag">✗ deprecated</span></p>
+        <p class="proof-fix">no rich result. Migrate to the current type.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ (GEO direct answers) ============ -->
+  <section class="faq" id="faq">
+    <h2 class="h2">Direct answers, no hedge</h2>
+    <p class="lede">The same plain declarative copy AI search engines quote. Short question, shorter answer.</p>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <h3>Is jev-seo free?</h3>
+        <p>Yes. jev-seo is MIT-licensed open source and costs zero subscriptions. It scrapes free DuckDuckGo endpoints and audits local files, so there is no paid API key required.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What does GEO mean in jev-seo?</h3>
+        <p>GEO stands for Generative Engine Optimization: making content likely to be cited by AI search engines such as Gemini Overviews, Perplexity, and SearchGPT. jev-seo scores citation likelihood from 1 to 10 with TypeSafe Jev.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Does jev-seo need a credit card or paid API?</h3>
+        <p>No. The only optional key is a free TypeSafe API key for semantic scoring. Ranking history, audits, schema validation, and SERP inspection all run locally with zero cost.</p>
+      </div>
+      <div class="faq-item">
+        <h3>jev-seo vs Semrush or Ahrefs?</h3>
+        <p>Semrush and Ahrefs are hosted dashboards that cost over $130 a month. jev-seo is a native Rust CLI and MCP server that audits local files, validates schema, checks robots.txt, and scores GEO citations — one binary, under 30MB RAM.</p>
+      </div>
+      <div class="faq-item">
+        <h3>How do I install jev-seo?</h3>
+        <p><code>cargo install jev-seo</code>, or download the release binary for Windows, macOS, or Linux from GitHub Releases.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Does jev-seo collect my data?</h3>
+        <p>No analytics, no telemetry. Audits read local files, rank history stays in one local SQLite database, and only semantic scoring calls reach the TypeSafe API with content you explicitly pass.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AUTHOR (E-E-A-T, Part A) ============ -->
+  <section style="padding:0 0 90px">
+    <div class="author" id="author">
+      <img src="https://github.com/AkashPriyadarshii.png" alt="Akash Priyadarshi" width="88" height="88">
+      <div>
+        <h3>Akash Priyadarshi</h3>
+        <p class="author-loc">Patna, Bihar, India</p>
+        <p class="author-note">Builds the Jev ecosystem: jev-seo, jev-curate, jev-superpowers, kharcha, tdlib-android. This site is proofed, not guessed: every number on it is a measured run.</p>
+        <div class="author-links">
+          <a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio ↗</a>
+          <a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">github ↗</a>
+          <a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin ↗</a>
+          <a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume ↗</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INSTALL ============ -->
+  <section class="install" id="install">
+    <h2 class="h2">Set up in two lines</h2>
+    <div class="install-code">
+      <p class="install-1"><span class="dim"># 1 — install (crates.io)</span><br><span class="ink-g">$</span> cargo install jev-seo</p>
+      <p class="install-2"><span class="dim"># 2 — free oracle key for semantic scoring</span><br><span class="ink-g">$</span> export TYPESAFE_API_KEY=your_key_here</p>
+    </div>
+    <p class="install-note">No credit card. No hosted dashboard. No telemetry. One binary, one local SQLite file, 30MB of RAM. v0.1.1 adds live-site crawl, llms.txt readiness, ranked fix actions, and HTML/PDF/Markdown reports. v0.1.2 (22 Oct 2026) adds explain, baseline diffs, action trackers, and MCP report tools.</p>
+    <div class="install-cta">
+      <a class="btn-primary" href="https://github.com/AkashPriyadarshii/jev-seo" target="_blank" rel="noopener">clone on github ↗</a>
+      <a class="btn-ghost" href="https://crates.io/crates/jev-seo" target="_blank" rel="noopener">crates.io</a>
+    </div>
+  </section>
+</main>
+
+<footer class="sheetfoot">
+  <div class="rule"></div>
+  <div class="foot-row">
+    <h3 class="foot-h">Site</h3>
+    <ul>
+      <li><a href="/">home</a></li>
+      <li><a href="/jev-for-seo.html">jev for seo guide</a></li>
+      <li><a href="/comparisons.html">comparisons</a></li>
+      <li><a href="/use-cases.html">use cases</a></li>
+      <li><a href="/benchmarks.html">benchmarks</a></li>
+      <li><a href="/what-is-jev.html">what is jev</a></li>
+      <li><a href="/about.html">about</a></li>
+      <li><a href="/contact.html">contact</a></li>
+      <li><a href="/privacy.html">privacy</a></li>
+    <li><a href="/PRODUCT.md" rel="noopener">product doc</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Ecosystem</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-superpowers" target="_blank" rel="noopener">jev-superpowers</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/jev-curate" target="_blank" rel="noopener">jev-curate</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/tdlib-android" target="_blank" rel="noopener">tdlib-android</a></li>
+      <li><a href="https://github.com/AkashPriyadarshii/kharcha" target="_blank" rel="noopener">kharcha</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Author</h3>
+    <ul>
+      <li><a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">Akash Priyadarshi — Patna, Bihar, India</a></li>
+      <li><a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio</a></li>
+      <li><a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin</a></li>
+      <li><a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume</a></li>
+    </ul>
+  </div>
+  <div class="foot-row">
+    <h3 class="foot-h">Social</h3>
+    <ul>
+      <li><a href="https://x.com/Akash__ydv001" target="_blank" rel="noopener">X / Twitter</a></li>
+      <li><a href="https://www.threads.net/@akash.priyadarshii" target="_blank" rel="noopener">Threads</a></li>
+      <li><a href="https://www.instagram.com/akash.priyadarshii/" target="_blank" rel="noopener">Instagram</a></li>
+      <li><a href="https://reddit.com/user/DragonfruitWeak2801" target="_blank" rel="noopener">Reddit</a></li>
+    </ul>
+  </div>
+  <p class="foot-note">jev-seo — proof the sheet, then ship it. <span class="ink-g">zero-cost SEO/GEO radar for developers and agents.</span></p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

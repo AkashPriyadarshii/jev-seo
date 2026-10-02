@@ -1,0 +1,11 @@
+# Rust crate is the indexed code; site/ is vendored static marketing copy.
+# Suppress site/ from language stats so GitHub bar stays Rust.
+site/** linguist-vendored
+site/*.html linguist-vendored
+site/*.css linguist-vendored
+site/*.js linguist-vendored
+site/assets/** linguist-vendored
+docs/assets/** linguist-vendored
+extensions/** linguist-vendored
+*.html linguist-vendored
+*.css linguist-vendored
