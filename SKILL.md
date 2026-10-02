@@ -26,7 +26,7 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 - `Needs review` marks Jev answers below the confidence bar. Treat those lines as unverified.
 - `--json` keeps stdout machine-clean; progress goes to stderr.
 
-## MCP server (14 tools)
+## MCP server (15 tools)
 
 Run it over stdio: `npx -y @akashpriyadarshii/jev-seo` (or `jev-seo mcp` with a local build). Client config:
 
@@ -48,3 +48,11 @@ Agentic loop: `seo_gap` ranks the Search Console queue (needs site auth once via
 4. Export findings with `--csv` for spreadsheets; rebuild past runs with `--rescore`, no spend.
 4. Jev needs `TYPESAFE_API_KEY`. Without it the tool still runs; semantic sections report local-only output.
 5. Keep crawls polite: default 50 pages, 8 workers, robots.txt honored. Raise `--max-pages` deliberately.
+
+## Capabilities
+
+`jev-seo capabilities --json` reports `{version, rule_set, rules, mcp_tools, mcp_tool_names[], commands[]}` — machine source of truth, never parse README counts.
+
+## Plugin bridge
+
+`jev-seo serve --addr 0.0.0.0:8787` exposes Streamable HTTP at `POST /mcp` plus `GET /plugin.json` and `/extensions/*` for ChatGPT Plugin Extensions.

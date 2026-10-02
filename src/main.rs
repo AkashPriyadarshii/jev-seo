@@ -23,6 +23,7 @@ mod rank;
 mod robots;
 mod rules;
 mod schema;
+mod capabilities;
 mod plugin_bridge;
 mod serp;
 mod sitemap;
@@ -315,6 +316,11 @@ enum Commands {
         /// Listen address
         #[arg(long, default_value = "0.0.0.0:8787")]
         addr: String,
+    },
+    /// Show capability counts (rules, tools, commands) as JSON
+    Capabilities {
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -1926,6 +1932,9 @@ fn main() -> Result<()> {
         }
         Commands::Serve { addr } => {
             plugin_bridge::run_plugin_bridge(&addr)?;
+        }
+        Commands::Capabilities { json: _ } => {
+            println!("{}", serde_json::to_string_pretty(&capabilities::as_json())?);
         }
     }
 

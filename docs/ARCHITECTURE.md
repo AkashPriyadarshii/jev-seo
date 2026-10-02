@@ -76,10 +76,10 @@
 
 ### `mcp.rs` (Stdio Model Context Protocol)
 - JSON-RPC 2.0 loop over stdin/stdout.
-- Tools (13):
+- Tools (15):
   - `seo_keywords`: Autocomplete variants and search intent classification.
   - `seo_serp_inspect`: Live SERP competitor titles, snippets, URLs.
-  - `seo_audit`: Local file/directory audit under the 57-rule engine.
+  - `seo_audit`: Local file/directory audit under the 58-rule engine (R01-R58).
   - `seo_geo`: GEO citation score with confidence gates.
   - `seo_schema`: JSON-LD structural and deprecation checks.
   - `seo_robots`: Robots.txt and AI crawler permissions.
@@ -88,7 +88,7 @@
   - `seo_crawl`: Live-site BFS crawl with health score.
   - `seo_llms`: llms.txt and AI crawler readiness.
   - `seo_extract`: URL to markdown (key-gated paid path).
-  - `seo_explain`: Rule card for stable R01-R57 ids.
+  - `seo_explain`: Rule card for stable R01-R58 ids.
   - `seo_report`: Diff two saved audit JSONs (score, rules, actions, pairs).
 
 ### `manifest.rs` (RunManifest & spend ledger)
@@ -113,7 +113,7 @@
 - Quality math picks the best body; budgets cap paid spend with refunds only when no call happened.
 
 ### `rules.rs` (Rule Engine)
-- Stable R01-R57 registry across nine areas with severity weights and reach factors. R51-R53 read homepage PageSpeed vitals.
+- Stable R01-R58 registry across nine areas with severity weights and reach factors. R51-R53 read homepage PageSpeed vitals.
 - One scoring truth for crawl and audit output: area scores, weighted overall, impact-ranked actions.
 
 ### `actions.rs` (Ranked Actions)
@@ -127,6 +127,12 @@
 
 ### `gsc.rs` (Search Console)
 - Free first-party query data via OAuth device flow; refresh tokens stored with owner-only permissions.
+
+### `capabilities.rs` (Single source)
+- `RULES.len()` + `MCP_TOOLS` + `COMMANDS` → `jev-seo capabilities --json`; generator for README/SKILL/PRD.
+
+### `plugin_bridge.rs` (HTTP bridge)
+- Stdlib `TcpListener` → `POST /mcp` (JSON-RPC), `GET /plugin.json` + `/extensions/*`; ponytail per-connection threads.
 
 ### `policy.rs` (Confidence Gates)
 - Per-command Jev thresholds plus needs-review surfacing for low-confidence answers.

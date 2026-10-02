@@ -22,7 +22,7 @@ Commercial SEO tools (Semrush, Ahrefs) cost $120-$300+/month and are designed fo
   - `Noul`: Is a direct factual answer present in the first 150 words?
   - `Choice`: Primary content gap (`missing_statistics`, `generic_prose`, `no_step_by_step`, `outdated_examples`, `none`).
 - **FR-6: Local SQLite Rank Tracker (`rank.rs`)**: Embedded `rusqlite` (WAL mode) tracking `keywords` and `rank_history` (domain, position, serp_url, timestamp) in `.jev-seo.db`.
-- **FR-7: Agent MCP Server (`mcp.rs`)**: Native stdio JSON-RPC 2.0 protocol for Claude Code and Gemini CLI exposing 13 tools (`seo_keywords`, `seo_serp_inspect`, `seo_audit`, `seo_geo`, `seo_schema`, `seo_robots`, `seo_brief`, `seo_sitemap`, `seo_crawl`, `seo_llms`, `seo_extract`, `seo_explain`, `seo_report`).
+- **FR-7: Agent MCP Server (`mcp.rs`)**: Native stdio JSON-RPC 2.0 protocol for Claude Code and Gemini CLI exposing 15 tools (`seo_keywords`, `seo_serp_inspect`, `seo_audit`, `seo_geo`, `seo_schema`, `seo_robots`, `seo_brief`, `seo_sitemap`, `seo_crawl`, `seo_llms`, `seo_extract`, `seo_explain`, `seo_report`, `seo_cite_check`, `seo_gap`).
 - **FR-8: XML Sitemap & International Hreflang Auditor (`sitemap.rs`)**: Fetch and parse XML sitemaps to verify HTTPS enforcement, 50,000 URL boundaries, query parameter avoidance, and ISO hreflang tag correctness with required `x-default` fallbacks.
 - **FR-9: Content Quality & Hierarchy Guard (`audit.rs`)**: Enforce strict heading progressions without skip-levels and scan for excessive em-dashes and synthetic AI writing terms.
 - **FR-10: Link Graph & Cannibalization Radar (`audit.rs`)**: Map in-memory directory link graphs to detect orphan pages and group competing pages targeting identical keyword stems.
@@ -31,6 +31,8 @@ Commercial SEO tools (Semrush, Ahrefs) cost $120-$300+/month and are designed fo
 - **FR-13: Ranked Actions & Grades (`actions.rs`)**: Shared P1-P3 priorities, effort bands, 0-100 impact, quick-win flags, and A-F grades on every command that scores.
 - **FR-14: Multi-Format Reports (`audit.rs`)**: Designed single-file HTML with grade scorecard, pure-Rust multi-page PDF, and Markdown tables from the same audit data.
 - **FR-15: Environment Doctor**: Version, API key presence (never printed), database state, and platform in one command.
+- **FR-16: Capabilities (`capabilities.rs`)**: Single source `jev-seo capabilities --json` reports `{version, rule_set, rules, mcp_tools, commands}` for agents/docs.
+- **FR-17: Plugin Bridge (`plugin_bridge.rs`)**: `jev-seo serve` HTTP bridge (`POST /mcp` Streamable HTTP, `GET /plugin.json`, `/extensions/*`) for ChatGPT Plugin Extensions.
 
 ## 4. Non-Functional Requirements
 - **Performance**: Cold start < 60ms. Memory consumption < 30MB RAM.

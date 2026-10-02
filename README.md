@@ -494,8 +494,12 @@ Drop `narrative.json` next to exports (or in `--manifest`). Required keys: `exec
 | `llms <domain>` | llms.txt and AI crawler readiness with actions | `--json` |
 | `explain <id>` | Rule card for `R19` or `RULE-R19` | `--json` |
 | `report <path>` | Diff two audit JSONs: score, rules, actions | `--baseline <path>`, `--actions-csv <path>`, `--json` |
+| `bundle <audit.json>` | Canonical close bundle (digest + pairs + drift) | `--out <PATH>` |
+| `drift <op>` | Snapshot baselines `baseline`/`compare`/`history` | `--report <path>`, `--label <name>`, `--json` |
 | `doctor` | Version, API key, database, platform | `--json` |
-| `gsc <auth\|sites\|query>` | Search Console: free first-party query data | `--site <url>`, `--code`, `--limit <n>`, `--json` |
+| `capabilities` | Machine source of truth `{version, rule_set, rules, mcp_tools, commands}` | `--json` |
+| `serve` | HTTP bridge for ChatGPT Plugin Extensions (Streamable HTTP) | `--addr <host:port>` |
+| `gsc <auth\|sites\|query\|gap>` | Search Console: free first-party query data | `--site <url>`, `--code`, `--limit <n>`, `--json` |
 | `mcp` | Stdio JSON-RPC 2.0 agent MCP server | (None) |
 
 Real `--help` excerpt (`audit`):
