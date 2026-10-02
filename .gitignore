@@ -51,10 +51,18 @@ crawl.json
 !examples/**/crawl.json
 !examples/narrative.example.json
 
-# Dropped research notes (local only, never commit)
+# Internal working notes - never publish (public surface is README, CHANGELOG, SKILL, docs/*)
 Research.md
+RESEARCH.md
+**/RESEARCH.md
+STATE.md
+CLAUDE.md
+docs/HANDOFF.md
+memory/
+references/private/
 
-# Plugin Extensions — committed
+
+# Plugin Extensions ï¿½ committed
 !plugin.json
 !.well-known/plugin.json
 !extensions/
