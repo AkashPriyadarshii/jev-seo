@@ -20,7 +20,7 @@ Run the binary. Prefer JSON output when chaining commands. Never invent scores; 
 
 - `Health`, `Score`, and `Grade` lines are deterministic 0-100 values with A-F grades.
 - `Top Actions` are ranked by impact with effort bands; ids like `RULE-R01` map to the rule registry (R01-R58) in `src/rules.rs`.
-- New in v0.1.2: `explain` any rule id, `report --baseline` diffs, `crawl --vitals` PageSpeed checks, `query --provider dfs` opt-in DataForSEO, `seo_cite_check`, `seo_gap`, keyless GEO scores, drift gates. Local is v0.3.0 (complete, not pushed): `serve`, `capabilities`, `watch --diff-only`, `fix-plan`, crawl sitemap `#3`, R32/R08/R56 breadth, JS feature gate, GEO trends, and rescore ship.
+- New in v0.3.0 (2 Oct 2026): `serve`, `capabilities --json`, `watch --diff-only`, `fix-plan`, crawl sitemap seeding (closes #3), R32/R08/R56 breadth, JS feature gate, GEO trends with sparkline SVG, offline `--rescore`. v0.1.2 shipped 26 Sep: `explain`, `report --baseline`, `crawl --vitals`, `query --provider dfs`, `seo_cite_check`, `seo_gap`, keyless GEO, drift gates.
 - Jev contract: Choices offer `insufficient_context`, Flags print the runner-up, every fan-out appends to `~/.jev-seo/eval.jsonl`. Question version rides the spend line.
 - `Completeness` says what was skipped (caps, missing sitemap, missing robots). A capped crawl is a sample, not a verdict.
 - `Needs review` marks Jev answers below the confidence bar. Treat those lines as unverified.

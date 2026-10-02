@@ -5,7 +5,7 @@ All notable changes to `jev-seo` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v0.3.0
+## [0.3.0] - 2026-10-02
 
 ### Added
 - Plugin bridge `jev-seo serve` (Streamable HTTP `POST /mcp` + `GET /plugin.json` + `extensions/`), `capabilities --json` single source (`58 rules / 15 tools`), `watch --once/--every` sqlite baseline `watch-<slug>` (closes former unreleased v0.1.3 — merged into v0.3.0, no separate 0.1.3).
@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory & trends: `geo_history` per-target trend (`geo_trend`, `record_geo`), `watch --diff-only`, `<svg>` sparkline (`sparkline_svg`) in HTML + PDF deck `pdf_trend`, offline `--rescore` already on audit/crawl (serde defaults keep old JSON compatible), `--rescore` hint in Markdown.
 
 ### Changed
-- After `v0.1.2`, versioning was bumped wrongly by automation. You corrected the map: `v0.1.2 -> v0.2` was wrong, `v0.3.0` is the merged next version that absorbs former 0.1.3 + PRD 0.2.0 + both 0.3.0 scopes + `jev.md` evidence role. `Cargo.toml` is `0.3.0` locally; no publish until you say go.
+- After `v0.1.2`, versioning was bumped wrongly by automation. You corrected the map: `v0.3.0` is the merged next version that absorbs former 0.1.3 + PRD 0.2.0 + both 0.3.0 scopes + `jev.md` evidence role.
 
 ## [0.1.2] - 2026-09-26
 
