@@ -86,8 +86,8 @@ fn handle_stream(mut stream: TcpStream) {
     http_response(&mut stream, "404 Not Found", "text/plain", "not found");
 }
 
-/// Run HTTP bridge on	addr (e.g. "0.0.0.0:8787"). Each connection handled on its own thread.
-/// ponytail: single-thread accept loop, per-connection threads; upgrade to thread pool if >100 rps.
+/// Run HTTP bridge on addr (e.g. "0.0.0.0:8787"). Each connection handled on own thread.
+/// ponytail: single-thread accept loop, per-connection threads; pool if >100 rps.
 pub fn run_plugin_bridge(addr: &str) -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr)?;
     eprintln!("jev-seo plugin bridge listening on http://{addr}  POST /mcp");
