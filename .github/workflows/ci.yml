@@ -28,4 +28,4 @@ jobs:
         run: cargo test --all --verbose
 
       - name: Docker build check
-        run: docker build -t jev-seo:test .
+        run: docker build -t jev-seo:test . --progress=plain 2>&1 | tail -n 100
