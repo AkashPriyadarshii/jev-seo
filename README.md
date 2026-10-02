@@ -283,7 +283,7 @@ Scores rank work. They do not predict rankings or traffic. Confidence gates prin
 
 ## What's new
 
-crates.io ships **v0.1.2** (26 September 2026).
+crates.io ships **v0.1.2** (26 September 2026). Local `Cargo.toml` is **v0.3.0 maxen half done** — automation bumped `0.1.3` after `0.1.2` wrongly; you corrected the map so `v0.3.0` absorbs former `0.1.3` + PRD `0.2.0` + both `0.3.0` scopes + `jev.md` evidence role. No `v0.1.3` publishes; half the code ships (bridge, capabilities, watch, fix-plan, crawl #3), half remains.
 
 | Feature on `master` | Use it |
 |---|---|
@@ -326,7 +326,7 @@ cargo install --path .
 ## Quickstart
 
 ```bash
-# Published crate (v0.1.2)
+# Published crate (v0.1.2) — local is v0.3.0 maxen half done
 cargo install jev-seo
 
 # Optional: TypeSafe key for Jev semantic scores

@@ -1,18 +1,26 @@
 # Project State: jev-seo
 
-## Current Phase: v0.1.2 released 2026-09-26
+## Current Phase: v0.3.0 maxen — half done (local, not pushed)
 
-### Shipped on master (local, unpushed)
+You shipped `v0.1.2` on 26 September 2026. Automation bumped `0.1.3` after it, which was wrong. You corrected the map: the next version is `v0.3.0 maxen`, not `0.1.3` or `0.2`. `Cargo.toml` reads `0.3.0` locally. This repo stays local until you say go.
+
+### Shipped in v0.3.0 half (local, not pushed — former 0.1.3 merged in)
+- [x] `jev-seo serve` plugin bridge: `POST /mcp` Streamable HTTP + `GET /plugin.json` + `extensions/`
+- [x] `capabilities --json` single source (`58 rules / 15 tools / commands`)
+- [x] `watch --once/--every` sqlite baseline `watch-<slug>` with delta and drift
+- [x] Deterministic `fix-plan audit.json --json`: `rule->patch->verify` per Finding, `fact/heuristic`, heuristic capped 0.65, blocking first
+- [x] Crawl sitemap seeding via `robots.txt Sitemap:` + `/sitemap.xml` fallback, `sitemapindex` 1-level expand, `--sitemap <url>` override, start-URL `*.xml/*sitemap*` detection, `warn: no sitemap seed` (closes #3) + `seo_crawl {sitemap}`
+- [x] `133 tests` green, `clippy -D warnings` clean (added `test_robots_sitemaps_and_sitemap_detection`)
+
+### Shipped in v0.1.2 (26 September 2026, pushed)
 - [x] W6-W8 + Phase A/B + Wave 1: PDF deck, vitals R51-R53, eval rigor, DFS opt-in, security, truthfulness, provenance
-- [x] Live audits recorded: `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md`, `docs/audits/typesafe-ai-2026-09-24.md`
-- [x] Review-driven P1 + PH-comment fixes: R03 only on 2+ hops, `seo_extract` SSRF per-URL, `--no-jev` audit gate, R54 advisory/heuristic; R56 soft-404 verified with probe-gate test
-- [x] Basic auth / custom headers: `--user`/`--password` (Basic) and repeatable `--header` applied to all target-site fetches (crawl/robots/sitemap/llms/site-scoring)
+- [x] Live audits: `docs/audits/akashpriyadarshi-vercel-app-2026-09-24.md`, `docs/audits/typesafe-ai-2026-09-24.md`
+- [x] Review-driven P1 + PH-comment fixes: R03 only on 2+ hops, `seo_extract` SSRF per-URL, `--no-jev` audit gate, R54 advisory/heuristic; R56 soft-404 probe
+- [x] Basic auth / custom headers: `--user`/`--password` and repeatable `--header` on all target-site fetches
 - [x] R58 broken-hreflang-cluster: cross-page graph flags noindexed or unreciprocated alternates, heuristic + advisory
-- [x] RULE_SET_VERSION 2026.09b; registry R01-R58
-- [x] 112 tests green, clippy clean
-- [x] 15-tool MCP: `seo_cite_check` (answer/sampling/engine/manual loop), `seo_gap` + `gsc gap`, keyless GEO score, paid engine answers, drift alerts, citation bot count, llms.txt shape grade
+- [x] `RULE_SET_VERSION 2026.09b`; registry `R01-R58`
+- [x] 15-tool MCP: `seo_cite_check` (answer/sampling/engine/manual loop), `seo_gap` + `gsc gap`, keyless GEO, paid engine answers, drift alerts, citation bot count, llms.txt shape grade
 - [x] Agentic loop kit: `drift baseline/compare/history`, `audit --digest`, `bundle`, pair judging, post-H1 excerpts, gate numbers in `docs/EVAL.md`
-- [x] 132 tests green, clippy `-D warnings` clean, descriptions refreshed with TypeSafe Jev naming
 
 ### Shipped on master (local + pushed docs)
 - [x] Phase 0-4 skeleton, modules, crawl, llms, doctor, HTML reports (v0.1.1 on crates.io)
@@ -44,12 +52,24 @@
 - [ ] `cargo publish` to crates.io (needs registry token)
 - [x] `npm publish` as `@akashpriyadarshii/jev-seo` (unscoped name blocked by registry)
 
-## v0.2.0 Structural Backlog (from independent arch review)
+## v0.3.0 maxen — remaining half (not yet coded — ask before you start)
+- [ ] Rule breadth finish: R56 hardened + JS-only shell flag (`readable_text <300w && script>2×`) + rich-result required props per `@type` + R03 loop hardened
+- [ ] JS-rendered verification: optional `--features js` (`chromiumoxide`) headless, default warns `unrendered shell?`; no dep until you opt in
+- [ ] Memory & trends: per-engine GEO `geo_history` sqlite, `watch --diff-only`, `<svg>` sparkline trends in HTML/PDF, offline `--rescore` for every command
+- [ ] Evidence layer for `jev-rewrite`: `CrawlReport`/`RunManifest` as `COMPATIBILITY REPORT` artifact, clean-room guards already shipped
+
+## v0.4.0 (next, after maxen ships)
+- [ ] Full `sitemap-index` recursion (>1 level), multi-host crawl projects, screenshot/social-preview checks
+- [ ] Perf-budget CI gates (`--max-lcp/--max-cls`), SARIF output, `plugin check` custom rules
+- [ ] Flagship demos `strace-rs` + `iproute2-rs` (ss) published via jev-seo case studies — per `jev.md` strategy
+
+## Structural Backlog (from arch review, not versioned)
 - [ ] Thin `src/main.rs`: extract printing to `src/view.rs`
 - [ ] One central fetch helper with body caps and redirect revalidation
 - [ ] Abstract HTTP and Jev behind traits for hermetic tests
 
-## Post-v0.1.2 Backlog (Phase C polish)
+## Post-v0.3.0 Backlog (carried)
+
 - [ ] Robots bot list refresh: Claude-User, Claude-SearchBot, Perplexity-User, Meta-ExternalAgent, Applebot-Extended, DuckAssistBot, YouBot, Cohere-ai, MistralAI-User, amazonbot, Grok; wildcard and longest-match evaluation
 - [ ] Sitemap index support, 50MB limit check, malformed-XML errors
 - [ ] Schema array `@context`/`@type` handling, HowTo deprecation correction

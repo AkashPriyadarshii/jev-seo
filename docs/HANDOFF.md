@@ -54,9 +54,15 @@ To test a live sitemap:
 jev-seo sitemap https://example.com/sitemap.xml
 ```
 
-## 5. Release checklist (v0.1.2 released 2026-09-26)
+## 5. Release checklist (v0.1.2 released 2026-09-26; next is v0.3.0 maxen — no 0.1.3/0.2)
 1. [x] Bump `Cargo.toml` to `0.1.2`
 2. [x] Rename CHANGELOG `[Unreleased]` → `[0.1.2] - 2026-09-26`
 3. [x] Tag `v0.1.2`, push master + site + tag
 4. [x] GitHub Release binaries from the release workflow
 5. [ ] `cargo publish` (needs registry token), `npm publish` (needs npm token)
+
+## 6. Next release (v0.3.0 maxen — half done, local only)
+- Local `Cargo.toml` is `0.3.0`. Former unreleased `0.1.3` was merged into `v0.3.0` per your correction — no separate `0.1.3` or `0.2` publishes.
+- Shipped half: `serve`, `capabilities --json`, `watch`, `fix-plan`, crawl sitemap `#3` (`75020b3` + 3 prior).
+- Remaining half needs your go: rule breadth finish, `chromiumoxide` optional feature, per-engine `geo_history`, `<svg>` trends, offline `--rescore` all commands.
+- No push/tag/publish until you say go (foreign repo per global AGENTS.md).
