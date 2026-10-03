@@ -67,3 +67,4 @@ references/private/
 !.well-known/plugin.json
 !extensions/
 !src/plugin_bridge.rs
+.vercel

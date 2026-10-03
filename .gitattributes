@@ -1,11 +1,17 @@
-# Rust crate is the indexed code; site/ is vendored static marketing copy.
-# Suppress site/ from language stats so GitHub bar stays Rust.
+# Rust CLI is the indexed product; site/ is marketing + plugin surface.
+# Keep GitHub language stats and search indexing on the Rust crate.
 site/** linguist-vendored
-site/*.html linguist-vendored
-site/*.css linguist-vendored
-site/*.js linguist-vendored
-site/assets/** linguist-vendored
-docs/assets/** linguist-vendored
 extensions/** linguist-vendored
+docs/assets/** linguist-vendored
+docs/index.html linguist-vendored
 *.html linguist-vendored
 *.css linguist-vendored
+
+# LF everywhere, no CRLF churn on Windows checkouts
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.pdf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
