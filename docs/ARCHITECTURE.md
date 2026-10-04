@@ -76,10 +76,10 @@
 
 ### `mcp.rs` (Stdio Model Context Protocol)
 - JSON-RPC 2.0 loop over stdin/stdout.
-- Tools (15):
+- Tools (19):
   - `seo_keywords`: Autocomplete variants and search intent classification.
   - `seo_serp_inspect`: Live SERP competitor titles, snippets, URLs.
-  - `seo_audit`: Local file/directory audit under the 58-rule engine (R01-R58).
+  - `seo_audit`: Local file/directory audit under the 64-rule engine (R01-R64).
   - `seo_geo`: GEO citation score with confidence gates.
   - `seo_schema`: JSON-LD structural and deprecation checks.
   - `seo_robots`: Robots.txt and AI crawler permissions.
@@ -88,8 +88,12 @@
   - `seo_crawl`: Live-site BFS crawl with health score.
   - `seo_llms`: llms.txt and AI crawler readiness.
   - `seo_extract`: URL to markdown (key-gated paid path).
-  - `seo_explain`: Rule card for stable R01-R58 ids.
+  - `seo_explain`: Rule card for stable R01-R64 ids.
   - `seo_report`: Diff two saved audit JSONs (score, rules, actions, pairs).
+  - `seo_check`: One-command search CI under policy gates.
+  - `seo_visibility`: Rich citation verdict (mentioned/cited/recommended/position/sentiment).
+  - `seo_index`: Indexability truth table for a URL.
+  - `seo_verify`: Re-check rule ids against a path.
 
 ### `manifest.rs` (RunManifest & spend ledger)
 - Writes `run.json` (schema 1.0) and `ledger.json` beside exports or `--manifest <DIR>`.
@@ -113,7 +117,7 @@
 - Quality math picks the best body; budgets cap paid spend with refunds only when no call happened.
 
 ### `rules.rs` (Rule Engine)
-- Stable R01-R58 registry across nine areas with severity weights and reach factors. R51-R53 read homepage PageSpeed vitals.
+- Stable R01-R64 registry across nine areas with severity weights and reach factors. R51-R53 read homepage PageSpeed vitals. R59-R63 cover robots/canonical/sitemap contradictions; R64 flags render divergence; R37 is informational.
 - One scoring truth for crawl and audit output: area scores, weighted overall, impact-ranked actions.
 
 ### `actions.rs` (Ranked Actions)

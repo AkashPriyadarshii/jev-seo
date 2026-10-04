@@ -5,6 +5,18 @@ All notable changes to `jev-seo` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - v0.4.0
+
+### Added
+- Search CI: `jev-seo check` (policy + audit + baseline compare + exit code, `--git` PR scope, `--sarif`/`--junit`), `jev-seo verify` (re-run rules per fix-plan item), `.jev-seo/policy.toml` search contract.
+- Regional SERP: `--country --language --device --city` on `query`, DFS `location_code`/`language_code` from flags (IN 3564, GB 2826, DE 2276, FR 2250, default US 2840), DDG `kl=` derived best-effort.
+- First-party: `gsc inspect/winners/losers`, `bing sites/queries` via `BING_WEBMASTER_KEY` REST.
+- Rules R59-R64 (meta-robots conflict, X-Robots-Tag conflict, canonical invalid/noindex, sitemap noncanonical, render divergence heuristic); R37 downgraded to informational (Google ignores llms.txt for Search).
+- Citation struct on `seo_cite_check`/`seo_visibility`: mentioned/cited/recommended/position/negated/sentiment; negation never cites. Indexability truth table via `seo_index`. Four new MCP tools (19 total), `resources/list|read` for `jev://project/config|health|findings`. Portable `jev-evidence/` JSONL snapshots with provenance per row.
+- Portable Agent Plugins package: root `plugin.json` with `$schema`, author, license, keywords, and `extensions.com.openai`; `mcp.json` with streamable-http transport; `.app.json` server mapping; bundled `skills/jev-audit/SKILL.md`.
+- MCP annotations on all tools (`title` plus `readOnlyHint`/`openWorldHint`/`destructiveHint`), `instructions` on `initialize`, `outputSchema` on `seo_cite_check`.
+- Bridge health probe: `GET /health` returns `{"status":"ok"}`; manifest routes serve the portable `plugin.json`; static routes cover `/skills/*` with markdown content type.
+
 ## [0.3.0] - 2026-10-02
 
 ### Added

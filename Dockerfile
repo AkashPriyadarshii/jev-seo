@@ -4,6 +4,9 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY plugin.json ./plugin.json
 COPY .well-known ./.well-known
+COPY mcp.json ./mcp.json
+COPY .app.json ./.app.json
+COPY skills ./skills
 COPY extensions ./extensions
 RUN cargo build --release --bin jev-seo
 
@@ -13,6 +16,9 @@ WORKDIR /srv
 COPY --from=build /app/target/release/jev-seo /usr/local/bin/jev-seo
 COPY --from=build /app/plugin.json ./plugin.json
 COPY --from=build /app/.well-known ./.well-known
+COPY --from=build /app/mcp.json ./mcp.json
+COPY --from=build /app/.app.json ./.app.json
+COPY --from=build /app/skills ./skills
 COPY --from=build /app/extensions ./extensions
 EXPOSE 8080
 ENV PORT=8080

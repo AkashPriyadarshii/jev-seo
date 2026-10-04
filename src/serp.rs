@@ -83,6 +83,13 @@ pub struct SearchOpts {
     pub depth: String,
     pub topic: String,
     pub answer: bool,
+    /// Country code (IN, US). DFS location_code lookup; DDG kl= derived best-effort.
+    pub country: String,
+    /// Language code (en, hi).
+    pub language: String,
+    /// Device (mobile, desktop). Recorded on observations.
+    #[allow(dead_code)]
+    pub device: String,
 }
 
 impl Default for SearchOpts {
@@ -91,6 +98,9 @@ impl Default for SearchOpts {
             depth: "advanced".into(),
             topic: "general".into(),
             answer: false,
+            country: "US".into(),
+            language: "en".into(),
+            device: "desktop".into(),
         }
     }
 }
@@ -118,20 +128,29 @@ pub fn scrape_serp_opts(
                     "[jev-seo] paid search failed ({}); falling back to free scrape",
                     e
                 );
-                Ok((scrape_ddg(query, limit)?, Provider::Ddg))
+                Ok((
+                    scrape_ddg_with(query, limit, &kl_param(&opts.country, &opts.language))?,
+                    Provider::Ddg,
+                ))
             }
         },
-        Provider::Dfs => match dfs_search_with(query, limit) {
+        Provider::Dfs => match dfs_search_with(query, limit, opts) {
             Ok(items) => Ok((items, Provider::Dfs)),
             Err(e) => {
                 eprintln!(
                     "[jev-seo] DataForSEO failed ({}); falling back to free scrape",
                     e
                 );
-                Ok((scrape_ddg(query, limit)?, Provider::Ddg))
+                Ok((
+                    scrape_ddg_with(query, limit, &kl_param(&opts.country, &opts.language))?,
+                    Provider::Ddg,
+                ))
             }
         },
-        Provider::Ddg | Provider::Auto => Ok((scrape_ddg(query, limit)?, Provider::Ddg)),
+        Provider::Ddg | Provider::Auto => Ok((
+            scrape_ddg_with(query, limit, &kl_param(&opts.country, &opts.language))?,
+            Provider::Ddg,
+        )),
     }
 }
 
@@ -229,7 +248,7 @@ pub fn dfs_enabled() -> bool {
     user && pass
 }
 
-fn dfs_search_with(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
+fn dfs_search_with(query: &str, limit: usize, opts: &SearchOpts) -> Result<Vec<SerpItem>> {
     let user = std::env::var("DATAFORSEO_USERNAME")
         .ok()
         .filter(|k| !k.trim().is_empty())
@@ -244,8 +263,8 @@ fn dfs_search_with(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
     };
     let payload = serde_json::json!([{
         "keyword": query,
-        "location_code": 2840,
-        "language_code": "en",
+        "location_code": dfs_location(&opts.country),
+        "language_code": opts.language,
         "depth": limit.clamp(1, 20),
     }]);
     let resp = ureq::post(&endpoint)
@@ -414,8 +433,36 @@ pub fn tavily_extract(urls: &[String], query: &str) -> Result<String> {
     Ok(out.chars().take(MAX_CHARS).collect())
 }
 
+/// DataForSEO location codes for policy countries. Unknown falls back to
+/// US 2840 so paid calls never fail on a new country string.
+// ponytail: 5 common codes; full table via locations endpoint when needed
+pub fn dfs_location(country: &str) -> u32 {
+    match country.trim().to_ascii_uppercase().as_str() {
+        "IN" => 3564,
+        "GB" | "UK" => 2826,
+        "DE" => 2276,
+        "FR" => 2250,
+        _ => 2840,
+    }
+}
+
+/// DuckDuckGo kl= from country+language. Best-effort: DDG ignores most
+/// regions, so callers must treat free-path locale as approximate.
+pub fn kl_param(country: &str, language: &str) -> String {
+    format!(
+        "{}-{}",
+        country.trim().to_ascii_lowercase(),
+        language.trim().to_ascii_lowercase()
+    )
+}
+
+#[allow(dead_code)]
 fn scrape_ddg(query: &str, limit: usize) -> Result<Vec<SerpItem>> {
-    let form_data = format!("q={}&b=&kl=us-en", urlencoding::encode(query));
+    scrape_ddg_with(query, limit, "us-en")
+}
+
+fn scrape_ddg_with(query: &str, limit: usize, kl: &str) -> Result<Vec<SerpItem>> {
+    let form_data = format!("q={}&b=&kl={}", urlencoding::encode(query), kl);
     let resp = ureq::post("https://html.duckduckgo.com/html/")
         .set("User-Agent", USER_AGENT)
         .set("Content-Type", "application/x-www-form-urlencoded")

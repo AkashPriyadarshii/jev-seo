@@ -1,10 +1,10 @@
 [package]
 name = "jev-seo"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Akash Priyadarshi <272530059+AkashPriyadarshii@users.noreply.github.com>"]
 license = "MIT"
-description = "Free Rust SEO and GEO toolkit powered by TypeSafe Jev: 58-rule audits, site crawls, AI citation checks, rank drift, CI gates, 15-tool MCP. Zero cost."
+description = "Free Rust SEO and GEO toolkit powered by TypeSafe Jev: 64-rule audits, site crawls, AI citation checks, rank drift, CI gates, 19-tool MCP. Zero cost."
 repository = "https://github.com/AkashPriyadarshii/jev-seo"
 homepage = "https://github.com/AkashPriyadarshii/jev-seo"
 readme = "README.md"
@@ -19,6 +19,11 @@ include = [
     "/README.md",
     "/LICENSE",
     "/SKILL.md",
+    "/plugin.json",
+    "/mcp.json",
+    "skills/*.md",
+    "skills/**/*.md",
+    "extensions/*.html",
     "/CHANGELOG.md",
     "examples/*.json",
     "examples/*.md",
@@ -35,6 +40,7 @@ serde_json = "1.0"
 rusqlite = { version = "0.32", features = ["bundled"] }
 colored = "2.1"
 anyhow = "1.0"
+toml = { version = "0.8", features = ["parse"] }
 
 [features]
 # Optional JS-rendered verification: `cargo run --features js -- crawl <url>`

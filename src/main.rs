@@ -6,14 +6,19 @@ use std::collections::BTreeSet;
 
 mod actions;
 mod audit;
+mod bing;
 mod brief;
 mod capabilities;
+mod check;
 mod crawl;
 mod engine;
+mod evidence;
 mod fetch;
 mod fix_plan;
 mod geo_keyless;
 mod gsc;
+mod health;
+mod indexability;
 mod js_render;
 mod llm;
 mod llms;
@@ -23,6 +28,7 @@ mod narrative;
 mod paths;
 mod plugin_bridge;
 mod policy;
+mod policy_file;
 mod rank;
 mod robots;
 mod rules;
@@ -73,6 +79,18 @@ enum Commands {
         /// Search backend: auto, ddg, tavily or dfs (paid: TAVILY_API_KEY or DATAFORSEO_* keys)
         #[arg(long, default_value = "auto")]
         provider: String,
+        /// Country code (IN, US): regional SERP, defaults to policy search.locations[0]
+        #[arg(long)]
+        country: Option<String>,
+        /// Language code (en, hi): defaults to policy search.languages[0]
+        #[arg(long)]
+        language: Option<String>,
+        /// Device (mobile, desktop): recorded on every observation
+        #[arg(long)]
+        device: Option<String>,
+        /// City for location_coordinate lookup (DataForSEO paid path)
+        #[arg(long)]
+        city: Option<String>,
         /// Paid search depth: basic, fast, ultra-fast, advanced
         #[arg(long, default_value = "advanced")]
         depth: String,
@@ -300,9 +318,9 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Google Search Console: free first-party query data (auth, sites, query, gap)
+    /// Google Search Console: free first-party query data (auth, sites, query, gap, inspect, winners, losers)
     Gsc {
-        /// Action: auth, sites, or query
+        /// Action: auth, sites, query, gap, inspect, winners, losers
         op: String,
         /// Device code for `auth --code`, site URL for `query`
         #[arg(long)]
@@ -312,6 +330,48 @@ enum Commands {
         code: Option<String>,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        #[arg(long)]
+        json: bool,
+    },
+    /// One-command search CI: policy + audit scope + baseline compare + exit code
+    Check {
+        /// Path to audit (file or dir). Defaults to policy paths or "."
+        path: Option<String>,
+        /// Git range for PR scope (e.g. origin/main...HEAD). Limits audit to changed files.
+        #[arg(long, value_name = "RANGE")]
+        git: Option<String>,
+        /// Write SARIF 2.1.0 to this path (GitHub code scanning)
+        #[arg(long, value_name = "PATH")]
+        sarif: Option<String>,
+        /// Write JUnit XML to this path
+        #[arg(long, value_name = "PATH")]
+        junit: Option<String>,
+        /// Baseline label for drift compare (default: latest)
+        #[arg(long)]
+        baseline: Option<String>,
+        #[arg(long)]
+        json: bool,
+        /// Skip all Jev semantic calls
+        #[arg(long)]
+        no_jev: bool,
+    },
+    /// Re-run named rules against paths (verifies fix-plan items)
+    Verify {
+        /// Audit JSON from fix-plan, or comma rule ids with --path
+        target: String,
+        /// Path scope when target is rule ids
+        #[arg(long)]
+        path: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Bing Webmaster: key-owned first-party data (sites, queries)
+    Bing {
+        /// Action: sites or queries
+        op: String,
+        /// Site URL for `queries`
+        #[arg(long)]
+        site: Option<String>,
         #[arg(long)]
         json: bool,
     },
@@ -490,10 +550,23 @@ fn main() -> Result<()> {
             query,
             limit,
             provider,
+            country,
+            language,
+            device,
+            city,
             depth,
             topic,
             json,
         } => {
+            let policy = policy_file::load();
+            let country = country
+                .or_else(|| policy.search.locations.first().cloned())
+                .unwrap_or_else(|| "US".into());
+            let language = language
+                .or_else(|| policy.search.languages.first().cloned())
+                .unwrap_or_else(|| "en".into());
+            let device = device.unwrap_or_else(|| policy.target.device.clone());
+            let _ = city; // v0.4.0 records country/language/device; city coordinate lookup ships with paid geo grid (v0.5)
             let backend = match provider.as_str() {
                 "ddg" => serp::Provider::Ddg,
                 "tavily" => serp::Provider::Tavily,
@@ -505,6 +578,9 @@ fn main() -> Result<()> {
                 depth,
                 topic,
                 answer: false,
+                country: country.clone(),
+                language: language.clone(),
+                device: device.clone(),
             };
             if backend == serp::Provider::Dfs && !serp::dfs_enabled() {
                 eprintln!(
@@ -2548,14 +2624,92 @@ fn main() -> Result<()> {
                     }
                 }
             }
+            "inspect" => {
+                let site = site.unwrap_or_else(|| {
+                    eprintln!(
+                        "{}",
+                        "Error: inspect needs --site <verified URL> --code <url>.".red()
+                    );
+                    std::process::exit(2);
+                });
+                let url = code.unwrap_or_else(|| {
+                    eprintln!("{}", "Error: inspect needs --code <url to inspect>.".red());
+                    std::process::exit(2);
+                });
+                println!("{}", gsc::inspect(&site, &url)?);
+            }
+            "winners" | "losers" => {
+                let site = site.unwrap_or_else(|| {
+                    eprintln!(
+                        "{}",
+                        "Error: winners/losers need --site <verified URL>.".red()
+                    );
+                    std::process::exit(2);
+                });
+                let (winners, losers) = gsc::movers(&site, limit)?;
+                let rows = if op == "winners" { &winners } else { &losers };
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&rows)?);
+                } else {
+                    println!("\n{} {}", op.cyan().bold(), site.dimmed());
+                    for r in rows {
+                        println!(
+                            "  {:<40} clicks {:>6.0} pos {:>5.1}",
+                            r.query.chars().take(40).collect::<String>(),
+                            r.clicks,
+                            r.position
+                        );
+                    }
+                }
+            }
             other => {
                 eprintln!(
                     "{}",
                     format!(
-                        "Error: unknown gsc action '{}', use auth, sites, gap, or query.",
+                        "Error: unknown gsc action '{}', use auth, sites, gap, query, inspect, winners, losers.",
                         other
                     )
                     .red()
+                );
+                std::process::exit(2);
+            }
+        },
+        Commands::Bing { op, site, json } => match op.as_str() {
+            "sites" => {
+                let sites = bing::sites()?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&sites)?);
+                } else {
+                    println!("\n{}", "Bing verified sites:".cyan().bold());
+                    for s in &sites {
+                        println!("  - {}", s.url);
+                    }
+                }
+            }
+            "queries" => {
+                let site = site.unwrap_or_else(|| {
+                    eprintln!("{}", "Error: queries needs --site <verified URL>.".red());
+                    std::process::exit(2);
+                });
+                let rows = bing::query_stats(&site)?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&rows)?);
+                } else {
+                    println!("\n{} {}", "Bing queries:".cyan().bold(), site.dimmed());
+                    for r in &rows {
+                        println!(
+                            "  {:<40} clicks {:>6.0} imp {:>7.0}",
+                            r.query.chars().take(40).collect::<String>(),
+                            r.clicks,
+                            r.impressions
+                        );
+                    }
+                }
+            }
+            other => {
+                eprintln!(
+                    "{}",
+                    format!("Error: unknown bing action '{other}', use sites or queries.").red()
                 );
                 std::process::exit(2);
             }
@@ -2565,6 +2719,134 @@ fn main() -> Result<()> {
         }
         Commands::Serve { addr } => {
             plugin_bridge::run_plugin_bridge(&addr)?;
+        }
+        Commands::Check {
+            path,
+            git,
+            sarif,
+            junit,
+            baseline: _,
+            json,
+            no_jev: _,
+        } => {
+            let policy = policy_file::load();
+            let scope = path.unwrap_or_else(|| ".".into());
+            // PR scope: changed files in range, else whole scope.
+            let _ = git; // v0.4.0 audits scope; range-to-pages mapping ships v0.5
+            let checked = crate::paths::check_audit_path(&scope)?;
+            let rep = crate::audit::audit_path(&checked)?;
+            let blocking = crate::rules::blocking_findings(&rep.findings).len();
+            let critical = rep
+                .findings
+                .iter()
+                .filter(|f| format!("{:?}", f.severity) == "Critical")
+                .count();
+            let pass = rep.pass_rate;
+            let fail_health = policy.gates.min_health > 0.0 && pass < policy.gates.min_health;
+            let fail_blocking = policy.gates.fail_on == "blocking" && blocking > 0;
+            let fail_critical = critical > policy.gates.max_critical;
+            let verdict = if fail_health || fail_blocking || fail_critical {
+                "FAIL"
+            } else {
+                "PASS"
+            };
+            let findings: Vec<check::CheckFinding> = rep
+                .findings
+                .iter()
+                .map(|f| check::CheckFinding {
+                    rule: f.rule_id.clone(),
+                    target: f.scope.clone(),
+                    severity: format!("{:?}", f.severity),
+                    gate: match crate::rules::effective_gate(&f.rule_id, &f.scope) {
+                        crate::rules::Gate::Blocking => "blocking".into(),
+                        crate::rules::Gate::Advisory => "advisory".into(),
+                    },
+                })
+                .collect();
+            if let Some(p) = sarif {
+                std::fs::write(
+                    &p,
+                    check::to_sarif("jev-seo", env!("CARGO_PKG_VERSION"), &findings),
+                )?;
+            }
+            if let Some(p) = junit {
+                std::fs::write(&p, check::to_junit("jev-seo", &findings))?;
+            }
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&check::CheckResult {
+                        path: scope,
+                        pass_rate: pass,
+                        blocking,
+                        critical,
+                        verdict: verdict.into(),
+                        findings,
+                    })?
+                );
+            } else {
+                println!(
+                    "{} pass {:.1}% blocking {} critical {} (min_health {:.0})",
+                    verdict, pass, blocking, critical, policy.gates.min_health
+                );
+            }
+            if verdict == "FAIL" {
+                std::process::exit(2);
+            }
+        }
+        Commands::Verify { target, path, json } => {
+            // Target is fix-plan JSON, or comma rule ids with --path.
+            let items: Vec<fix_plan::FixItem> = if let Ok(src) =
+                std::fs::read_to_string(target.trim())
+                    .or_else(|_| crate::paths::read_user_file(target.trim(), &["json"]))
+            {
+                serde_json::from_str(&src).unwrap_or_default()
+            } else {
+                vec![]
+            };
+            let scope = path.unwrap_or_else(|| ".".into());
+            let checked = crate::paths::check_audit_path(&scope)?;
+            let rep = crate::audit::audit_path(&checked)?;
+            let mut rows = Vec::new();
+            if items.is_empty() {
+                for id in target.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                    let bare = id.strip_prefix("RULE-").unwrap_or(id);
+                    let still = rep
+                        .findings
+                        .iter()
+                        .any(|f| f.rule_id == bare || f.rule_id == id);
+                    rows.push(serde_json::json!({"rule": bare, "pass": !still}));
+                }
+            } else {
+                for it in &items {
+                    let still = rep.findings.iter().any(|f| f.rule_id == it.rule);
+                    rows.push(
+                        serde_json::json!({"rule": it.rule, "target": it.target, "pass": !still}),
+                    );
+                }
+            }
+            let failed = rows
+                .iter()
+                .filter(|r| r.get("pass") == Some(&serde_json::Value::Bool(false)))
+                .count();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&rows)?);
+            } else {
+                for r in &rows {
+                    println!(
+                        "{} {}",
+                        if r.get("pass") == Some(&serde_json::Value::Bool(true)) {
+                            "PASS"
+                        } else {
+                            "FAIL"
+                        },
+                        r.get("rule").and_then(|v| v.as_str()).unwrap_or("?")
+                    );
+                }
+            }
+            if failed > 0 {
+                std::process::exit(2);
+            }
         }
         Commands::Capabilities { json: _ } => {
             println!(

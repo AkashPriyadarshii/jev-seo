@@ -1,4 +1,4 @@
-//! Rule audit engine (R01-R58). Rules are data, findings are facts.
+//! Rule audit engine (R01-R64). Rules are data, findings are facts.
 //! Severity weights and reach factors turn findings into area scores;
 //! area scores blend into one overall grade. Deterministic, no model calls.
 
@@ -24,6 +24,7 @@ pub enum Severity {
     High,
     Medium,
     Low,
+    Info,
 }
 
 #[derive(Debug, Clone)]
@@ -78,7 +79,9 @@ pub fn now_ms() -> u64 {
 pub fn truth_kind(rule_id: &str) -> &'static str {
     let bare = rule_id.strip_prefix("RULE-").unwrap_or(rule_id);
     match bare.to_ascii_uppercase().as_str() {
-        "R18" | "R19" | "R20" | "R23" | "R24" | "R41" | "R54" | "R55" | "R58" => "heuristic",
+        "R18" | "R19" | "R20" | "R23" | "R24" | "R41" | "R54" | "R55" | "R58" | "R64" => {
+            "heuristic"
+        }
         _ => "fact",
     }
 }
@@ -422,15 +425,62 @@ pub const RULES: &[Rule] = &[
         title: "Broken hreflang cluster",
         fix: "Make every hreflang pair reciprocal and never point at a noindexed target.",
     },
+    Rule {
+        id: "R59",
+        area: Area::Canonical,
+        severity: Severity::High,
+        effort: 1,
+        title: "Meta robots conflict",
+        fix: "One robots directive per page: remove the contradicting noindex or nofollow.",
+    },
+    Rule {
+        id: "R60",
+        area: Area::Canonical,
+        severity: Severity::High,
+        effort: 1,
+        title: "X-Robots-Tag conflict",
+        fix: "Align the X-Robots-Tag header with the meta robots tag.",
+    },
+    Rule {
+        id: "R61",
+        area: Area::Canonical,
+        severity: Severity::High,
+        effort: 1,
+        title: "Canonical target invalid",
+        fix: "Point canonical at a 200 HTTPS URL, not a redirect or error page.",
+    },
+    Rule {
+        id: "R62",
+        area: Area::Canonical,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Canonical target noindex",
+        fix: "Never canonicalize to a noindexed page; pick an indexable target.",
+    },
+    Rule {
+        id: "R63",
+        area: Area::Crawl,
+        severity: Severity::Medium,
+        effort: 1,
+        title: "Sitemap URL noncanonical",
+        fix: "List only canonical 200 URLs in the sitemap.",
+    },
+    Rule {
+        id: "R64",
+        area: Area::Crawl,
+        severity: Severity::Medium,
+        effort: 2,
+        title: "Render/source content divergence",
+        fix: "Server-render primary content; JS-only shells lose indexable words.",
+    },
     // AI access (5)
     Rule {
         id: "R37",
         area: Area::AiAccess,
-        severity: Severity::Low,
+        severity: Severity::Info,
         effort: 1,
-        title: "No llms.txt",
-        fix:
-            "Ship /llms.txt for ChatGPT/Perplexity/Claude plumbing; Google Search ignores the file.",
+        title: "No llms.txt (informational)",
+        fix: "Optional plumbing for ChatGPT/Perplexity/Claude; Google Search ignores the file.",
     },
     Rule {
         id: "R38",
@@ -586,9 +636,8 @@ pub fn gate(id: &str) -> Gate {
     let bare = id.strip_prefix("RULE-").unwrap_or(id);
     match bare.to_ascii_uppercase().as_str() {
         "R01" | "R02" | "R03" | "R04" | "R05" | "R06" | "R07" | "R08" | "R09" | "R11" | "R13"
-        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" | "R56" | "R57" => {
-            Gate::Blocking
-        }
+        | "R16" | "R21" | "R22" | "R26" | "R31" | "R33" | "R36" | "R43" | "R47" | "R56" | "R57"
+        | "R59" | "R60" | "R61" => Gate::Blocking,
         _ => Gate::Advisory,
     }
 }
@@ -654,6 +703,7 @@ fn deduct(sev: Severity) -> f64 {
         Severity::High => 12.0,
         Severity::Medium => 6.0,
         Severity::Low => 2.0,
+        Severity::Info => 0.0,
     }
 }
 
@@ -749,7 +799,7 @@ pub fn actions_for(findings: &[Finding]) -> Vec<crate::actions::Action> {
         let priority = match first.severity {
             Severity::Critical | Severity::High => 1,
             Severity::Medium => 2,
-            Severity::Low => 3,
+            Severity::Low | Severity::Info => 3,
         };
         let effort = rule(id).map(|r| r.effort).unwrap_or(2);
         let title = rule(id).map(|r| r.title).unwrap_or("Fix flagged issue");

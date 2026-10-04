@@ -243,8 +243,49 @@ pub struct GapRow {
     pub gap_score: f64,
 }
 
-/// Page-two weight: high impressions far down the page outrank page-one
-/// tweaks. Pure arithmetic, no model involved.
+/// URL Inspection: index state for one URL on a verified property.
+/// Free for verified properties. Returns the raw verdict string.
+pub fn inspect(site: &str, url: &str) -> Result<String> {
+    let token = access_token()?;
+    let body: serde_json::Value =
+        ureq::post("https://searchconsole.googleapis.com/v1/urlInspection/index:inspect")
+            .timeout(Duration::from_secs(20))
+            .set("Authorization", &format!("Bearer {}", token))
+            .send_json(serde_json::json!({
+                "inspectionUrl": url,
+                "siteUrl": site,
+            }))
+            .context("urlInspection inspect failed")?
+            .into_json()?;
+    Ok(
+        serde_json::to_string_pretty(body.get("inspectionResult").unwrap_or(&body))
+            .unwrap_or_default(),
+    )
+}
+
+/// Winners and losers: top queries split by position trend proxy.
+/// v0.4.0 thin slice: ranks current top-clicks rows; position > 10 = needs work.
+// ponytail: single-window split; two-window trend diff when history lands
+pub fn movers(site: &str, limit: usize) -> Result<(Vec<GscRow>, Vec<GscRow>)> {
+    let rows = top_queries(site, limit)?;
+    let mut winners: Vec<GscRow> = rows
+        .iter()
+        .filter(|r| r.position <= 10.0)
+        .cloned()
+        .collect();
+    let mut losers: Vec<GscRow> = rows.iter().filter(|r| r.position > 10.0).cloned().collect();
+    winners.sort_by(|a, b| {
+        b.clicks
+            .partial_cmp(&a.clicks)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    losers.sort_by(|a, b| {
+        b.impressions
+            .partial_cmp(&a.impressions)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    Ok((winners, losers))
+}
 pub fn gap_score(impressions: f64, position: f64) -> f64 {
     impressions * position.max(1.0) / 10.0
 }

@@ -292,6 +292,101 @@ Sitemap: https://example.com/sitemap.xml
     }
 
     #[test]
+    fn test_evidence_hash_and_append() {
+        use crate::evidence::{append, input_hash, Observation};
+        assert_eq!(input_hash("abc").len(), 16);
+        assert_ne!(input_hash("a"), input_hash("b"));
+        let dir = tempfile::tempdir().unwrap();
+        let obs = Observation {
+            kind: "serp".into(),
+            provider: "ddg".into(),
+            engine: "duckduckgo".into(),
+            country: "IN".into(),
+            language: "en".into(),
+            device: "mobile".into(),
+            observed_at: 1,
+            input_hash: input_hash("q"),
+            ruleset: "2026.09b".into(),
+            cost_usd: 0.0,
+            confidence: 1.0,
+            payload: serde_json::json!({"q": 1}),
+        };
+        append(dir.path().to_str().unwrap(), "serp", &obs).unwrap();
+        let line = std::fs::read_to_string(dir.path().join("jev-evidence/serp.jsonl")).unwrap();
+        assert!(line.contains("\"country\":\"IN\""));
+    }
+
+    #[test]
+    fn test_health_dims() {
+        use std::collections::HashMap;
+        let areas = HashMap::from([("crawl".to_string(), 90.0), ("content".to_string(), 80.0)]);
+        let h = crate::health::from_areas(&areas, 85.0);
+        assert!((h.overall - 85.0).abs() < f64::EPSILON);
+        assert!((h.dims["technical"] - 90.0).abs() < f64::EPSILON);
+        assert!((h.dims["content_evidence"] - 80.0).abs() < f64::EPSILON);
+        assert!(h.dims.contains_key("indexability"));
+    }
+
+    #[test]
+    fn test_mcp_resources_list() {
+        use crate::mcp::{handle_request, RpcRequest};
+        use serde_json::json;
+        let req = RpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "resources/list".into(),
+            params: None,
+        };
+        let resp = handle_request(&req);
+        let res = resp.result.unwrap();
+        let uris: Vec<&str> = res["resources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| r.get("uri").and_then(|u| u.as_str()))
+            .collect();
+        assert!(uris.contains(&"jev://project/config"));
+        assert!(uris.contains(&"jev://project/health"));
+        assert!(uris.contains(&"jev://project/findings"));
+    }
+
+    #[test]
+    fn test_bing_gates_without_key() {
+        let (k,) = (std::env::var("BING_WEBMASTER_KEY").ok(),);
+        std::env::remove_var("BING_WEBMASTER_KEY");
+        assert!(!crate::bing::enabled());
+        assert!(crate::bing::sites().is_err());
+        assert!(crate::bing::query_stats("https://example.com").is_err());
+        if let Some(v) = k {
+            std::env::set_var("BING_WEBMASTER_KEY", v);
+        }
+    }
+
+    #[test]
+    fn test_cite_struct_negation() {
+        // "would not recommend X" mentions but never cites.
+        let d = crate::mcp::cite_detail_for_test(
+            "example.com",
+            "I would not recommend example.com, avoid it.",
+            &[],
+        );
+        assert!(d.get("mentioned").and_then(|v| v.as_bool()).unwrap());
+        assert!(!d.get("cited").and_then(|v| v.as_bool()).unwrap());
+        assert!(!d.get("recommended").and_then(|v| v.as_bool()).unwrap());
+        assert_eq!(
+            d.get("sentiment").and_then(|v| v.as_str()),
+            Some("negative")
+        );
+        // Bare link with source signal cites.
+        let e = crate::mcp::cite_detail_for_test(
+            "example.com",
+            "Source: https://example.com/docs has the guide.",
+            &[],
+        );
+        assert!(e.get("cited").and_then(|v| v.as_bool()).unwrap());
+    }
+
+    #[test]
     fn test_mcp_tools_list_protocol() {
         use crate::mcp::{handle_request, RpcRequest};
         use serde_json::json;
@@ -307,7 +402,31 @@ Sitemap: https://example.com/sitemap.xml
         assert!(resp.error.is_none());
         let res = resp.result.unwrap();
         let tools = res.get("tools").and_then(|t| t.as_array()).unwrap();
-        assert_eq!(tools.len(), 15, "All 15 agent SEO tools must be exposed");
+        assert_eq!(tools.len(), 19, "All 19 agent SEO tools must be exposed");
+
+        for t in tools {
+            assert!(
+                t.get("title").and_then(|v| v.as_str()).is_some(),
+                "tool {} needs title",
+                t.get("name").unwrap()
+            );
+            assert!(
+                t.get("annotations")
+                    .and_then(|v| v.get("readOnlyHint"))
+                    .and_then(|v| v.as_bool())
+                    .is_some(),
+                "tool {} needs readOnlyHint",
+                t.get("name").unwrap()
+            );
+        }
+        let cite = tools
+            .iter()
+            .find(|t| t.get("name").and_then(|n| n.as_str()) == Some("seo_cite_check"))
+            .unwrap();
+        assert!(
+            cite.get("outputSchema").is_some(),
+            "seo_cite_check needs outputSchema"
+        );
 
         let names: Vec<&str> = tools
             .iter()
@@ -1337,6 +1456,15 @@ Sitemap: https://example.com/sitemap.xml
             .unwrap()
             .get("protocolVersion")
             .is_some());
+        assert!(
+            resp.result
+                .as_ref()
+                .unwrap()
+                .get("instructions")
+                .and_then(|v| v.as_str())
+                .is_some(),
+            "initialize must carry instructions"
+        );
 
         let call = RpcRequest {
             jsonrpc: "2.0".into(),
@@ -1410,7 +1538,7 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_rules_registry_and_scoring() {
         use crate::rules::{overall, score_areas, Area, Finding, Severity, RULES};
-        assert_eq!(RULES.len(), 58);
+        assert_eq!(RULES.len(), 64);
         assert!(RULES.iter().all(|r| crate::rules::rule(r.id).is_some()));
         let findings = vec![
             Finding {
@@ -1670,13 +1798,13 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_gate_split_covers_registry() {
         use crate::rules::{gate, Gate, RULES};
-        assert_eq!(RULES.len(), 58);
+        assert_eq!(RULES.len(), 64);
         let blocking: Vec<&&str> = RULES
             .iter()
             .filter(|r| gate(r.id) == Gate::Blocking)
             .map(|r| &r.id)
             .collect();
-        assert_eq!(blocking.len(), 22, "blocking set changed: {:?}", blocking);
+        assert_eq!(blocking.len(), 25, "blocking set changed: {:?}", blocking);
         for id in ["R01", "R09", "R11", "R33", "R36", "R47", "RULE-R02"] {
             assert_eq!(gate(id), Gate::Blocking, "{id}");
         }
@@ -1785,6 +1913,71 @@ Sitemap: https://example.com/sitemap.xml
             .unwrap();
         let ids = needs_review(&extra, "geo");
         assert_eq!(ids, vec!["geo_density", "geo_freshness"]);
+    }
+
+    #[test]
+    fn test_gsc_movers_split() {
+        use crate::gsc::GscRow;
+        // Pure split logic mirrors movers(): <=10 wins, >10 loses.
+        let rows = [
+            GscRow {
+                query: "a".into(),
+                clicks: 9.0,
+                impressions: 9.0,
+                ctr: 0.1,
+                position: 3.0,
+            },
+            GscRow {
+                query: "b".into(),
+                clicks: 1.0,
+                impressions: 500.0,
+                ctr: 0.0,
+                position: 15.0,
+            },
+        ];
+        let (w, l): (Vec<GscRow>, Vec<GscRow>) = (
+            rows.iter()
+                .filter(|r| r.position <= 10.0)
+                .cloned()
+                .collect(),
+            rows.iter().filter(|r| r.position > 10.0).cloned().collect(),
+        );
+        assert_eq!(w.len(), 1);
+        assert_eq!(l.len(), 1);
+        assert_eq!(w[0].query, "a");
+        assert_eq!(l[0].query, "b");
+    }
+
+    #[test]
+    fn test_locale_helpers() {
+        use crate::serp::{dfs_location, kl_param};
+        assert_eq!(dfs_location("IN"), 3564);
+        assert_eq!(dfs_location("in"), 3564);
+        assert_eq!(dfs_location("GB"), 2826);
+        assert_eq!(dfs_location("XX"), 2840);
+        assert_eq!(kl_param("IN", "en"), "in-en");
+        assert_eq!(kl_param("US", "EN"), "us-en");
+    }
+
+    #[test]
+    fn test_policy_file_defaults_and_parse() {
+        use crate::policy_file;
+        let p = policy_file::load_at(".jev-seo/does-not-exist.toml");
+        assert_eq!(p.gates.fail_on, "blocking");
+        assert_eq!(p.search.locations, vec!["IN", "US"]);
+        assert!((p.ai.min_confidence - 0.80).abs() < f64::EPSILON);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("policy.toml");
+        std::fs::write(
+            &path,
+            "[gates]\nmin_health = 85.0\n[search]\nlocations = [\"DE\"]\n",
+        )
+        .unwrap();
+        let q = policy_file::load_at(path.to_str().unwrap());
+        assert!((q.gates.min_health - 85.0).abs() < f64::EPSILON);
+        assert_eq!(q.search.locations, vec!["DE"]);
+        // Defaults fill the rest: fail_on stays blocking.
+        assert_eq!(q.gates.fail_on, "blocking");
     }
 
     #[test]
@@ -2432,11 +2625,11 @@ Sitemap: https://example.com/sitemap.xml
     #[test]
     fn test_registry_invariants() {
         use crate::rules::{gate, truth_kind, Gate, RULES};
-        assert_eq!(RULES.len(), 58);
+        assert_eq!(RULES.len(), 64);
         let mut ids: Vec<&str> = RULES.iter().map(|r| r.id).collect();
         ids.sort();
         ids.dedup();
-        assert_eq!(ids.len(), 58, "rule ids must be unique");
+        assert_eq!(ids.len(), 64, "rule ids must be unique");
         for r in RULES {
             assert!(!r.title.is_empty() && !r.fix.is_empty(), "{}", r.id);
             assert!(r.effort >= 1 && r.effort <= 3, "{}", r.id);
@@ -2455,7 +2648,7 @@ Sitemap: https://example.com/sitemap.xml
             .collect();
         assert_eq!(
             heu,
-            vec![&"R18", &"R19", &"R20", &"R23", &"R24", &"R54", &"R55", &"R58", &"R41"]
+            vec![&"R18", &"R19", &"R20", &"R23", &"R24", &"R54", &"R55", &"R58", &"R64", &"R41"]
         );
     }
 

@@ -1,0 +1,1 @@
+{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{"jev-seo":{"description":"Free Rust SEO and GEO audits: 58-rule checks, live crawl, AI citation scoring, rank drift.","type":"streamable-http","url":"https://jev-seo.de.deplexo.com/mcp"}}}

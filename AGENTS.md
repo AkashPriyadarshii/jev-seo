@@ -2,9 +2,9 @@
 
 ## Overview
 `jev-seo` is a 100% Free and Open Source (FOSS), agent-first SEO & Generative Engine Optimization (GEO) suite powered by TypeSafe AI Jev (System One) and local zero-cost scraping. An open-source, subscription-free alternative to Semrush, Ahrefs, and OpenSEO.
-- Registry: **58 stable rules (R01-R58)** across 9 areas; **133 tests** green; rule-set build `2026.09b`.
+- Registry: **64 stable rules (R01-R64)** across 9 areas; **142 tests** green; rule-set build `2026.09b`.
 - Free path costs ₹0 (DuckDuckGo + local files). Jev semantic calls are hard-capped (`--jev-budget`, default $0.25/run; `--no-jev` is fully offline). Paid backends (Tavily, DataForSEO, Jina, Firecrawl) are explicit opt-in only: flag + key, never silent.
-- **v0.3.0 released 2 October 2026** (58 rules, 133 tests, rule-set `2026.09b`). `v0.1.2` shipped 26 September 2026. Former unreleased `0.1.3` was merged into `v0.3.0`.
+- **v0.4.0 unreleased** (Search CI: `check` + `verify`, `.jev-seo/policy.toml`, regional SERP, GSC inspect/winners/losers, Bing sites/queries, SARIF/JUnit, R59-R64, R37 informational, citation struct, indexability table, 4 new MCP tools, `jev://` resources, evidence snapshots, portable manifest). `v0.3.0` shipped 2 October 2026 (64 rules, 142 tests). `v0.1.2` shipped 26 September 2026. Former unreleased `0.1.3` was merged into `v0.3.0`.
 
 ## Core Directives
 1. **FOSS & Zero-Cost Free Path**: MIT licensed. DuckDuckGo + local files + SQLite drift are free forever. No paid API is *required*; DFS/Tavily/Jina/Firecrawl exist only behind opt-in flags.
@@ -21,8 +21,8 @@ Every marketing page or documentation footer must reference:
 - **Author**: Akash Priyadarshi (Patna, Bihar, India)
 - **Links**: Portfolio (https://akashpriyadarshi.vercel.app), GitHub (https://github.com/AkashPriyadarshii)
 
-## Live Site Deploy (site branch)
-- Site files live on the **`site` branch** (never `master`).
+## Live Site Deploy
+- Site files live in **`master/site/`** (vendored, `linguist-vendored`). GitHub Pages is off; Vercel serves `site/` as canonical. Edit `site/` on `master`; push on go.
 - GitHub Pages: https://akashpriyadarshii.github.io/jev-seo/ auto-deploys on push to `site`.
 - Vercel: https://jevseo.vercel.app (user-managed link, independent of Pages).
-- Edit flow: `git checkout site` → edit → commit → push origin site. `master` stays pure Rust crate.
+- Edit flow: edit `site/` on `master`, commit, push on go. `master` stays pure Rust crate plus vendored site.

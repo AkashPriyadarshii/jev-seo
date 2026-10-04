@@ -181,6 +181,16 @@ pub(crate) fn handle_request(req: &RpcRequest) -> RpcResponse {
     handle_request_with(req, &mut NoSampler)
 }
 
+/// Test seam: citation struct without ledger side effects.
+#[cfg(test)]
+pub(crate) fn cite_detail_for_test(
+    target: &str,
+    answer: &str,
+    citations: &[String],
+) -> serde_json::Value {
+    cite_detail(target, answer, citations)
+}
+
 pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -> RpcResponse {
     match req.method.as_str() {
         "initialize" => RpcResponse {
@@ -189,7 +199,8 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
             result: Some(json!({
                 "protocolVersion": "2024-11-05",
                 "capabilities": { "tools": {} },
-                "serverInfo": { "name": "jev-seo", "version": env!("CARGO_PKG_VERSION") }
+                "serverInfo": { "name": "jev-seo", "version": env!("CARGO_PKG_VERSION") },
+                "instructions": "Free SEO and GEO audits: audit local docs, crawl live sites, score AI citation likelihood, track rank drift. Crawl before judging; quote the completeness line with any score."
             })),
             error: None,
         },
@@ -206,6 +217,7 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                 "tools": [
                     {
                         "name": "seo_cite_check",
+                        "title": "Citation check",
                         "description": "Check whether an AI answer names the target domain for a buyer query. Pass \"answer\" to score directly (works everywhere); omit it to borrow the client's model via sampling, or get the prompt back to answer yourself",
                         "inputSchema": {
                             "type": "object",
@@ -215,11 +227,26 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                                 "answer": { "type": "string", "description": "AI answer text to score; omit to use sampling or receive the prompt" }
                             },
                             "required": ["target", "query"]
-                        }
+                        },
+                        "outputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "target": { "type": "string" },
+                                "query": { "type": "string" },
+                                "cited": { "type": "boolean" },
+                                "since_last": {},
+                                "source": { "type": "string" },
+                                "excerpt": { "type": "string" }
+                            },
+                            "required": ["target", "query", "cited", "source"]
+                        },
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                     },
                     {
                         "name": "seo_gap",
+                        "title": "Gap queue",
                         "description": "Ranked gap queue for a verified Search Console site: high-impression queries in weak positions joined with citation history",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -231,7 +258,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_keywords",
+                        "title": "Keyword suggestions",
                         "description": "Fetch autocomplete keyword suggestions for zero cost",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -242,7 +271,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_serp_inspect",
+                        "title": "SERP inspect",
                         "description": "Search live SERP competitors (search API, DuckDuckGo fallback) and analyze content gaps",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -254,7 +285,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_audit",
+                        "title": "Audit path",
                         "description": "Audit a local file or an entire directory for on-page SEO issues, duplicate titles, and thin pages",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -265,7 +298,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_geo",
+                        "title": "GEO score",
                         "description": "Evaluate Generative Engine Optimization (GEO) citation likelihood (1-10) and direct answer presence using TypeSafe Jev",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -277,7 +312,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_schema",
+                        "title": "Validate schema",
                         "description": "Validate Schema.org JSON-LD markup against active 2026 search specifications",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -288,7 +325,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_robots",
+                        "title": "Inspect robots",
                         "description": "Inspect robots.txt on a live domain for AI crawler permissions (GPTBot, ClaudeBot, PerplexityBot, Google-Extended) and sitemaps",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -299,7 +338,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_brief",
+                        "title": "Content brief",
                         "description": "Synthesize live SERP competitor results into a ready-to-write content brief with H2 outlines and 150-word direct answer guidance",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -311,7 +352,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_sitemap",
+                        "title": "Audit sitemap",
                         "description": "Inspect and validate XML sitemaps for protocols, 50k URL limits, and international hreflang tags",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -322,7 +365,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_crawl",
+                        "title": "Crawl site",
                         "description": "Crawl a live site for broken links, redirect chains, and orphan pages",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -335,7 +380,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_llms",
+                        "title": "Check llms.txt",
                         "description": "Check llms.txt presence and AI crawler permissions for answer-engine readiness",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -346,7 +393,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_extract",
+                        "title": "Extract markdown",
                         "description": "Extract clean markdown from URLs via paid API (needs TAVILY_API_KEY), else error",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -358,7 +407,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_explain",
+                        "title": "Explain rule",
                         "description": "Explain a stable rule id (R19 or RULE-R19): area, severity, effort, title, fix",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -369,7 +420,9 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                     },
                     {
                         "name": "seo_report",
+                        "title": "Diff reports",
                         "description": "Diff two saved audit JSON reports: score delta, rules cleared/new, ranked actions",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -379,11 +432,115 @@ pub(crate) fn handle_request_with(req: &RpcRequest, sampler: &mut dyn Sampler) -
                             },
                             "required": ["path"]
                         }
+                    },
+                    {
+                        "name": "seo_check",
+                        "title": "Search CI check",
+                        "description": "One-command search CI: audit a path under policy gates, report PASS/FAIL with blocking counts",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string", "description": "File or directory to check" }
+                            },
+                            "required": ["path"]
+                        }
+                    },
+                    {
+                        "name": "seo_visibility",
+                        "title": "Citation visibility",
+                        "description": "Rich citation verdict: mentioned vs cited vs recommended, position, sentiment (alias of seo_cite_check struct)",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "target": { "type": "string" },
+                                "query": { "type": "string" },
+                                "answer": { "type": "string", "description": "AI answer text to score" }
+                            },
+                            "required": ["target", "query"]
+                        }
+                    },
+                    {
+                        "name": "seo_index",
+                        "title": "Indexability truth",
+                        "description": "Indexability truth table for a URL: HTTP, robots, meta, canonical, sitemap, inlinks to one verdict",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": true, "destructiveHint": false },
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "url": { "type": "string", "description": "URL to evaluate" }
+                            },
+                            "required": ["url"]
+                        }
+                    },
+                    {
+                        "name": "seo_verify",
+                        "title": "Verify fixes",
+                        "description": "Re-check rule ids against a path: PASS when the finding is gone",
+                        "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "rules": { "type": "string", "description": "Comma rule ids, e.g. R09,R13" },
+                                "path": { "type": "string" }
+                            },
+                            "required": ["rules", "path"]
+                        }
                     }
                 ]
             })),
             error: None,
         },
+        "resources/list" => RpcResponse {
+            jsonrpc: "2.0".into(),
+            id: req.id.clone(),
+            result: Some(json!({
+                "resources": [
+                    { "uri": "jev://project/config", "name": "Project search contract", "mimeType": "application/json" },
+                    { "uri": "jev://project/health", "name": "Current search health", "mimeType": "application/json" },
+                    { "uri": "jev://project/findings", "name": "Latest audit findings", "mimeType": "application/json" },
+                ]
+            })),
+            error: None,
+        },
+        "resources/read" => {
+            let uri = req
+                .params
+                .as_ref()
+                .and_then(|p| p.get("uri"))
+                .and_then(|u| u.as_str())
+                .unwrap_or("");
+            let text = match uri {
+                "jev://project/config" => {
+                    let p = crate::policy_file::load();
+                    serde_json::to_string_pretty(&p).unwrap_or_default()
+                }
+                "jev://project/health" => {
+                    serde_json::to_string_pretty(&crate::health::empty_coverage())
+                        .unwrap_or_default()
+                }
+                "jev://project/findings" => "[]".into(),
+                _ => String::new(),
+            };
+            if text.is_empty() {
+                RpcResponse {
+                    jsonrpc: "2.0".into(),
+                    id: req.id.clone(),
+                    result: None,
+                    error: Some(json!({ "code": -32002, "message": "Unknown resource" })),
+                }
+            } else {
+                RpcResponse {
+                    jsonrpc: "2.0".into(),
+                    id: req.id.clone(),
+                    result: Some(
+                        json!({ "contents": [{ "uri": uri, "mimeType": "application/json", "text": text }] }),
+                    ),
+                    error: None,
+                }
+            }
+        }
         "tools/call" => {
             let params = req.params.as_ref();
             let tool_name = params
@@ -453,6 +610,73 @@ fn cite_prompt(query: &str) -> String {
     )
 }
 
+/// Citation struct: mentioned vs cited vs recommended, with position and
+/// sentiment. Deterministic text heuristics, no model. Keeps bool `cited`
+/// for compat. Negation ("would not recommend X") counts as mentioned only.
+fn cite_detail(target: &str, answer: &str, citations: &[String]) -> serde_json::Value {
+    let host = cite_host(target);
+    let lower = answer.to_lowercase();
+    let in_text = lower.contains(&host);
+    let in_cites = citations.iter().any(|c| c.to_lowercase().contains(&host));
+    let mentioned = in_text;
+    // Answer text naming the domain IS the citation (the model said it).
+    // Engine citation list is the second path. Negation revokes both.
+    let cited = (in_text || in_cites) && !is_negated(&lower, &host);
+    let negated = is_negated(&lower, &host);
+    let recommended = cited && !negated && has_recommend_signal(&lower, &host);
+    let position = mention_position(&lower, &host);
+    json!({
+        "mentioned": mentioned,
+        "cited": cited && !negated,
+        "recommended": recommended,
+        "position": position,
+        "negated": negated,
+        "sentiment": if negated { "negative" } else if recommended { "positive" } else { "neutral" },
+    })
+}
+
+#[allow(dead_code)]
+fn has_citation_signal(lower: &str, host: &str) -> bool {
+    let i = lower.find(host).unwrap_or(usize::MAX);
+    let window = &lower[i.saturating_sub(120)..(i + host.len() + 120).min(lower.len())];
+    window.contains("http")
+        || window.contains("www.")
+        || window.contains("source")
+        || window.contains("cite")
+        || window.contains("link")
+}
+
+fn is_negated(lower: &str, host: &str) -> bool {
+    let i = match lower.find(host) {
+        Some(i) => i,
+        None => return false,
+    };
+    let window = &lower[i.saturating_sub(80)..i];
+    window.contains("not recommend")
+        || window.contains("would not")
+        || window.contains("avoid")
+        || window.contains("don't")
+        || window.contains("do not")
+}
+
+fn has_recommend_signal(lower: &str, host: &str) -> bool {
+    let i = match lower.find(host) {
+        Some(i) => i,
+        None => return false,
+    };
+    let window = &lower[i.saturating_sub(160)..(i + host.len() + 60).min(lower.len())];
+    window.contains("recommend")
+        || window.contains("best")
+        || window.contains("top")
+        || window.contains("try")
+        || window.contains("use")
+}
+
+fn mention_position(lower: &str, host: &str) -> Option<usize> {
+    let i = lower.find(host)?;
+    Some(lower[..i].chars().filter(|&c| c == '.').count() + 1)
+}
+
 /// Score one answer for a target citation and log the drift verdict.
 /// Best-effort ledger: a stuck database never fails the check.
 fn cite_verdict(
@@ -462,15 +686,17 @@ fn cite_verdict(
     source: &str,
     citations: &[String],
 ) -> String {
-    let host = cite_host(target);
-    let lower = answer.to_lowercase();
-    let cited = lower.contains(&host) || citations.iter().any(|c| c.to_lowercase().contains(&host));
+    let detail = cite_detail(target, answer, citations);
+    let cited = detail
+        .get("cited")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let prev = crate::rank::DbStore::open()
         .ok()
         .and_then(|db| db.record_cite(target, query, cited).ok())
         .flatten();
     let excerpt: String = answer.chars().take(300).collect();
-    serde_json::to_string_pretty(&json!({
+    let mut out = serde_json::json!({
         "target": target,
         "query": query,
         "cited": cited,
@@ -478,8 +704,15 @@ fn cite_verdict(
         "source": source,
         "engine_citations": citations,
         "excerpt": excerpt,
-    }))
-    .unwrap_or_default()
+    });
+    if let Some(map) = out.as_object_mut() {
+        if let Some(d) = detail.as_object() {
+            for (k, v) in d {
+                map.insert(k.clone(), v.clone());
+            }
+        }
+    }
+    serde_json::to_string_pretty(&out).unwrap_or_default()
 }
 
 fn cite_host(target: &str) -> String {
@@ -803,6 +1036,87 @@ fn execute_tool_with(name: &str, args: &serde_json::Value, sampler: &mut dyn Sam
                     Err(e) => format!("Error: parse audit JSON: {}", e),
                 },
                 Err(e) => format!("Error: read audit JSON: {}", e),
+            }
+        }
+        "seo_check" => {
+            let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+            if let Some(err) = safety_gate("seo_check", path) {
+                return err;
+            }
+            let checked = match crate::paths::check_audit_path(path) {
+                Ok(p) => p,
+                Err(e) => return format!("Error: {e:#}"),
+            };
+            match crate::audit::audit_path(&checked) {
+                Ok(rep) => {
+                    let blocking = crate::rules::blocking_findings(&rep.findings).len();
+                    serde_json::to_string_pretty(&json!({
+                        "path": path, "pass_rate": rep.pass_rate,
+                        "blocking": blocking,
+                        "verdict": if blocking > 0 { "FAIL" } else { "PASS" },
+                    }))
+                    .unwrap_or_default()
+                }
+                Err(e) => format!("Error: {}", e),
+            }
+        }
+        "seo_visibility" => {
+            // Rich struct alias: same engine as seo_cite_check, struct output.
+            let target = args
+                .get("target")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            let query = args
+                .get("query")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            if target.is_empty() || query.is_empty() {
+                return "Error: seo_visibility needs both \"target\" and \"query\".".into();
+            }
+            if let Some(answer) = args.get("answer").and_then(|v| v.as_str()) {
+                if !answer.trim().is_empty() {
+                    return cite_verdict(target, query, answer, "answer", &[]);
+                }
+            }
+            cite_verdict(target, query, &cite_prompt(query), "prompt", &[])
+        }
+        "seo_index" => {
+            let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            if url.trim().is_empty() {
+                return "Error: seo_index needs \"url\".".into();
+            }
+            serde_json::to_string_pretty(&crate::indexability::truth(url)).unwrap_or_default()
+        }
+        "seo_verify" => {
+            let rules = args.get("rules").and_then(|v| v.as_str()).unwrap_or("");
+            let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+            if let Some(err) = safety_gate("seo_verify", path) {
+                return err;
+            }
+            let checked = match crate::paths::check_audit_path(path) {
+                Ok(p) => p,
+                Err(e) => return format!("Error: {e:#}"),
+            };
+            match crate::audit::audit_path(&checked) {
+                Ok(rep) => {
+                    let rows: Vec<serde_json::Value> = rules
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(|id| {
+                            let bare = id.strip_prefix("RULE-").unwrap_or(id);
+                            let still = rep
+                                .findings
+                                .iter()
+                                .any(|f| f.rule_id == bare || f.rule_id == id);
+                            json!({"rule": bare, "pass": !still})
+                        })
+                        .collect();
+                    serde_json::to_string_pretty(&rows).unwrap_or_default()
+                }
+                Err(e) => format!("Error: {}", e),
             }
         }
         _ => format!("Error: unknown tool: {}", name),

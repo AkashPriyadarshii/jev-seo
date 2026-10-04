@@ -3,7 +3,7 @@
 
 use crate::rules::{RULES, RULE_SET_VERSION};
 
-pub const MCP_TOOLS: usize = 15;
+pub const MCP_TOOLS: usize = 19;
 
 /// Ordered tool names matching mcp.rs tools/list.
 pub const MCP_TOOL_NAMES: &[&str] = &[
@@ -22,6 +22,10 @@ pub const MCP_TOOL_NAMES: &[&str] = &[
     "seo_extract",
     "seo_explain",
     "seo_report",
+    "seo_check",
+    "seo_visibility",
+    "seo_index",
+    "seo_verify",
 ];
 
 /// Canonical command list.
@@ -48,6 +52,8 @@ pub const COMMANDS: &[&str] = &[
     "serve",
     "capabilities",
     "watch",
+    "check",
+    "verify",
     "fix-plan",
 ];
 

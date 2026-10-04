@@ -81,26 +81,33 @@ fn handle_stream(mut stream: TcpStream) {
         return;
     }
 
-    // Health / manifest
-    if req.contains("GET /health")
-        || req.contains("GET /plugin.json")
-        || req.contains("GET /.well-known")
-    {
+    // Health probe for hosts (Deplexo, load balancers)
+    if req.contains("GET /health") {
+        http_response(
+            &mut stream,
+            "200 OK",
+            "application/json",
+            r#"{"status":"ok"}"#,
+        );
+        return;
+    }
+
+    // Plugin manifest (portable Agent Plugins entry point)
+    if req.contains("GET /plugin.json") || req.contains("GET /.well-known") {
         let path = if req.contains("/plugin.json") {
             "plugin.json"
         } else {
             ".well-known/plugin.json"
         };
-        // Try plugin.json, else minimal manifest
-        let body = std::fs::read_to_string("plugin.json")
-            .or_else(|_| std::fs::read_to_string(path))
+        let body = std::fs::read_to_string(path)
+            .or_else(|_| std::fs::read_to_string("plugin.json"))
             .unwrap_or_else(|_| r#"{"name":"jev-seo"}"#.into());
         http_response(&mut stream, "200 OK", "application/json", &body);
         return;
     }
 
-    // Serve extensions static (sidebar/panel/viewer)
-    if req.starts_with("GET /extensions/") {
+    // Serve extensions + bundled skills static (sidebar/panel/viewer)
+    if req.starts_with("GET /extensions/") || req.starts_with("GET /skills/") {
         let line = req.lines().next().unwrap_or("");
         let p = line
             .split(' ')
@@ -113,6 +120,8 @@ fn handle_stream(mut stream: TcpStream) {
         let body = std::fs::read_to_string(&safe).unwrap_or_else(|_| "<h1>not found</h1>".into());
         let ctype = if safe.ends_with(".html") {
             "text/html"
+        } else if safe.ends_with(".md") {
+            "text/markdown"
         } else {
             "application/json"
         };
