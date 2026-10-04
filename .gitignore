@@ -58,6 +58,8 @@ RESEARCH.md
 STATE.md
 CLAUDE.md
 docs/HANDOFF.md
+docs/*.md
+docs/**/*.md
 memory/
 references/private/
 

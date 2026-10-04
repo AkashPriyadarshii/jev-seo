@@ -1,0 +1,42 @@
+name: npm-token-rotation
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open rotation reminder when due
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const created = new Date('2026-10-04T09:06:00Z').getTime();
+            const now = Date.now();
+            const days = (now - created) / 86400000;
+            if (days < 80) {
+              core.info(`NPM_TOKEN age ${Math.floor(days)}d, no action yet`);
+              return;
+            }
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'npm-token-rotation',
+            });
+            if (open.data.length > 0) {
+              core.info('rotation issue already open');
+              return;
+            }
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Rotate NPM_TOKEN (90-day expiry)',
+              labels: ['npm-token-rotation'],
+              body: 'NPM_TOKEN is past 80 days old. Generate a new granular token on npmjs.com (scope @akashpriyadarshii/jev-seo, publish only), run `gh secret set NPM_TOKEN`, then revoke the old token.',
+            });
