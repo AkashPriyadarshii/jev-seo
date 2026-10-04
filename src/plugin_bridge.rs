@@ -15,13 +15,65 @@ fn http_response(stream: &mut TcpStream, status: &str, ctype: &str, body: &str) 
     let _ = stream.write_all(resp.as_bytes());
 }
 
-fn handle_stream(mut stream: TcpStream) {
-    let mut buf = vec![0u8; 64 * 1024];
-    let n = match stream.read(&mut buf) {
-        Ok(0) | Err(_) => return,
-        Ok(n) => n,
+fn header_len(head: &str, name: &str) -> Option<usize> {
+    for line in head.lines().skip(1) {
+        let line = line.trim_end_matches('\r');
+        if line.is_empty() {
+            break;
+        }
+        if let Some((k, v)) = line.split_once(':') {
+            if k.trim().eq_ignore_ascii_case(name) {
+                return v.trim().parse::<usize>().ok();
+            }
+        }
+    }
+    None
+}
+
+fn read_request(stream: &mut TcpStream) -> Option<Vec<u8>> {
+    // Headers first, then the body per Content-Length. A single read()
+    // is not enough: proxies split head and body across TCP segments.
+    let mut raw: Vec<u8> = Vec::with_capacity(8 * 1024);
+    let mut tmp = [0u8; 8 * 1024];
+    let head_end = loop {
+        let n = stream.read(&mut tmp).ok()?;
+        if n == 0 {
+            return None;
+        }
+        raw.extend_from_slice(&tmp[..n]);
+        if let Some(i) = raw.windows(4).position(|w| w == b"\r\n\r\n") {
+            break i + 4;
+        }
+        if raw.len() > 64 * 1024 {
+            return None;
+        }
     };
-    let req = String::from_utf8_lossy(&buf[..n]);
+    let head = String::from_utf8_lossy(&raw[..head_end]).into_owned();
+    let mut body = raw[head_end..].to_vec();
+    if let Some(clen) = header_len(&head, "content-length") {
+        while body.len() < clen {
+            let n = stream.read(&mut tmp).ok()?;
+            if n == 0 {
+                break;
+            }
+            body.extend_from_slice(&tmp[..n]);
+            if body.len() > 4 * 1024 * 1024 {
+                break;
+            }
+        }
+        body.truncate(clen);
+    }
+    let mut full = head.into_bytes();
+    full.extend_from_slice(&body);
+    Some(full)
+}
+
+fn handle_stream(mut stream: TcpStream) {
+    let raw = match read_request(&mut stream) {
+        Some(r) => r,
+        None => return,
+    };
+    let req = String::from_utf8_lossy(&raw);
 
     // CORS preflight
     if req.starts_with("OPTIONS ") {
