@@ -577,7 +577,35 @@ section { padding: 90px 0; }
   /* world is flat print ink; nothing to degrade */
 }
 
+/* ---------- floating support: BMC + Product Hunt ---------- */
+.support-float {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+.support-float a { display: block; line-height: 0; }
+.support-float .bmc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffdd00;
+  color: #000;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 10px 16px;
+  text-decoration: none;
+  line-height: 1.2;
+}
+.support-float .bmc-btn:hover { color: #000; filter: brightness(1.05); }
+.support-float .ph-badge img { display: block; }
+
 @media print {
   body { background: #fff; color: #111; }
-  .cropmark, .reg-cross, .toplink { display: none; }
+  .cropmark, .reg-cross, .toplink, .support-float { display: none; }
 }
