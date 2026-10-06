@@ -139,6 +139,8 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
     <a href="https://jevseo.vercel.app"><img src="https://img.shields.io/badge/live%20-%20vercel-black?style=flat-square" alt="Vercel"></a>
     <a href="https://akashpriyadarshii.github.io/jev-seo/"><img src="https://img.shields.io/badge/live%20-%20github%20pages-222?style=flat-square" alt="GitHub Pages"></a>
     <a href="https://github.com/AkashPriyadarshii/jev-seo/stargazers"><img src="https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars" alt="stars" /></a>
+  </p>
+  <p>
     <a href="https://www.producthunt.com/products/jev-seo/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-jev-seo" target="_blank" rel="noopener"><img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1325282&theme=light" alt="jev-seo — review on Product Hunt" width="250" height="54" /></a>
   </p>
   <img src="docs/assets/banner.png" alt="jev-seo banner: free Rust SEO and GEO CLI with 64 rules, 19 MCP tools, 142 tests" width="100%">
