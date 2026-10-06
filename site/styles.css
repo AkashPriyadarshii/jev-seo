@@ -577,36 +577,7 @@ section { padding: 90px 0; }
   /* world is flat print ink; nothing to degrade */
 }
 
-/* ---------- floating support: BMC + Product Hunt ---------- */
-.support-float {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-end;
-}
-.support-float a { display: block; line-height: 0; }
-.support-float .bmc-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #ffdd00;
-  color: #000;
-  font-family: var(--body);
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 8px 14px;
-  border-radius: 6px;
-  text-decoration: none;
-  line-height: 1.4;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
-}
-.support-float .bmc-btn:hover { color: #000; filter: brightness(1.05); }
-.support-float .bmc-btn svg { flex: none; }
-.support-float .ph-badge img { display: block; }
+/* ---------- floating support: BMC + Product Hunt (mirrors jev-curate) ---------- */
 
 @media print {
   body { background: #fff; color: #111; }
