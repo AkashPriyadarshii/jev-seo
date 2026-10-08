@@ -700,7 +700,7 @@ CI runs `cargo check --all-targets`, `cargo test --all`, and the SEO gate on eve
 Patna, Bihar, India  
 
 - GitHub: [@AkashPriyadarshii](https://github.com/AkashPriyadarshii)
-- Portfolio: [akashpriyadarshi.vercel.app](https://akashpriyadarshi.vercel.app)
+- Portfolio: [akashpriyadarshi.is-a.dev](https://akashpriyadarshi.is-a.dev)
 - LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akashpriyadarshii)
 - Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)
 
