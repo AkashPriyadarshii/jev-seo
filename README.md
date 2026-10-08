@@ -700,8 +700,8 @@ CI runs `cargo check --all-targets`, `cargo test --all`, and the SEO gate on eve
 Patna, Bihar, India  
 
 - GitHub: [@AkashPriyadarshii](https://github.com/AkashPriyadarshii)
-- Portfolio: [akashpriyadarshi.is-a.dev](https://akashpriyadarshi.is-a.dev)
-- LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akashpriyadarshii)
+- Portfolio: [akashpriyadarshi.is-a.dev](https://akashpriyadarshi.is-a.dev) · Project page: [akashpriyadarshi.is-a.dev/projects/jev-seo/](https://akashpriyadarshi.is-a.dev/projects/jev-seo/)
+- LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akash-priyadarshi-1aa51b37a)
 - Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)
 
 **Social:** [X / Twitter](https://x.com/Akash__ydv001) · [Threads](https://www.threads.net/@akash.priyadarshii) · [Instagram](https://www.instagram.com/akash.priyadarshii/) · [Reddit](https://reddit.com/user/akashpriyadarshi)
