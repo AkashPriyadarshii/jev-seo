@@ -116,7 +116,7 @@ Visual assets: docs/assets/banner.png (hero), preview-summary.png (scorecard + a
     <a href="https://github.com/AkashPriyadarshii/jev-seo/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/AkashPriyadarshii/jev-seo/ci.yml?branch=master&style=flat-square&label=ci" alt="CI" /></a>
     <a href="https://github.com/AkashPriyadarshii/jev-seo/releases"><img src="https://img.shields.io/github/v/release/AkashPriyadarshii/jev-seo?style=flat-square&label=release" alt="GitHub release" /></a>
     <a href="https://typesafe.ai"><img src="https://img.shields.io/badge/oracle-TypeSafe%20Jev-0055ff.svg?style=flat-square" alt="TypeSafe Jev" /></a>
-    <img src="https://img.shields.io/badge/tests-133%20green-0055ff.svg?style=flat-square" alt="142 tests" />
+    <img src="https://img.shields.io/badge/tests-142%20green-0055ff.svg?style=flat-square" alt="142 tests" />
   </p>
   <p>By <strong>Akash Priyadarshi</strong> · MIT · Rust 2021 · zero runtime services</p>
   <p>
@@ -424,7 +424,7 @@ Live DuckDuckGo competitors, word-count estimate, Jev fan-out for H2 outline plu
 jev-seo geo README.md --query "agentic skills framework for coding agents"
 ```
 
-Citation likelihood 1-10 from Jev `Score` and `Noul`. Five-dimension composite (structure, density, directness, statistics, freshness) with published weights and history delta. Low-confidence answers are withheld. For a broader view of how AI engines perceive your brand, see [Prefer](https://tryprefer.com/).
+Citation likelihood 1-10 from Jev `Score` and `Noul`. Five-dimension composite (structure, density, directness, statistics, freshness) with published weights and history delta. Low-confidence answers are withheld.
 
 ### 6. Confidence-gated scoring
 
@@ -684,13 +684,12 @@ CI runs `cargo check --all-targets`, `cargo test --all`, and the SEO gate on eve
 
 ## Ecosystem
 
-- [jev-seo](https://github.com/AkashPriyadarshii/jev-seo) — this radar (FOSS SEO and GEO CLI + MCP)
-- [jev-superpowers](https://github.com/AkashPriyadarshii/jev-superpowers) — Jev-gated agent engineering workflows
-- [jev-curate](https://github.com/AkashPriyadarshii/jev-curate) — Jev-curated content toolkit
-- [jev-git](https://github.com/AkashPriyadarshii/jev-git) — Jev reflex gates for git
-- [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android) — Precompiled TDLib binaries for four Android ABIs
-- [kharcha](https://github.com/AkashPriyadarshii/kharcha) — Offline-first UPI expense tracker for Android
-- [Prefer](https://tryprefer.com/) — AI visibility platform for understanding how ChatGPT, Claude, Gemini, and Perplexity talk about your brand
+- [jev-seo](https://github.com/AkashPriyadarshii/jev-seo) - this radar (FOSS SEO and GEO CLI + MCP)
+- [jev-superpowers](https://github.com/AkashPriyadarshii/jev-superpowers) - Jev-gated agent engineering workflows
+- [jev-curate](https://github.com/AkashPriyadarshii/jev-curate) - Jev-curated content toolkit
+- [jev-git](https://github.com/AkashPriyadarshii/jev-git) - Jev reflex gates for git
+- [tdlib-android](https://github.com/AkashPriyadarshii/tdlib-android) - Precompiled TDLib binaries for four Android ABIs
+- [kharcha](https://github.com/AkashPriyadarshii/kharcha) - Offline-first UPI expense tracker for Android
 
 ---
 
@@ -699,18 +698,20 @@ CI runs `cargo check --all-targets`, `cargo test --all`, and the SEO gate on eve
 **Akash Priyadarshi**  
 Patna, Bihar, India  
 
+Akash Priyadarshi, self-taught developer & open-source builder from Patna, Bihar, India. Rust systems tooling, AI agents, Android internals.
+
 - GitHub: [@AkashPriyadarshii](https://github.com/AkashPriyadarshii)
 - Portfolio: [akashpriyadarshi.is-a.dev](https://akashpriyadarshi.is-a.dev) · Project page: [akashpriyadarshi.is-a.dev/projects/jev-seo/](https://akashpriyadarshi.is-a.dev/projects/jev-seo/)
-- LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akash-priyadarshi-1aa51b37a)
+- LinkedIn: [Akash Priyadarshi](https://linkedin.com/in/akashpriyadarshii)
 - Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)
 
-**Social:** [X / Twitter](https://x.com/Akash__ydv001) · [Threads](https://www.threads.net/@akash.priyadarshii) · [Instagram](https://www.instagram.com/akash.priyadarshii/) · [Reddit](https://reddit.com/user/akashpriyadarshi)
+**Social:** [X / Twitter](https://x.com/Akash__ydv001) · [Threads](https://www.threads.net/@akash.priyadarshii) · [Instagram](https://www.instagram.com/akash.priyadarshii/) · [Reddit](https://reddit.com/user/akashpriyadarshii)
 
 ---
 
 ## Contributors
 
-- [@jerryrat](https://github.com/jerryrat) — paid search provider path and DuckDuckGo header research (PR #2)
+- [@jerryrat](https://github.com/jerryrat) - paid search provider path and DuckDuckGo header research (PR #2)
 
 ---
 

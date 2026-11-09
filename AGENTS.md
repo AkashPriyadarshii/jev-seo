@@ -19,7 +19,7 @@
 Every marketing page or documentation footer must reference:
 - **Ecosystem**: `jev-superpowers`, `jev-curate`, `tdlib-android`, `kharcha`
 - **Author**: Akash Priyadarshi (Patna, Bihar, India)
-- **Links**: Portfolio (https://akashpriyadarshi.vercel.app), GitHub (https://github.com/AkashPriyadarshii)
+- **Links**: Portfolio (https://akashpriyadarshi.is-a.dev), GitHub (https://github.com/AkashPriyadarshii)
 
 ## Live Site Deploy
 - Site files live in **`master/site/`** (vendored, `linguist-vendored`). GitHub Pages is off; Vercel serves `site/` as canonical. Edit `site/` on `master`; push on go.
