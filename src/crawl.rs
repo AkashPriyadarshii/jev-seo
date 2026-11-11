@@ -251,8 +251,9 @@ pub fn robots_sitemaps(body: &str) -> Vec<String> {
 pub fn is_sitemap_xml(body: &str) -> bool {
     let low = body.to_ascii_lowercase();
     // Yoast indexes use <sitemapindex>, plain sitemaps use <urlset>; both carry <loc>.
-    (low.contains("<urlset") || low.contains("<sitemapindex") || low.contains("<sitemap"))
-        && low.contains("<loc>")
+    // Spec root tags only: a broad `<sitemap>` substring matches HTML pages
+    // that merely link two sitemaps, which then get parsed as XML and scored as pages.
+    low.contains("<urlset") || low.contains("<sitemapindex")
 }
 
 fn fetch_sitemap_body(url: &str) -> Option<String> {
@@ -301,7 +302,20 @@ fn expand_sitemap_locs(xml: &str) -> Vec<String> {
         }
     }
     if pages.is_empty() {
-        // Index fetch failed (network/empty) — fall back to locs themselves so caller still seeds something
+        // Index fetch failed (network/empty) — fall back to locs, but only entries
+        // that look like pages: at index level, locs are child sitemap files, and
+        // seeding those as crawl targets scores .xml as content pages.
+        let pages_only: Vec<String> = locs
+            .iter()
+            .filter(|u| {
+                let l = u.to_ascii_lowercase();
+                !(l.ends_with(".xml") || l.ends_with(".xml.gz") || l.ends_with(".gz"))
+            })
+            .cloned()
+            .collect();
+        if !pages_only.is_empty() {
+            return pages_only;
+        }
         return locs;
     }
     pages

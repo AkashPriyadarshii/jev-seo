@@ -928,9 +928,15 @@ pub fn check_crawl(rep: &crate::crawl::CrawlReport) -> Vec<Finding> {
         {
             out.push(mk("R44", p.url.clone(), "no content-encoding".into()));
         }
-        if p.url.starts_with("http://") {
-            out.push(mk("R47", p.url.clone(), "plain HTTP".into()));
-        }
+    // Site-level, not per-page: an all-HTTP site otherwise emits 500 R47s.
+    let http_pages = rep.pages.iter().filter(|p| p.url.starts_with("http://")).count();
+    if http_pages > 0 {
+        out.push(mk(
+            "R47",
+            rep.start_url.clone(),
+            format!("{} of {} pages plain HTTP", http_pages, rep.pages.len()),
+        ));
+    }
         if p.hops.len() >= 5 || p.hops.iter().any(|(_, u)| u == &p.final_url) {
             out.push(mk("R04", p.url.clone(), format!("{} hops", p.hops.len())));
         }
@@ -1074,7 +1080,9 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
                 ),
             ));
         }
-        if r.word_count > 0 && (r.em_dash_count as f64) * 500.0 / (r.word_count.max(1) as f64) > 2.0
+        if r.word_count > 0
+            && r.em_dash_count >= 2
+            && (r.em_dash_count as f64) * 500.0 / (r.word_count.max(1) as f64) > 2.0
         {
             out.push(mk(
                 "R20",
@@ -1152,6 +1160,7 @@ pub fn check_audit(rep: &crate::audit::DirectoryAuditReport) -> Vec<Finding> {
             let mut f = mk("R08", scope.clone(), "JS-only shell: thin readable text with heavy script payload (ponytail: warn only, render with --features js)".into());
             f.severity = Severity::Low;
             out.push(f);
+            out.push(mk("R64", scope.clone(), "Render/source divergence heuristic: page detected as JS-only shell; rendered-DOM verification is not implemented yet, so divergence is assumed, not measured".into()));
         }
         if !r.schema_missing_required.is_empty() {
             out.push(mk(

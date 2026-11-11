@@ -2740,6 +2740,11 @@ Sitemap: https://example.com/sitemap.xml
             "<html><body><a href=\"/a\">a</a></body></html>"
         ));
         assert!(!is_sitemap_xml(""));
+        // HTML page that merely links two sitemaps must not parse as a sitemap
+        // (regression: broad `<sitemap>` substring matched its link text).
+        assert!(!is_sitemap_xml(
+            r#"<html><body><a href="/s1.xml">sitemap</a><a href="/s2.xml">sitemap</a></body></html>"#
+        ));
     }
 
     #[test]

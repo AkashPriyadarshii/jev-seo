@@ -42,7 +42,7 @@ impl Sampler for NoSampler {
 /// the same stdio pair and waits for the matching response id. Notifications
 /// are skipped; responses for unknown ids keep waiting instead of dropping.
 pub(crate) struct StdioSampler<'a> {
-    lines: std::io::Lines<std::io::StdinLock<'a>>,
+    rdr: std::io::StdinLock<'a>,
     stdout: &'a mut std::io::Stdout,
     next_id: u64,
     /// Set from the client's `initialize` params: no declared capability,
@@ -50,10 +50,43 @@ pub(crate) struct StdioSampler<'a> {
     sampling_allowed: bool,
 }
 
+/// Next non-empty client line, or None on EOF/error. Reads with a byte cap:
+/// an unbounded `read_line` lets a hostile client stream megabytes without a
+/// newline and balloon RSS on a small-memory box. Over-cap chunks are
+/// truncated; parse error handling downstream turns each into a -32700 reply.
+const MCP_LINE_CAP: usize = 8 * 1024 * 1024;
+
+fn capped_line(rdr: &mut std::io::StdinLock) -> Option<String> {
+    let mut buf: Vec<u8> = Vec::new();
+    let mut over_cap = false;
+    loop {
+        let avail = rdr.fill_buf().ok()?;
+        if avail.is_empty() {
+            break; // EOF
+        }
+        let newl = avail.iter().position(|&b| b == b'\n');
+        let take = newl.map(|i| i + 1).unwrap_or(avail.len());
+        if !over_cap && buf.len() + take <= MCP_LINE_CAP {
+            buf.extend_from_slice(&avail[..take]);
+        } else {
+            over_cap = true;
+        }
+        rdr.consume(take);
+        if newl.is_some() {
+            break;
+        }
+    }
+    if buf.is_empty() && !over_cap {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&buf).into_owned();
+    Some(s.trim_end_matches(['\r', '\n']).to_string())
+}
+
 impl<'a> StdioSampler<'a> {
-    fn new(lines: std::io::Lines<std::io::StdinLock<'a>>, stdout: &'a mut std::io::Stdout) -> Self {
+    fn new(stdout: &'a mut std::io::Stdout, rdr: std::io::StdinLock<'a>) -> Self {
         Self {
-            lines,
+            rdr,
             stdout,
             next_id: 0,
             sampling_allowed: false,
@@ -63,10 +96,10 @@ impl<'a> StdioSampler<'a> {
     /// Next non-empty client line, or None on EOF/error.
     fn next_line(&mut self) -> Option<String> {
         loop {
-            match self.lines.next()? {
-                Ok(t) if t.trim().is_empty() => continue,
-                Ok(t) => return Some(t),
-                Err(_) => return None,
+            match capped_line(&mut self.rdr) {
+                None => return None,
+                Some(t) if t.trim().is_empty() => continue,
+                Some(t) => return Some(t),
             }
         }
     }
@@ -138,7 +171,7 @@ fn sample_text(result: Option<&serde_json::Value>) -> Option<String> {
 pub fn run_stdio_server() -> Result<()> {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
-    let mut sampler = StdioSampler::new(stdin.lock().lines(), &mut stdout);
+    let mut sampler = StdioSampler::new(&mut stdout, stdin.lock());
 
     while let Some(text) = sampler.next_line() {
         let req: RpcRequest = match serde_json::from_str(&text) {

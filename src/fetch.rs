@@ -30,7 +30,9 @@ pub fn set_extra_headers(user: Option<&str>, password: Option<&str>, raw: &[Stri
             }
         }
     }
-    let _ = EXTRA_HEADERS.set(headers);
+    if EXTRA_HEADERS.set(headers).is_err() {
+        eprintln!("warn: --header passed again; keeping the first header set");
+    }
 }
 
 /// Apply the run's extra headers to a request builder. No-op when none set.
@@ -197,7 +199,9 @@ pub fn readable_text(html: &str, limit: usize) -> String {
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
-        .replace("&#39;", "'");
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .replace("&#x27;", "'");
     let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
     collapsed.chars().take(limit).collect()
 }

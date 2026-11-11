@@ -491,6 +491,25 @@ fn export_dir(path: &Path) -> PathBuf {
 /// half-written ledger that a later run trusts.
 pub fn write_pair(dir: &Path, manifest: &RunManifest) -> Result<(PathBuf, PathBuf)> {
     std::fs::create_dir_all(dir)?;
+    // Advisory lock: atomic renames make each write crash-safe, but two
+    // concurrent runs (CI + MCP) would still last-writer-wins the whole pair.
+    let lock_path = dir.join(".jev-seo.lock");
+    let lock = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&lock_path);
+    let _guarded = lock.map(|_f| {
+        struct G<'a>(&'a Path); // released (tombstone removed) on drop
+        impl Drop for G<'_> {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(self.0);
+            }
+        }
+        G(&lock_path)
+    });
+    // Lock held best-effort only: a stale tombstone from a crashed run must
+    // never wedge writes. Contention loses silently to the second writer rather
+    // than corrupting anything — acceptable for single-user CLI artifacts.
     let run_json = serde_json::to_string_pretty(manifest).context("serialize run.json")?;
     let ledger_json =
         serde_json::to_string_pretty(&manifest.ledger).context("serialize ledger.json")?;
@@ -622,7 +641,7 @@ pub fn append_eval_log(entry: serde_json::Value) {
         .map(|m| m.len() > CAP_BYTES)
         .unwrap_or(false)
     {
-        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::rename(&path, dir.join("eval.jsonl.1"));
     }
     use std::io::Write;
     if let Ok(mut f) = std::fs::OpenOptions::new()
