@@ -1,3 +1,7 @@
+<!-- yarkr:badges:start -->
+[![Indexed on Yarkr](https://api.yarkr.com/functions/v1/api/api/v1/badges/repos/AkashPriyadarshii/jev-seo/version.svg)](https://yarkr.com/arks/akashpriyadarshii/jev-seo)
+<!-- yarkr:badges:end -->
+
 ---
 
 title: "jev-seo: Free Rust SEO & GEO CLI + MCP for Devs and Agents"
@@ -378,6 +382,38 @@ MCP config for any client:
 ```
 
 ---
+
+<!-- yarkr:install:start -->
+## Install with Yarkr
+
+This repo is indexed on [Yarkr](https://yarkr.com/arks/akashpriyadarshii/jev-seo) as the ark [akashpriyadarshii/jev-seo](https://yarkr.com/arks/akashpriyadarshii/jev-seo), so its skills install into Claude Code, Codex, Cursor and other agent harnesses with one command.
+
+### CLI
+
+Install the whole ark, which Yarkr keeps equal to this repo:
+
+```bash
+npx yarkr-cli sync akashpriyadarshii/jev-seo
+```
+
+Or add individual skills:
+
+```bash
+npx yarkr-cli add skill:akashpriyadarshii/jev-seo/jev-seo
+```
+
+No Node.js? `curl -fsSL https://yarkr.com/install.sh | sh` (macOS, Linux) or `irm https://yarkr.com/install.ps1 | iex` (Windows PowerShell) installs `yarkr` as a standalone binary; then type `yarkr` in place of `npx yarkr-cli`.
+
+### MCP
+
+Connect your agent to the ark over MCP:
+
+```bash
+npx yarkr-cli mcp add akashpriyadarshii/jev-seo
+```
+
+Or point any MCP client at `https://api.yarkr.com/functions/v1/api/mcp/o/akashpriyadarshii/jev-seo`.
+<!-- yarkr:install:end -->
 
 ## Workflows
 
