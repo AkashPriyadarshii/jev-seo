@@ -12,6 +12,10 @@ Free Rust SEO and GEO CLI with a 19-tool MCP server for developers and coding ag
 [![stars](https://img.shields.io/github/stars/AkashPriyadarshii/jev-seo?style=flat-square&label=stars)](https://github.com/AkashPriyadarshii/jev-seo/stargazers)
 [![Live Site](https://img.shields.io/badge/site-jevseo.vercel.app-black?style=flat-square)](https://jevseo.vercel.app)
 
+<p>
+  <a href="https://www.producthunt.com/products/jev-seo?utm_source=badge-follow&utm_medium=badge&utm_source=badge-jev-seo" target="_blank" rel="noopener"><img src="https://api.producthunt.com/widgets/embed-image/v1/follow.svg?product_id=1325282&theme=light" alt="jev-seo on Product Hunt" width="180" height="39" /></a>
+</p>
+
 <img src="docs/assets/banner.png" alt="jev-seo banner: free Rust SEO and GEO CLI with 64 rules, 19 MCP tools, and zero-cost local execution" width="100%">
 
 ---
@@ -413,5 +417,4 @@ Rank history, GEO history, and baselines stay in local `.jev-seo.db`. Audits run
 
 <p>
   <a href="https://buymeacoffee.com/AkashPriyadarshi"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" /></a>
-  <a href="https://www.producthunt.com/products/jev-seo?utm_source=badge-follow&utm_medium=badge&utm_source=badge-jev-seo" target="_blank" rel="noopener"><img src="https://api.producthunt.com/widgets/embed-image/v1/follow.svg?product_id=1325282&theme=light" alt="jev-seo on Product Hunt" width="180" height="39" /></a>
 </p>
