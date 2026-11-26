@@ -1265,6 +1265,21 @@ Sitemap: https://example.com/sitemap.xml
         assert!(rep.invalid_hreflang_codes[0].contains("en-GB"));
         assert!(rep.warnings.iter().any(|w| w.contains("Insecure HTTP")));
         assert!(rep.warnings.iter().any(|w| w.contains("Query Parameters")));
+
+        let no_x_default = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+                xmlns:xhtml="http://www.w3.org/1999/xhtml">
+            <url>
+                <loc>https://example.com/en/page</loc>
+                <xhtml:link rel="alternate" hreflang="en-US" href="https://example.com/en/page"/>
+            </url>
+        </urlset>"#;
+        let rep2 = parse_sitemap_xml("https://example.com/sitemap.xml", no_x_default).unwrap();
+        assert!(rep2.is_valid);
+        assert!(rep2
+            .warnings
+            .iter()
+            .any(|w| w.contains("recommended 'x-default'")));
     }
 
     #[test]

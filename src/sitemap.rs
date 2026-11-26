@@ -124,7 +124,7 @@ pub fn parse_sitemap_xml(target: &str, xml: &str) -> Result<SitemapReport> {
     }
 
     if hreflang_count > 0 && !has_x_default {
-        warnings.push("Multilingual hreflang annotations found but missing required 'x-default' fallback entry.".into());
+        warnings.push("Multilingual hreflang annotations found without a recommended 'x-default' fallback entry.".into());
     }
 
     if !invalid_hreflang_codes.is_empty() {

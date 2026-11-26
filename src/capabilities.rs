@@ -48,6 +48,7 @@ pub const COMMANDS: &[&str] = &[
     "bundle",
     "drift",
     "gsc",
+    "bing",
     "mcp",
     "serve",
     "capabilities",
