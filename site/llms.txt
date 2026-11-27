@@ -2,10 +2,10 @@
 
 > FOSS zero-cost SEO & GEO search radar for developers and AI agents. Rust CLI + MCP. No subscriptions, no credit card.
 
-- Homepage: https://jevseo.vercel.app/
-- Real audit field report: https://jevseo.vercel.app/real-audit.html
-- Repo: https://github.com/AkashPriyadarshii/jev-seo
-- Sitemap: https://jevseo.vercel.app/sitemap.xml
+- [Homepage](https://jevseo.vercel.app/): Overview, CLI quickstart, and MCP setup
+- [Real audit field report](https://jevseo.vercel.app/real-audit.html): Live audit case study
+- [GitHub Repository](https://github.com/AkashPriyadarshii/jev-seo): Source code and releases
+- [Sitemap](https://jevseo.vercel.app/sitemap.xml): XML sitemap
 
 ## When to use this
 
